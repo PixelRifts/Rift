@@ -86,6 +86,7 @@ struct P_Expr {
 typedef u32 P_StmtType;
 enum {
     StmtType_Expression, StmtType_Block, StmtType_Return, StmtType_If,
+    StmtType_IfElse,
     StmtType_VarDecl, StmtType_FuncDecl,
 };
 
@@ -100,6 +101,7 @@ struct P_Stmt {
         struct { P_ValueType type; string name; } var_decl;
         struct { P_ValueType type; P_Stmt* block; string name; u32 arity; P_ValueType* param_types; string* param_names; } func_decl;
         struct { P_Expr* condition; P_Stmt* then; } if_s;
+        struct { P_Expr* condition; P_Stmt* then; P_Stmt* else_s; } if_else;
     } op;
 };
 

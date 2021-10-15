@@ -1,7 +1,8 @@
 bool foo(int x, bool y) {
-	if ((1 + 2) == (2 + 1)) {
+	if ((1 + 2) == (2 + 1))
 		return false;
-	}
+	else
+		return true;
 	return true;
 }
 

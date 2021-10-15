@@ -245,8 +245,8 @@ static void report_error_at(P_Parser* parser, L_Token* token, string message, ..
     parser->panik_mode = true;
 }
 
-#define report_error(parser, message, ...) report_error_at(parser, &parser->previous, message, __VA_ARGS__)
-#define report_error_at_current(parser, message, ...) report_error_at(parser, &parser->current, message, __VA_ARGS__)
+#define report_error(parser, message, ...) report_error_at(parser, &parser->previous, message, ##__VA_ARGS__)
+#define report_error_at_current(parser, message, ...) report_error_at(parser, &parser->current, message, ##__VA_ARGS__)
 
 //~ Elpers
 void P_Advance(P_Parser* parser) {
@@ -512,6 +512,16 @@ static P_Stmt* P_MakeIfStmtNode(P_Parser* parser, P_Expr* condition, P_Stmt* the
     stmt->next = nullptr;
     stmt->op.if_s.condition = condition;
     stmt->op.if_s.then = then;
+    return stmt;
+}
+
+static P_Stmt* P_MakeIfElseStmtNode(P_Parser* parser, P_Expr* condition, P_Stmt* then, P_Stmt* else_s) {
+    P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
+    stmt->type = StmtType_IfElse;
+    stmt->next = nullptr;
+    stmt->op.if_else.condition = condition;
+    stmt->op.if_else.then = then;
+    stmt->op.if_else.else_s = else_s;
     return stmt;
 }
 
@@ -992,6 +1002,10 @@ static P_Stmt* P_StmtIf(P_Parser* parser) {
     }
     P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression"));
     P_Stmt* then = P_Statement(parser);
+    if (P_Match(parser, TokenType_Else)) {
+        P_Stmt* else_s = P_Statement(parser);
+        return P_MakeIfElseStmtNode(parser, condition, then, else_s);
+    }
     return P_MakeIfStmtNode(parser, condition, then);
 }
 

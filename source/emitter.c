@@ -142,7 +142,16 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             E_Write(emitter, "if (");
             E_EmitExpression(emitter, stmt->op.if_s.condition);
             E_WriteLine(emitter, ")");
-            E_EmitStatementChain(emitter, stmt->op.if_s.then, indent + 1);,
+            E_EmitStatement(emitter, stmt->op.if_s.then, indent + 1);
+        } break;
+        
+        case StmtType_IfElse: {
+            E_Write(emitter, "if (");
+            E_EmitExpression(emitter, stmt->op.if_else.condition);
+            E_WriteLine(emitter, ")");
+            E_EmitStatement(emitter, stmt->op.if_else.then, indent + 1);
+            E_WriteLine(emitter, "else");
+            E_EmitStatement(emitter, stmt->op.if_else.else_s, indent + 1);
         } break;
     }
 }
