@@ -1130,6 +1130,11 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
             P_PrintExprAST_Indent(arena, expr->op.binary.left, indent + 1);
             P_PrintExprAST_Indent(arena, expr->op.binary.right, indent + 1);
         } break;
+        case ExprType_FuncCall: {
+            printf("%s()", expr->op.func_call.name.str);
+            for (u32 i = 0; i < expr->op.func_call.call_arity; i++)
+                P_PrintExprAST_Indent(arena, expr->op.func_call.params[i], indent + 1);
+        } break;
     }
 }
 

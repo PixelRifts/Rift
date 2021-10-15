@@ -1,4 +1,3 @@
-REM build script for engine
 @ECHO off
 SetLocal EnableDelayedExpansion
 
