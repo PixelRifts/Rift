@@ -20,4 +20,4 @@ SET defines=-D_DEBUG -DCPLATEST -D_CRT_SECURE_NO_WARNINGS
 SET output=-o bin/cpcom.exe
 
 ECHO "Building cpcom.exe..."
-clang %c_filenames% %compiler_flags% %defines% %include_flags% %linker_flags% %output%
+%cc% %c_filenames% %compiler_flags% %defines% %include_flags% %linker_flags% %output%
