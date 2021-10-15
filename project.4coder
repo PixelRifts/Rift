@@ -63,8 +63,20 @@ command_list =
 			{ "lexeronly.bat", .os = "win" },
 		},
 	},
+	{
+		.name = "parseronly",
+		.out = "*compilation*",
+		.footer_panel = true,
+		.save_dirty_files = true,
+		.cursor_at_end = false,
+		.cmd =
+		{
+			{ "parseronly.bat", .os = "win" },
+		},
+	},
 };
 
 fkey_command[1] = "build";
 fkey_command[2] = "run";
 fkey_command[3] = "lexeronly";
+fkey_command[4] = "parseronly";

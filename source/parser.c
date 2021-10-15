@@ -1159,9 +1159,39 @@ static void P_PrintAST_Indent(M_Arena* arena, P_Stmt* stmt, u8 indent) {
             printf("Expression Statement:\n");
             P_PrintExprAST_Indent(arena, stmt->op.expression, indent + 1);
         } break;
+        case StmtType_If: {
+            printf("If Statement:\n");
+            P_PrintExprAST_Indent(arena, stmt->op.if_s.condition, indent + 1);
+            for (u8 i = 0; i < indent; i++)
+                printf("  ");
+            printf("Then\n");
+            P_PrintAST_Indent(arena, stmt->op.if_s.then, indent + 1);
+        } break;
+        case StmtType_IfElse: {
+            printf("If Statement:\n");
+            P_PrintExprAST_Indent(arena, stmt->op.if_else.condition, indent + 1);
+            for (u8 i = 0; i < indent; i++)
+                printf("  ");
+            printf("Then\n");
+            P_PrintAST_Indent(arena, stmt->op.if_else.then, indent + 1);
+            for (u8 i = 0; i < indent; i++)
+                printf("  ");
+            printf("Else\n");
+            P_PrintAST_Indent(arena, stmt->op.if_else.else_s, indent + 1);
+        } break;
+        case StmtType_Return: {
+            printf("Return Statement:\n");
+            P_PrintExprAST_Indent(arena, stmt->op.returned, indent + 1);
+        } break;
         case StmtType_VarDecl: {
             printf("Variable Declaration:\n\t");
             printf("%s: %s\n", stmt->op.var_decl.name.str, P__get_value_type_name__(stmt->op.var_decl.type));
+        } break;
+        case StmtType_FuncDecl: {
+            printf("Function Declaration:\n\t");
+            printf("%s: %s\n", stmt->op.func_decl.name.str, P__get_value_type_name__(stmt->op.func_decl.type));
+            if (stmt->op.block != nullptr)
+                P_PrintAST_Indent(arena, stmt->op.func_decl.block, indent + 1);
         } break;
     }
     
