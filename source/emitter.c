@@ -42,7 +42,7 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
         } break;
         
         case ExprType_LongLit: {
-            E_WriteF(emitter, "%lld", expr->op.long_lit);
+            E_WriteF(emitter, "%I64d", expr->op.long_lit);
         } break;
         
         case ExprType_FloatLit: {

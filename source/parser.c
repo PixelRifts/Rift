@@ -1097,7 +1097,7 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
             printf("%d [Integer]\n", expr->op.integer_lit);
         } break;
         case ExprType_LongLit: {
-            printf("%lld [Long]\n", expr->op.long_lit);
+            printf("%I64d [Long]\n", expr->op.long_lit);
         } break;
         case ExprType_FloatLit: {
             printf("%f [Float]\n", expr->op.float_lit);
