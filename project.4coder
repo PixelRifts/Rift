@@ -1,6 +1,6 @@
 version(1);
 
-project_name = "Top shekret";
+project_name = "Rift Transpiler";
 
 patterns =
 {

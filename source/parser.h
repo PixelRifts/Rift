@@ -38,22 +38,7 @@ enum {
     ValueTypeCollection_Bool,
 };
 
-// DO NOT CHANGE PLACES OF INT LONG FLOAT DOUBLE. WILL BREAK P_GETBINVALUETYPE()
-typedef u32 P_ValueType;
-enum {
-    ValueType_Invalid,
-    
-    ValueType_Integer,
-    ValueType_Long,
-    ValueType_Float,
-    ValueType_Double,
-    
-    ValueType_String,
-    ValueType_Char,
-    ValueType_Bool,
-    
-    ValueType_MaxCount,
-};
+typedef string P_ValueType;
 
 typedef u32 P_ExprType;
 enum {
@@ -86,8 +71,8 @@ struct P_Expr {
 typedef u32 P_StmtType;
 enum {
     StmtType_Expression, StmtType_Block, StmtType_Return, StmtType_If,
-    StmtType_IfElse,
-    StmtType_VarDecl, StmtType_FuncDecl,
+    StmtType_IfElse, StmtType_While, StmtType_DoWhile,
+    StmtType_VarDecl, StmtType_FuncDecl, StmtType_StructDecl,
 };
 
 typedef struct P_Stmt P_Stmt;
@@ -98,13 +83,17 @@ struct P_Stmt {
         P_Expr* expression;
         P_Expr* returned;
         P_Stmt* block;
+        
         struct { P_ValueType type; string name; } var_decl;
-        struct { P_ValueType type; P_Stmt* block; string name; u32 arity; P_ValueType* param_types; string* param_names; } func_decl;
+        struct { string name; u32 arity; P_ValueType* param_types; string* param_names; P_ValueType type; P_Stmt* block; } func_decl;
+        struct { string name; u32 member_count; P_ValueType* member_types; string* member_names; } struct_decl;
+        
         struct { P_Expr* condition; P_Stmt* then; } if_s;
         struct { P_Expr* condition; P_Stmt* then; P_Stmt* else_s; } if_else;
+        struct { P_Expr* condition; P_Stmt* then; } while_s;
+        struct { P_Expr* condition; P_Stmt* then; } do_while;
     } op;
 };
-
 
 typedef struct var_entry_key {
     string name;
@@ -153,6 +142,24 @@ b8   func_hash_table_set(func_hash_table* table, func_entry_key key, P_ValueType
 b8   func_hash_table_del(func_hash_table* table, func_entry_key key);
 void func_hash_table_add_all(func_hash_table* from, func_hash_table* to);
 
+typedef struct P_Struct {
+    string name;
+    u32 depth;
+    u32 member_count;
+    P_ValueType* member_types;
+    string* member_names;
+} P_Struct;
+
+typedef struct struct_array {
+    u32 capacity;
+    u32 count;
+    P_Struct* elements;
+} struct_array;
+
+void struct_array_init(struct_array* array);
+void struct_array_free(struct_array* array);
+void struct_array_add(struct_array* array, P_Struct structure);
+
 typedef struct P_Parser {
     M_Arena arena;
     L_Lexer lexer;
@@ -165,6 +172,7 @@ typedef struct P_Parser {
     u32 scope_depth;
     var_hash_table variables;
     func_hash_table functions;
+    struct_array structures;
     
     b8 had_error;
     b8 panik_mode;
@@ -181,7 +189,5 @@ void P_Parse(P_Parser* parser);
 void P_Free(P_Parser* parser);
 void P_PrintExprAST(P_Expr* expr);
 void P_PrintAST(P_Stmt* stmt);
-
-const char* P__get_value_type_name__(P_ValueType val);
 
 #endif //PARSER_H

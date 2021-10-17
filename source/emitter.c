@@ -122,20 +122,30 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
         } break;
         
         case StmtType_VarDecl: {
-            E_WriteF(emitter, "%s %.*s", P__get_value_type_name__(stmt->op.var_decl.type), stmt->op.var_decl.name.size, stmt->op.var_decl.name.str);
+            E_WriteF(emitter, "%s %.*s", stmt->op.var_decl.type.str, stmt->op.var_decl.name.size, stmt->op.var_decl.name.str);
             E_WriteLine(emitter, ";");
         } break;
         
         case StmtType_FuncDecl: {
-            E_WriteF(emitter, "%s %.*s(", P__get_value_type_name__(stmt->op.var_decl.type), stmt->op.func_decl.name.size, stmt->op.func_decl.name.str);
+            E_WriteF(emitter, "%s %.*s(", stmt->op.func_decl.type.str, stmt->op.func_decl.name.size, stmt->op.func_decl.name.str);
             for (u32 i = 0; i < stmt->op.func_decl.arity; i++) {
-                E_WriteF(emitter, "%s %.*s", P__get_value_type_name__(stmt->op.func_decl.param_types[i]), stmt->op.func_decl.param_names[i].size, stmt->op.func_decl.param_names[i].str);
+                E_WriteF(emitter, "%s %.*s", stmt->op.func_decl.param_types[i].str, stmt->op.func_decl.param_names[i].size, stmt->op.func_decl.param_names[i].str);
                 if (i != stmt->op.func_decl.arity - 1)
                     E_Write(emitter, ", ");
             }
             E_WriteLine(emitter, ") {");
             E_EmitStatementChain(emitter, stmt->op.func_decl.block, indent + 1);
             E_WriteLine(emitter, "}");
+        } break;
+        
+        case StmtType_StructDecl: {
+            E_WriteLineF(emitter, "struct %.*s {", stmt->op.struct_decl.name.size, stmt->op.struct_decl.name.str);
+            for (u32 i = 0; i < stmt->op.struct_decl.member_count; i++) {
+                for (u32 idt = 0; idt < indent + 1; idt++)
+                    E_Write(emitter, "\t");
+                E_WriteLineF(emitter, "%s %.*s;", stmt->op.struct_decl.member_types[i].str, stmt->op.struct_decl.member_names[i].size, stmt->op.struct_decl.member_names[i].str);
+            }
+            E_WriteLine(emitter, "};");
         } break;
         
         case StmtType_If: {
@@ -152,6 +162,21 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             E_EmitStatement(emitter, stmt->op.if_else.then, indent + 1);
             E_WriteLine(emitter, "else");
             E_EmitStatement(emitter, stmt->op.if_else.else_s, indent + 1);
+        } break;
+        
+        case StmtType_While: {
+            E_Write(emitter, "while (");
+            E_EmitExpression(emitter, stmt->op.while_s.condition);
+            E_WriteLine(emitter, ")");
+            E_EmitStatement(emitter, stmt->op.while_s.then, indent + 1);
+        } break;
+        
+        case StmtType_DoWhile: {
+            E_WriteLine(emitter, "do");
+            E_EmitStatement(emitter, stmt->op.do_while.then, indent + 1);
+            E_Write(emitter, " while (");
+            E_EmitExpression(emitter, stmt->op.while_s.condition);
+            E_WriteLine(emitter, ");");
         } break;
     }
 }
