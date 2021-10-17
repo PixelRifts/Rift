@@ -122,12 +122,12 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
         } break;
         
         case StmtType_VarDecl: {
-            E_WriteF(emitter, "%s %.*s", stmt->op.var_decl.type.str, stmt->op.var_decl.name.size, stmt->op.var_decl.name.str);
+            E_WriteF(emitter, "%.*s %.*s", stmt->op.var_decl.type.size, stmt->op.var_decl.type.str, stmt->op.var_decl.name.size, stmt->op.var_decl.name.str);
             E_WriteLine(emitter, ";");
         } break;
         
         case StmtType_FuncDecl: {
-            E_WriteF(emitter, "%s %.*s(", stmt->op.func_decl.type.str, stmt->op.func_decl.name.size, stmt->op.func_decl.name.str);
+            E_WriteF(emitter, "%.*s %.*s(", stmt->op.func_decl.type.size, stmt->op.func_decl.type.str, stmt->op.func_decl.name.size, stmt->op.func_decl.name.str);
             for (u32 i = 0; i < stmt->op.func_decl.arity; i++) {
                 E_WriteF(emitter, "%s %.*s", stmt->op.func_decl.param_types[i].str, stmt->op.func_decl.param_names[i].size, stmt->op.func_decl.param_names[i].str);
                 if (i != stmt->op.func_decl.arity - 1)
@@ -139,13 +139,13 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
         } break;
         
         case StmtType_StructDecl: {
-            E_WriteLineF(emitter, "struct %.*s {", stmt->op.struct_decl.name.size, stmt->op.struct_decl.name.str);
+            E_WriteLineF(emitter, "typedef struct %.*s {", stmt->op.struct_decl.name.size, stmt->op.struct_decl.name.str);
             for (u32 i = 0; i < stmt->op.struct_decl.member_count; i++) {
                 for (u32 idt = 0; idt < indent + 1; idt++)
                     E_Write(emitter, "\t");
                 E_WriteLineF(emitter, "%s %.*s;", stmt->op.struct_decl.member_types[i].str, stmt->op.struct_decl.member_names[i].size, stmt->op.struct_decl.member_names[i].str);
             }
-            E_WriteLine(emitter, "};");
+            E_WriteLineF(emitter, "} %.*s;", stmt->op.struct_decl.name.size, stmt->op.struct_decl.name.str);
         } break;
         
         case StmtType_If: {

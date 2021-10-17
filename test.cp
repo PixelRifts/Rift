@@ -1,19 +1,10 @@
+struct yolo {
+	int nullable;
+}
+
 int foo(int x, bool y) {
-	while (y) {
-		int hahayes;
-		return 10;
-	}
-	if (y) {
-		int hahayesIF;
-		hahayesIF = 19;
-		return hahayesIF;
-	}
-	do {
-		int hahayesDO;
-		hahayesDO = 54;
-		return hahayesDO;
-	} while (true);
-	return 10;
+	yolo haha;
+	return 0;
 }
 
 int main() {

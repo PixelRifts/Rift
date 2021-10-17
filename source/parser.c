@@ -322,12 +322,19 @@ static void P_Sync(P_Parser* parser) {
 }
 
 static b8 P_IsTypeToken(P_Parser* parser) {
-    return P_Match(parser, TokenType_Int) ||
+    if (P_Match(parser, TokenType_Int)    ||
         P_Match(parser, TokenType_Long)   ||
         P_Match(parser, TokenType_Float)  ||
         P_Match(parser, TokenType_Double) ||
         P_Match(parser, TokenType_Char)   ||
-        P_Match(parser, TokenType_Bool);
+        P_Match(parser, TokenType_Bool)) return true;
+    if (parser->current.type == TokenType_Identifier) {
+        if (structure_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
+            P_Advance(parser);
+            return true;
+        }
+    }
+    return false;
 }
 
 static P_ValueType P_TypeTokenToValueType(P_Parser* parser) {
@@ -339,7 +346,7 @@ static P_ValueType P_TypeTokenToValueType(P_Parser* parser) {
         case TokenType_Char:   return ValueType_Char;
         case TokenType_Bool:   return ValueType_Bool;
     }
-    return ValueType_Invalid;
+    return (P_ValueType) { .str = parser->previous.start, .size = parser->previous.length };
 }
 
 static string P_FuncNameMangle(P_Parser* parser, string name, u32 arity, P_ValueType* params, string additional_info) {
@@ -350,9 +357,6 @@ static string P_FuncNameMangle(P_Parser* parser, string name, u32 arity, P_Value
     if (additional_info.size != 0) string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "_%s", additional_info));
     return string_list_flatten(&parser->arena, &sl);
 }
-
-// void hahayes(int x) {  }
-// hahayes_1int {}
 
 //~ Binding
 static b8 P_CheckValueType(P_ValueTypeCollection expected, P_ValueType type) {
@@ -837,6 +841,13 @@ static P_Expr* P_ExprBinary(P_Parser* parser, P_Expr* left) {
     return P_MakeBinaryNode(parser, op_type, left, right, ret_type);
 }
 
+static P_Expr* P_ExprDot(P_Parser* parser, P_Expr* left) {
+    if (left->type != ExprType_Variable) {
+        report_error(parser, str_lit("Cannot apply . operator\n"));
+    }
+    return nullptr;
+}
+
 P_ParseRule parse_rules[] = {
     [TokenType_Error]            = { nullptr, nullptr, Prec_None },
     [TokenType_EOF]              = { nullptr, nullptr, Prec_None },
@@ -883,7 +894,7 @@ P_ParseRule parse_rules[] = {
     [TokenType_CloseBrace]       = { nullptr, nullptr, Prec_None },
     [TokenType_CloseParenthesis] = { nullptr, nullptr, Prec_None },
     [TokenType_CloseBracket]     = { nullptr, nullptr, Prec_None },
-    [TokenType_Dot]              = { nullptr, nullptr, Prec_None },
+    [TokenType_Dot]              = { nullptr, P_ExprDot, Prec_None },
     [TokenType_Semicolon]        = { nullptr, nullptr, Prec_None },
     [TokenType_Colon]            = { nullptr, nullptr, Prec_None },
     [TokenType_Question]         = { nullptr, nullptr, Prec_None },
@@ -1099,7 +1110,7 @@ static P_Stmt* P_StmtReturn(P_Parser* parser) {
     P_Expr* val = P_Expression(parser);
     if (val == nullptr) return nullptr;
     if (!str_eq(val->ret_type, parser->function_body_ret))
-        report_error(parser, str_lit("Function return type mismatch. Expected %s\n"), parser->function_body_ret.str);
+        report_error(parser, str_lit("Function return type mismatch. Expected %.*s\n"), parser->function_body_ret.size, parser->function_body_ret.str);
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after return statement\n"));
     return P_MakeReturnStmtNode(parser, val);
 }
