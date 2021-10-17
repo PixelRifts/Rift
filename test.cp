@@ -1,7 +1,3 @@
-struct yolo {
-	int x;
-}
-
 int foo(int x, bool y) {
 	while (y) {
 		int hahayes;

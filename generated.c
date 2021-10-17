@@ -1,15 +1,18 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-struct yolo {
-	int x;
-};
 int foo_2intbool(int x, bool y) {
 	while (y)
 		{
+			struct yolo {
+				int x;
+};
 			int hahayes;
 			return 10;
 }
+	struct yolo {
+		int x;
+};
 	if (y)
 		{
 			int hahayesIF;

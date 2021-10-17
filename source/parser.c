@@ -253,9 +253,9 @@ void struct_array_add(struct_array* array, P_Struct structure) {
     array->count++;
 }
 
-static b8 structure_exists(P_Parser* parser, string struct_name) {
+static b8 structure_exists(P_Parser* parser, string struct_name, u32 depth) {
     for (u32 i = 0; i < parser->structures.count; i++) {
-        if (str_eq(struct_name, parser->structures.elements[i].name))
+        if (str_eq(struct_name, parser->structures.elements[i].name) && parser->structures.elements[i].depth <= depth)
             return true;
     }
     return false;
@@ -1030,12 +1030,12 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser) {
     P_Consume(parser, TokenType_Identifier, str_lit("Expected Struct name after keyword 'struct'\n"));
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     
-    if (structure_exists(parser, name))
+    if (structure_exists(parser, name, parser->scope_depth))
         report_error(parser, str_lit("Cannot redeclare structure with name %.*s\n"), name.size, name.str);
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Struct Name\n"));
     
     u64 idx = parser->structures.count;
-    struct_array_add(&parser->structures, (P_Struct) { .name = name });
+    struct_array_add(&parser->structures, (P_Struct) { .name = name, .depth = parser->scope_depth });
     
     u32 member_count = 0;
     string member_names[1024];
