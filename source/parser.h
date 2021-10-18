@@ -45,13 +45,14 @@ enum {
     ExprType_IntLit, ExprType_LongLit, ExprType_FloatLit, ExprType_DoubleLit,
     ExprType_StringLit, ExprType_CharLit, ExprType_BoolLit,
     ExprType_Unary, ExprType_Binary, ExprType_Assignment, ExprType_Variable,
-    ExprType_FuncCall
+    ExprType_FuncCall, ExprType_Dot
 };
 
 typedef struct P_Expr P_Expr;
 struct P_Expr {
     P_ExprType type;
     P_ValueType ret_type;
+    b8 can_assign;
     union {
         i32    integer_lit;
         i64    long_lit;
@@ -62,7 +63,8 @@ struct P_Expr {
         string string_lit;
         struct { L_TokenType operator; P_Expr* left; P_Expr* right; } binary;
         struct { L_TokenType operator; P_Expr* operand; } unary;
-        struct { string name; P_Expr* value; } assignment;
+        struct { P_Expr* left; string right; } dot;
+        struct { P_Expr* name; P_Expr* value; } assignment;
         string variable;
         struct { string name; P_Expr** params; u32 call_arity; } func_call;
     } op;

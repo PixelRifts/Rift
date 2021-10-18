@@ -44,8 +44,10 @@ static var_table_entry* find_var_entry(var_table_entry* entries, i32 cap, var_en
                 return tombstone_e != nullptr ? tombstone_e : entry;
             else
                 if (tombstone_e == nullptr) tombstone_e = entry;
-        } else if (str_eq(entry->key.name, key.name) && entry->key.depth == key.depth)
+        } else if (entry->key.name.size == key.name.size)
+            if (memcmp(entry->key.name.str, key.name.str, key.name.size) == 0 && entry->key.depth == key.depth) {
             return entry;
+        }
         idx = (idx + 1) % cap;
     }
 }
@@ -249,13 +251,37 @@ void struct_array_add(struct_array* array, P_Struct structure) {
         memmove(array->elements, prev, array->count * sizeof(P_Struct));
         free(prev);
     }
-    array->elements[array->count] = structure;
+    *(array->elements + array->count) = structure;
     array->count++;
+}
+
+static P_Struct* struct_array_get(P_Parser* parser, string struct_name, u32 depth) {
+    for (u32 i = 0; i < parser->structures.count; i++) {
+        if (str_eq(struct_name, parser->structures.elements[i].name) && parser->structures.elements[i].depth <= depth)
+            return &parser->structures.elements[i];
+    }
+    return nullptr;
 }
 
 static b8 structure_exists(P_Parser* parser, string struct_name, u32 depth) {
     for (u32 i = 0; i < parser->structures.count; i++) {
         if (str_eq(struct_name, parser->structures.elements[i].name) && parser->structures.elements[i].depth <= depth)
+            return true;
+    }
+    return false;
+}
+
+static P_ValueType member_type_get(P_Struct* structure, string reqd) {
+    for (u32 i = 0; i < structure->member_count; i++) {
+        if (str_eq(structure->member_names[i], reqd))
+            return structure->member_types[i];
+    }
+    return ValueType_Invalid;
+}
+
+static b8 member_exists(P_Struct* structure, string reqd) {
+    for (u32 i = 0; i < structure->member_count; i++) {
+        if (str_eq(structure->member_names[i], reqd))
             return true;
     }
     return false;
@@ -429,6 +455,7 @@ static P_Expr* P_MakeIntNode(P_Parser* parser, i32 value) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_IntLit;
     expr->ret_type = ValueType_Integer;
+    expr->can_assign = false;
     expr->op.integer_lit = value;
     return expr;
 }
@@ -437,6 +464,7 @@ static P_Expr* P_MakeLongNode(P_Parser* parser, i64 value) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_LongLit;
     expr->ret_type = ValueType_Long;
+    expr->can_assign = false;
     expr->op.long_lit = value;
     return expr;
 }
@@ -445,6 +473,7 @@ static P_Expr* P_MakeFloatNode(P_Parser* parser, f32 value) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_FloatLit;
     expr->ret_type = ValueType_Long;
+    expr->can_assign = false;
     expr->op.float_lit = value;
     return expr;
 }
@@ -453,6 +482,7 @@ static P_Expr* P_MakeDoubleNode(P_Parser* parser, f64 value) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_DoubleLit;
     expr->ret_type = ValueType_Double;
+    expr->can_assign = false;
     expr->op.double_lit = value;
     return expr;
 }
@@ -461,6 +491,7 @@ static P_Expr* P_MakeStringNode(P_Parser* parser, string value) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_StringLit;
     expr->ret_type = ValueType_String;
+    expr->can_assign = false;
     expr->op.string_lit = value;
     return expr;
 }
@@ -469,6 +500,7 @@ static P_Expr* P_MakeCharNode(P_Parser* parser, string value) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_CharLit;
     expr->ret_type = ValueType_Char;
+    expr->can_assign = false;
     expr->op.char_lit = value;
     return expr;
 }
@@ -477,6 +509,7 @@ static P_Expr* P_MakeBoolNode(P_Parser* parser, b8 value) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_BoolLit;
     expr->ret_type = ValueType_Bool;
+    expr->can_assign = false;
     expr->op.bool_lit = value;
     return expr;
 }
@@ -485,6 +518,7 @@ static P_Expr* P_MakeUnaryNode(P_Parser* parser, L_TokenType type, P_Expr* opera
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_Unary;
     expr->ret_type = ret_type;
+    expr->can_assign = false;
     expr->op.unary.operator = type;
     expr->op.unary.operand = operand;
     return expr;
@@ -494,18 +528,30 @@ static P_Expr* P_MakeBinaryNode(P_Parser* parser, L_TokenType type, P_Expr* left
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_Binary;
     expr->ret_type = ret_type;
+    expr->can_assign = false;
     expr->op.binary.operator = type;
     expr->op.binary.left = left;
     expr->op.binary.right = right;
     return expr;
 }
 
-static P_Expr* P_MakeAssignmentNode(P_Parser* parser, string name, P_Expr* value) {
+static P_Expr* P_MakeAssignmentNode(P_Parser* parser, P_Expr* name, P_Expr* value) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_Assignment;
     expr->ret_type = value->ret_type;
+    expr->can_assign = false;
     expr->op.assignment.name = name;
     expr->op.assignment.value = value;
+    return expr;
+}
+
+static P_Expr* P_MakeDotNode(P_Parser* parser, P_ValueType type, P_Expr* left, string right) {
+    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+    expr->type = ExprType_Dot;
+    expr->ret_type = type;
+    expr->can_assign = true;
+    expr->op.dot.left = left;
+    expr->op.dot.right = right;
     return expr;
 }
 
@@ -513,6 +559,7 @@ static P_Expr* P_MakeVariableNode(P_Parser* parser, string name, P_ValueType typ
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_Variable;
     expr->ret_type = type;
+    expr->can_assign = true;
     expr->op.variable = name;
     return expr;
 }
@@ -521,6 +568,7 @@ static P_Expr* P_MakeFuncCallNode(P_Parser* parser, string name, P_ValueType typ
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_FuncCall;
     expr->ret_type = type;
+    expr->can_assign = false;
     expr->op.func_call.name = name;
     expr->op.func_call.params = exprs;
     expr->op.func_call.call_arity = call_arity;
@@ -713,15 +761,15 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
 
 static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
     if (left != nullptr) {
-        if (left->type != ExprType_Variable)
+        if (!left->can_assign)
             report_error(parser, str_lit("Required variable name before = sign\n"));
-        string name = left->op.variable;
+        P_Expr* name = left;
         
         P_Expr* xpr = P_Expression(parser);
         if (str_eq(xpr->ret_type, left->ret_type))
             return P_MakeAssignmentNode(parser, name, xpr);
         
-        report_error(parser, str_lit("Cannot assign %s to %s variable %.*s\n"), xpr->ret_type.str, left->ret_type.str, name.size, name.str);
+        report_error(parser, str_lit("Cannot assign %.*s to variable\n"), xpr->ret_type.size, xpr->ret_type.str);
     }
     return nullptr;
 }
@@ -842,10 +890,21 @@ static P_Expr* P_ExprBinary(P_Parser* parser, P_Expr* left) {
 }
 
 static P_Expr* P_ExprDot(P_Parser* parser, P_Expr* left) {
-    if (left->type != ExprType_Variable) {
+    P_ValueType type = left->ret_type;
+    
+    if (!structure_exists(parser, type, parser->scope_depth)) {
         report_error(parser, str_lit("Cannot apply . operator\n"));
     }
-    return nullptr;
+    
+    P_Consume(parser, TokenType_Identifier, str_lit("Expected Member name after .\n"));
+    string reqd = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    P_Struct* structure = struct_array_get(parser, type, parser->scope_depth);
+    if (!member_exists(structure, reqd)) {
+        report_error(parser, str_lit("No member %.*s in struct %.*s\n"), reqd.size, reqd.str, type.size, type.str);
+    }
+    P_ValueType member_type = member_type_get(structure, reqd);
+    
+    return P_MakeDotNode(parser, member_type, left, reqd);
 }
 
 P_ParseRule parse_rules[] = {
@@ -894,7 +953,7 @@ P_ParseRule parse_rules[] = {
     [TokenType_CloseBrace]       = { nullptr, nullptr, Prec_None },
     [TokenType_CloseParenthesis] = { nullptr, nullptr, Prec_None },
     [TokenType_CloseBracket]     = { nullptr, nullptr, Prec_None },
-    [TokenType_Dot]              = { nullptr, P_ExprDot, Prec_None },
+    [TokenType_Dot]              = { nullptr, P_ExprDot, Prec_Call },
     [TokenType_Semicolon]        = { nullptr, nullptr, Prec_None },
     [TokenType_Colon]            = { nullptr, nullptr, Prec_None },
     [TokenType_Question]         = { nullptr, nullptr, Prec_None },
@@ -1047,7 +1106,6 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser) {
     
     u64 idx = parser->structures.count;
     struct_array_add(&parser->structures, (P_Struct) { .name = name, .depth = parser->scope_depth });
-    
     u32 member_count = 0;
     string member_names[1024];
     P_ValueType member_types[1024];
@@ -1319,7 +1377,8 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
         } break;
         
         case ExprType_Assignment: {
-            printf("%.*s=\n", (int)expr->op.assignment.name.size, expr->op.assignment.name.str);
+            P_PrintExprAST_Indent(arena, expr->op.assignment.name, indent + 1);
+            printf("=\n");
             P_PrintExprAST_Indent(arena, expr->op.assignment.value, indent + 1);
         } break;
         
@@ -1342,6 +1401,11 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
             printf("%s()\n", expr->op.func_call.name.str);
             for (u32 i = 0; i < expr->op.func_call.call_arity; i++)
                 P_PrintExprAST_Indent(arena, expr->op.func_call.params[i], indent + 1);
+        } break;
+        
+        case ExprType_Dot: {
+            printf(".%.*s [Member Access]\n", (i32)expr->op.dot.right.size, expr->op.dot.right.str);
+            P_PrintExprAST_Indent(arena, expr->op.dot.left, indent + 1);
         } break;
     }
 }

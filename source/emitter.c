@@ -66,7 +66,8 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
         } break;
         
         case ExprType_Assignment: {
-            E_WriteF(emitter, "%.*s=", expr->op.assignment.name.size, expr->op.assignment.name.str);
+            E_EmitExpression(emitter, expr->op.assignment.name);
+            E_WriteF(emitter, " = ");
             E_EmitExpression(emitter, expr->op.assignment.value);
         } break;
         
@@ -97,6 +98,11 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
                     E_Write(emitter, ", ");
             }
             E_Write(emitter, ")");
+        } break;
+        
+        case ExprType_Dot: {
+            E_EmitExpression(emitter, expr->op.dot.left);
+            E_WriteF(emitter, ".%.*s", expr->op.dot.right.size, expr->op.dot.right.str);
         } break;
     }
 }
