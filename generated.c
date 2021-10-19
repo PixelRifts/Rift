@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdbool.h>
+typedef const char* string;
 
 typedef struct another {
 	int t1;
@@ -14,8 +15,10 @@ int foo_2intbool(int x, bool y) {
 	return 0;
 }
 int main() {
-	yolo haha;
-	haha.term.t1 = 1;
-	foo_2intbool(haha.term.t1, true);
+	string haha;
+	haha = "Testing";
+	int x;
+	x = test();
+	foo_2intbool(x, true);
 	return 0;
 }

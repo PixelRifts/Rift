@@ -28,6 +28,7 @@ static void E_WriteLineF(E_Emitter* emitter, const char* text, ...) {
 static void E_BeginEmitting(E_Emitter* emitter) {
     E_WriteLine(emitter, "#include <stdio.h>");
     E_WriteLine(emitter, "#include <stdbool.h>");
+    E_WriteLine(emitter, "typedef const char* string;");
     E_WriteLine(emitter, "");
 }
 
@@ -58,11 +59,11 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
         } break;
         
         case ExprType_CharLit: {
-            E_WriteF(emitter, "%s", expr->op.char_lit);
+            E_WriteF(emitter, "%.*s", expr->op.char_lit.size, expr->op.char_lit.str);
         } break;
         
         case ExprType_StringLit: {
-            E_WriteF(emitter, "%s", expr->op.string_lit);
+            E_WriteF(emitter, "%.*s", expr->op.string_lit.size, expr->op.string_lit.str);
         } break;
         
         case ExprType_Assignment: {

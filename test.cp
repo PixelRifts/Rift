@@ -13,9 +13,13 @@ int foo(int x, bool y) {
 	return 0;
 }
 
+int native test();
+
 int main() {
-	yolo haha;
-	haha.term.t1 = 1;
-    foo(haha.term.t1, true);
+	string haha;
+	haha = "Testing";
+	int x;
+	x = test();
+    foo(x, true);
     return 0;
 }

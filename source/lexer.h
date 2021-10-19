@@ -31,10 +31,10 @@ enum {
     TokenType_Comma, TokenType_Dot, TokenType_Semicolon, TokenType_Colon, TokenType_Question,
     
     TokenType_Return, TokenType_Struct, TokenType_Enum,
-    TokenType_Null, TokenType_Nullptr,
+    TokenType_Null, TokenType_Nullptr, TokenType_Native,
     TokenType_If, TokenType_Else, TokenType_Do, TokenType_For, TokenType_While,
     TokenType_True, TokenType_False,
-    TokenType_Int, TokenType_Float, TokenType_Bool, TokenType_Double, TokenType_Char, TokenType_Long, TokenType_Void,
+    TokenType_Int, TokenType_String, TokenType_Float, TokenType_Bool, TokenType_Double, TokenType_Char, TokenType_Long, TokenType_Void,
     
     TokenType_TokenTypeCount
 };

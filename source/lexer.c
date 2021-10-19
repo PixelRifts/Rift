@@ -71,6 +71,8 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_Double: return str_lit("Double");
         case TokenType_Char: return str_lit("Char");
         case TokenType_Long: return str_lit("Long");
+        case TokenType_Native: return str_lit("Native");
+        case TokenType_String: return str_lit("String");
     }
     return str_lit("unreachable");
 }
@@ -197,13 +199,17 @@ static L_TokenType L_MatchType(L_Lexer* lexer, u32 start, string needle, L_Token
 static L_TokenType L_IdentifierType(L_Lexer* lexer) {
     switch (lexer->start[0]) {
         case 'r': return L_MatchType(lexer, 1, str_lit("eturn"), TokenType_Return);
-        case 's': return L_MatchType(lexer, 1, str_lit("truct"), TokenType_Struct);
         case 'w': return L_MatchType(lexer, 1, str_lit("hile"), TokenType_While);
         case 'b': return L_MatchType(lexer, 1, str_lit("ool"), TokenType_Bool);
         case 'c': return L_MatchType(lexer, 1, str_lit("har"), TokenType_Char);
         case 'l': return L_MatchType(lexer, 1, str_lit("ong"), TokenType_Long);
         case 'v': return L_MatchType(lexer, 1, str_lit("oid"), TokenType_Void);
         case 't': return L_MatchType(lexer, 1, str_lit("rue"), TokenType_True);
+        case 's': {
+            if (L_MatchType(lexer, 1, str_lit("truct"), TokenType_Struct) == TokenType_Struct) {
+                return TokenType_Struct;
+            } else return L_MatchType(lexer, 1, str_lit("tring"), TokenType_String);
+        }
         case 'e': {
             switch (lexer->start[1]) {
                 case 'n': return L_MatchType(lexer, 2, str_lit("um"), TokenType_Enum);
@@ -211,9 +217,14 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
             }
         }
         case 'n': {
-            if (L_MatchType(lexer, 1, str_lit("ullptr"), TokenType_Nullptr) == TokenType_Nullptr) {
-                return TokenType_Nullptr;
-            } else return L_MatchType(lexer, 1, str_lit("ull"), TokenType_Null);
+            switch (lexer->start[1]) {
+                case 'a': return L_MatchType(lexer, 2, str_lit("tive"), TokenType_Native);
+                case 'u': {
+                    if (L_MatchType(lexer, 2, str_lit("llptr"), TokenType_Nullptr) == TokenType_Nullptr) {
+                        return TokenType_Nullptr;
+                    } else return L_MatchType(lexer, 2, str_lit("ll"), TokenType_Null);
+                }
+            }
         }
         case 'i': {
             switch (lexer->start[1]) {

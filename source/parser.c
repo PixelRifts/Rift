@@ -233,7 +233,7 @@ void func_hash_table_add_all(func_hash_table* from, func_hash_table* to) {
 
 //~ Struct List
 void struct_array_init(struct_array* array) {
-    array->elements = calloc(8, sizeof(struct_array));
+    array->elements = calloc(8, sizeof(P_Struct));
     array->count = 0;
     array->capacity = 8;
 }
@@ -247,7 +247,7 @@ void struct_array_free(struct_array* array) {
 void struct_array_add(struct_array* array, P_Struct structure) {
     if (array->count + 1 > array->capacity) {
         void* prev = array->elements;
-        array->elements = malloc(array->capacity * 2);
+        array->elements = malloc(array->capacity * 2 * sizeof(P_Struct));
         memmove(array->elements, prev, array->count * sizeof(P_Struct));
         free(prev);
     }
@@ -335,7 +335,7 @@ static void P_Consume(P_Parser* parser, L_TokenType type, string message) {
 
 static void P_ConsumeType(P_Parser* parser, string message) {
     if (parser->current.type == TokenType_Int || parser->current.type == TokenType_Long ||
-        parser->current.type == TokenType_Float || parser->current.type == TokenType_Double || parser->current.type == TokenType_Bool || parser->current.type == TokenType_Char) { P_Advance(parser); return; }
+        parser->current.type == TokenType_Float || parser->current.type == TokenType_Double || parser->current.type == TokenType_Bool || parser->current.type == TokenType_Char || parser->current.type == TokenType_String) { P_Advance(parser); return; }
     if (parser->current.type == TokenType_Identifier) {
         if (structure_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
             P_Advance(parser);
@@ -369,7 +369,8 @@ static b8 P_IsTypeToken(P_Parser* parser) {
         P_Match(parser, TokenType_Float)  ||
         P_Match(parser, TokenType_Double) ||
         P_Match(parser, TokenType_Char)   ||
-        P_Match(parser, TokenType_Bool)) return true;
+        P_Match(parser, TokenType_Bool)   ||
+        P_Match(parser, TokenType_String)) return true;
     if (parser->current.type == TokenType_Identifier) {
         if (structure_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
             P_Advance(parser);
@@ -387,6 +388,7 @@ static P_ValueType P_TypeTokenToValueType(P_Parser* parser) {
         case TokenType_Double: return ValueType_Double;
         case TokenType_Char:   return ValueType_Char;
         case TokenType_Bool:   return ValueType_Bool;
+        case TokenType_String: return ValueType_String;
     }
     return (P_ValueType) { .str = parser->previous.start, .size = parser->previous.length };
 }
@@ -689,6 +691,14 @@ static P_Stmt* P_MakeFuncStmtNode(P_Parser* parser, P_ValueType type, string nam
     return stmt;
 }
 
+static P_Stmt* P_MakeNativeFuncStmtNode(P_Parser* parser, P_ValueType type, string name, u32 arity, string_list param_types, string_list param_names) {
+    P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
+    stmt->type = StmtType_NativeFuncDecl;
+    stmt->next = nullptr;
+    stmt->op.native_func_decl = name;
+    return stmt;
+}
+
 //~ Expressions
 static P_Expr* P_ExprPrecedence(P_Parser* parser, P_Precedence precedence);
 static P_ParseRule* P_GetRule(L_TokenType type);
@@ -748,16 +758,25 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             call_arity++;
         }
         
-        string actual_name = P_FuncNameMangle(parser, name, call_arity, param_types, (string) {0});
+        string possible_name_one = P_FuncNameMangle(parser, name, call_arity, param_types, (string) {0});
+        string possible_name_two = name;
         
         P_Expr** param_buffer = arena_alloc(&parser->arena, call_arity * sizeof(P_Expr*));
         memcpy(param_buffer, params, call_arity * sizeof(P_Expr*));
         
-        func_entry_key key = { .name = actual_name, .depth = parser->scope_depth };
+        func_entry_key key = { .name = possible_name_one, .depth = parser->scope_depth };
         P_ValueType value = ValueType_Invalid;
         while (key.depth != -1) {
             if (func_hash_table_get(&parser->functions, key, &value)) {
-                return P_MakeFuncCallNode(parser, actual_name, value, param_buffer, call_arity);
+                return P_MakeFuncCallNode(parser, possible_name_one, value, param_buffer, call_arity);
+            }
+            key.depth--;
+        }
+        key.name = possible_name_two;
+        key.depth = parser->scope_depth;
+        while (key.depth != -1) {
+            if (func_hash_table_get(&parser->functions, key, &value)) {
+                return P_MakeFuncCallNode(parser, possible_name_two, value, param_buffer, call_arity);
             }
             key.depth--;
         }
@@ -914,6 +933,7 @@ static P_Expr* P_ExprDot(P_Parser* parser, P_Expr* left) {
     
     if (!structure_exists(parser, type, parser->scope_depth)) {
         report_error(parser, str_lit("Cannot apply . operator\n"));
+        return nullptr;
     }
     
     P_Consume(parser, TokenType_Identifier, str_lit("Expected Member name after .\n"));
@@ -1028,9 +1048,9 @@ static P_Expr* P_Expression(P_Parser* parser) {
 static P_Stmt* P_Statement(P_Parser* parser);
 static P_Stmt* P_Declaration(P_Parser* parser);
 
-static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name) {
+static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b8 native) {
     P_ValueType test;
-    // NOTE(voxel): Parse Parameters
+    
     string_list params = {0};
     string_list param_names = {0};
     u32 arity = 0;
@@ -1038,11 +1058,12 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name) {
     P_ValueType prev_function_body_ret = parser->function_body_ret;
     b8 prev_directly_in_func_body = parser->is_directly_in_func_body;
     
-    parser->all_code_paths_return = false;
-    parser->encountered_return = false;
-    parser->function_body_ret = type;
-    parser->is_directly_in_func_body = true;
-    
+    if (!native) {
+        parser->all_code_paths_return = false;
+        parser->encountered_return = false;
+        parser->function_body_ret = type;
+        parser->is_directly_in_func_body = true;
+    }
     parser->scope_depth++;
     
     while (!P_Match(parser, TokenType_CloseParenthesis)) {
@@ -1063,41 +1084,52 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name) {
         }
     }
     
-    string actual_name = P_FuncNameMangle(parser, name, arity, params, (string){0});
+    string actual_name = native ? name : P_FuncNameMangle(parser, name, arity, params, (string){0});
+    
+    // TODO(voxel): Change this bs
     if (str_eq(actual_name, str_lit("main_0")))
         actual_name = str_lit("main");
     
     func_entry_key key = (func_entry_key) { .name = actual_name, .depth = parser->scope_depth - 1 };
+    // -1 Because the scope deptgh is changed by this point
     if (!func_hash_table_get(&parser->functions, key, &test)) {
         func_hash_table_set(&parser->functions, key, type);
     } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), name.size, name.str);
     
     // Block Stuff
-    P_Consume(parser, TokenType_OpenBrace, str_lit("Expected {\n"));
+    P_Stmt* func = nullptr;
     
-    P_Stmt* func = P_MakeFuncStmtNode(parser, type, actual_name, arity, params, param_names);
-    
-    P_Stmt* curr = nullptr;
-    while (!P_Match(parser, TokenType_CloseBrace)) {
-        P_Stmt* stmt = P_Declaration(parser);
+    if (!native) {
+        P_Consume(parser, TokenType_OpenBrace, str_lit("Expected {\n"));
         
-        if (curr == nullptr) func->op.func_decl.block = stmt;
-        else curr->next = stmt;
+        func = P_MakeFuncStmtNode(parser, type, actual_name, arity, params, param_names);
         
-        curr = stmt;
-        if (parser->current.type == TokenType_EOF)
-            report_error(parser, str_lit("Unterminated Function Block. Expected }\n"));
+        P_Stmt* curr = nullptr;
+        while (!P_Match(parser, TokenType_CloseBrace)) {
+            P_Stmt* stmt = P_Declaration(parser);
+            
+            if (curr == nullptr) func->op.func_decl.block = stmt;
+            else curr->next = stmt;
+            
+            curr = stmt;
+            if (parser->current.type == TokenType_EOF)
+                report_error(parser, str_lit("Unterminated Function Block. Expected }\n"));
+        }
+        // Pop all entries with the current scope depth from variables here
+        for (u32 i = 0; i < parser->variables.capacity; i++) {
+            if (parser->variables.entries[i].key.depth == parser->scope_depth)
+                var_hash_table_del(&parser->variables, parser->variables.entries[i].key);
+        }
+        
+        parser->function_body_ret = prev_function_body_ret;
+        parser->is_directly_in_func_body = prev_directly_in_func_body;
+        if (!parser->all_code_paths_return) report_error(parser, str_lit("Not all code paths return a value\n"));
+    } else {
+        P_Consume(parser, TokenType_Semicolon, str_lit("Can't have function body on a native function\n"));
+        func = P_MakeNativeFuncStmtNode(parser, type, actual_name, arity, params, param_names);
     }
-    // Pop all entries with the current scope depth from variables here
-    for (u32 i = 0; i < parser->variables.capacity; i++) {
-        if (parser->variables.entries[i].key.depth == parser->scope_depth)
-            var_hash_table_del(&parser->variables, parser->variables.entries[i].key);
-    }
-    
     parser->scope_depth--;
-    parser->function_body_ret = prev_function_body_ret;
-    parser->is_directly_in_func_body = prev_directly_in_func_body;
-    if (!parser->all_code_paths_return) report_error(parser, str_lit("Not all code paths return a value\n"));
+    
     return func;
 }
 
@@ -1299,11 +1331,13 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
     
     if (P_IsTypeToken(parser)) {
         P_ValueType type = P_TypeTokenToValueType(parser);
+        b8 native = false;
+        if (P_Match(parser, TokenType_Native)) native = true;
         P_Consume(parser, TokenType_Identifier, str_lit("Expected Identifier after variable type\n"));
         
         string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
         if (P_Match(parser, TokenType_OpenParenthesis)) {
-            s = P_StmtFuncDecl(parser, type, name);
+            s = P_StmtFuncDecl(parser, type, name, native);
         } else {
             s = P_StmtVarDecl(parser, type, name);
         }
