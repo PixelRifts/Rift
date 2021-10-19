@@ -272,17 +272,27 @@ static b8 structure_exists(P_Parser* parser, string struct_name, u32 depth) {
 }
 
 static P_ValueType member_type_get(P_Struct* structure, string reqd) {
+    string_list_node* curr = structure->member_names.first;
+    string_list_node* type = structure->member_types.first;
     for (u32 i = 0; i < structure->member_count; i++) {
-        if (str_eq(structure->member_names[i], reqd))
-            return structure->member_types[i];
+        if (curr->size == reqd.size) {
+            if (memcmp(curr->str, reqd.str, curr->size) == 0)
+                return (P_ValueType) { .str = type->str, .size = type->size };
+        }
+        curr = curr->next;
+        type = type->next;
     }
     return ValueType_Invalid;
 }
 
 static b8 member_exists(P_Struct* structure, string reqd) {
+    string_list_node* curr = structure->member_names.first;
     for (u32 i = 0; i < structure->member_count; i++) {
-        if (str_eq(structure->member_names[i], reqd))
-            return true;
+        if (curr->size == reqd.size) {
+            if (memcmp(curr->str, reqd.str, curr->size) == 0)
+                return true;
+        }
+        curr = curr->next;
     }
     return false;
 }
@@ -326,6 +336,12 @@ static void P_Consume(P_Parser* parser, L_TokenType type, string message) {
 static void P_ConsumeType(P_Parser* parser, string message) {
     if (parser->current.type == TokenType_Int || parser->current.type == TokenType_Long ||
         parser->current.type == TokenType_Float || parser->current.type == TokenType_Double || parser->current.type == TokenType_Bool || parser->current.type == TokenType_Char) { P_Advance(parser); return; }
+    if (parser->current.type == TokenType_Identifier) {
+        if (structure_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
+            P_Advance(parser);
+            return;
+        }
+    }
     
     report_error_at_current(parser, message);
 }
@@ -375,11 +391,15 @@ static P_ValueType P_TypeTokenToValueType(P_Parser* parser) {
     return (P_ValueType) { .str = parser->previous.start, .size = parser->previous.length };
 }
 
-static string P_FuncNameMangle(P_Parser* parser, string name, u32 arity, P_ValueType* params, string additional_info) {
+static string P_FuncNameMangle(P_Parser* parser, string name, u32 arity, string_list params, string additional_info) {
     string_list sl = {0};
     string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "%.*s_%u", name.size, name.str, arity));
-    for (u32 i = 0; i < arity; i++)
-        string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "%s", params[i].str));
+    string_list_node* curr = params.first;
+    for (u32 i = 0; i < arity; i++) {
+        string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "%.*s", curr->size, curr->str));
+        curr = curr->next;
+    }
+    
     if (additional_info.size != 0) string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "_%s", additional_info));
     return string_list_flatten(&parser->arena, &sl);
 }
@@ -645,7 +665,7 @@ static P_Stmt* P_MakeVarDeclStmtNode(P_Parser* parser, P_ValueType type, string 
     return stmt;
 }
 
-static P_Stmt* P_MakeStructDeclStmtNode(P_Parser* parser, string name, u32 count, P_ValueType* types, string* names) {
+static P_Stmt* P_MakeStructDeclStmtNode(P_Parser* parser, string name, u32 count, string_list types, string_list names) {
     P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
     stmt->type = StmtType_StructDecl;
     stmt->next = nullptr;
@@ -656,7 +676,7 @@ static P_Stmt* P_MakeStructDeclStmtNode(P_Parser* parser, string name, u32 count
     return stmt;
 }
 
-static P_Stmt* P_MakeFuncStmtNode(P_Parser* parser, P_ValueType type, string name, u32 arity, P_ValueType* param_types, string* param_names) {
+static P_Stmt* P_MakeFuncStmtNode(P_Parser* parser, P_ValueType type, string name, u32 arity, string_list param_types, string_list param_names) {
     P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
     stmt->type = StmtType_FuncDecl;
     stmt->next = nullptr;
@@ -713,7 +733,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     if (P_Match(parser, TokenType_OpenParenthesis)) {
         P_Expr* params[256];
-        P_ValueType param_types[256];
+        string_list param_types = {0};
         u32 call_arity = 0;
         while (!P_Match(parser, TokenType_CloseParenthesis)) {
             if (call_arity != 0) {
@@ -724,7 +744,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             }
             
             params[call_arity] = P_Expression(parser);
-            param_types[call_arity] = params[call_arity]->ret_type;
+            string_list_push(&parser->arena, &param_types, params[call_arity]->ret_type);
             call_arity++;
         }
         
@@ -1011,8 +1031,8 @@ static P_Stmt* P_Declaration(P_Parser* parser);
 static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name) {
     P_ValueType test;
     // NOTE(voxel): Parse Parameters
-    P_ValueType params[256];
-    string param_names[256];
+    string_list params = {0};
+    string_list param_names = {0};
     u32 arity = 0;
     
     P_ValueType prev_function_body_ret = parser->function_body_ret;
@@ -1027,11 +1047,14 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name) {
     
     while (!P_Match(parser, TokenType_CloseParenthesis)) {
         P_ConsumeType(parser, str_lit("Expected type\n"));
-        params[arity] = P_TypeTokenToValueType(parser);
+        P_ValueType param_type = P_TypeTokenToValueType(parser);
+        string_list_push(&parser->arena, &params, param_type);
+        
         P_Consume(parser, TokenType_Identifier, str_lit("Expected param name\n"));
         string param_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
-        param_names[arity] = param_name;
-        var_hash_table_set(&parser->variables, (var_entry_key) { .name = param_name, .depth = parser->scope_depth }, params[arity]);
+        string_list_push(&parser->arena, &param_names, param_name);
+        
+        var_hash_table_set(&parser->variables, (var_entry_key) { .name = param_name, .depth = parser->scope_depth }, param_type);
         
         arity++;
         if (!P_Match(parser, TokenType_Comma)) {
@@ -1044,12 +1067,6 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name) {
     if (str_eq(actual_name, str_lit("main_0")))
         actual_name = str_lit("main");
     
-    // TODO(voxel) There should be an arena_push function for this cuz i don't like using memcpy in user code
-    P_ValueType* param_buffer = arena_alloc(&parser->arena, arity * sizeof(P_ValueType));
-    memcpy(param_buffer, params, arity * sizeof(P_ValueType));
-    string* param_names_buffer = arena_alloc(&parser->arena, arity * sizeof(string));
-    memcpy(param_names_buffer, param_names, arity * sizeof(string));
-    
     func_entry_key key = (func_entry_key) { .name = actual_name, .depth = parser->scope_depth - 1 };
     if (!func_hash_table_get(&parser->functions, key, &test)) {
         func_hash_table_set(&parser->functions, key, type);
@@ -1058,7 +1075,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name) {
     // Block Stuff
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected {\n"));
     
-    P_Stmt* func = P_MakeFuncStmtNode(parser, type, actual_name, arity, param_buffer, param_names_buffer);
+    P_Stmt* func = P_MakeFuncStmtNode(parser, type, actual_name, arity, params, param_names);
     
     P_Stmt* curr = nullptr;
     while (!P_Match(parser, TokenType_CloseBrace)) {
@@ -1106,32 +1123,29 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser) {
     
     u64 idx = parser->structures.count;
     struct_array_add(&parser->structures, (P_Struct) { .name = name, .depth = parser->scope_depth });
-    u32 member_count = 0;
-    string member_names[1024];
-    P_ValueType member_types[1024];
+    u32 tmp_member_count = 0;
+    string_list member_names = {0};
+    string_list member_types = {0};
     
     while (!P_Match(parser, TokenType_CloseBrace)) {
-        P_ConsumeType(parser, str_lit("Expected Type or }"));
-        member_types[member_count] = P_TypeTokenToValueType(parser);
-        P_Consume(parser, TokenType_Identifier, str_lit("Expected member name"));
-        member_names[member_count] = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
-        P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after name"));
-        member_count++;
+        P_ConsumeType(parser, str_lit("Expected Type or }\n"));
+        string_list_push(&parser->arena, &member_types, P_TypeTokenToValueType(parser));
+        
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
+        string_list_push(&parser->arena, &member_names, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
+        
+        P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after name\n"));
+        tmp_member_count++;
         
         if (parser->current.type == TokenType_EOF)
-            report_error(parser, str_lit("Unterminated block for structure definition"));
+            report_error(parser, str_lit("Unterminated block for structure definition\n"));
     }
     
-    P_ValueType* member_types_buffer = arena_alloc(&parser->arena, member_count * sizeof(P_ValueType));
-    memcpy(member_types_buffer, member_types, member_count * sizeof(P_ValueType));
-    string* member_names_buffer = arena_alloc(&parser->arena, member_count * sizeof(string));
-    memcpy(member_names_buffer, member_names, member_count * sizeof(string));
-    
-    parser->structures.elements[idx].member_count = member_count;
+    parser->structures.elements[idx].member_count = tmp_member_count;
     parser->structures.elements[idx].member_types = member_types;
     parser->structures.elements[idx].member_names = member_names;
     
-    return P_MakeStructDeclStmtNode(parser, name, member_count, member_types_buffer, member_names_buffer);
+    return P_MakeStructDeclStmtNode(parser, name, tmp_member_count, member_types, member_names);
 }
 
 static P_Stmt* P_StmtBlock(P_Parser* parser) {
@@ -1209,7 +1223,7 @@ static P_Stmt* P_StmtWhile(P_Parser* parser) {
     if (!str_eq(condition->ret_type, ValueType_Bool)) {
         report_error(parser, str_lit("While loop condition doesn't resolve to boolean\n"));
     }
-    P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression"));
+    P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression\n"));
     
     b8 reset = false;
     b8 prev_directly_in_func_body = parser->is_directly_in_func_body;
@@ -1475,10 +1489,15 @@ static void P_PrintAST_Indent(M_Arena* arena, P_Stmt* stmt, u8 indent) {
         
         case StmtType_StructDecl: {
             printf("Struct Declaration: %s\n", stmt->op.struct_decl.name.str);
+            string_list_node* curr = stmt->op.struct_decl.member_names.first;
+            string_list_node* type = stmt->op.struct_decl.member_types.first;
             for (u32 i = 0; i < stmt->op.struct_decl.member_count; i++) {
                 for (u8 idt = 0; idt < indent + 1; idt++)
                     printf("  ");
-                printf("%.*s: %s\n", (i32)stmt->op.struct_decl.member_names[i].size, stmt->op.struct_decl.member_names[i].str, stmt->op.struct_decl.member_types[i].str);
+                printf("%.*s: %.*s\n", (i32)curr->size, curr->str, (i32)type->size, type->str);
+                
+                curr = curr->next;
+                type = type->next;
             }
         } break;
         

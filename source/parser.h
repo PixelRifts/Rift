@@ -87,8 +87,8 @@ struct P_Stmt {
         P_Stmt* block;
         
         struct { P_ValueType type; string name; } var_decl;
-        struct { string name; u32 arity; P_ValueType* param_types; string* param_names; P_ValueType type; P_Stmt* block; } func_decl;
-        struct { string name; u32 member_count; P_ValueType* member_types; string* member_names; } struct_decl;
+        struct { string name; u32 arity; string_list param_types; string_list param_names; P_ValueType type; P_Stmt* block; } func_decl;
+        struct { string name; u32 member_count; string_list member_types; string_list member_names; } struct_decl;
         
         struct { P_Expr* condition; P_Stmt* then; } if_s;
         struct { P_Expr* condition; P_Stmt* then; P_Stmt* else_s; } if_else;
@@ -148,8 +148,8 @@ typedef struct P_Struct {
     string name;
     u32 depth;
     u32 member_count;
-    P_ValueType* member_types;
-    string* member_names;
+    string_list member_types;
+    string_list member_names;
 } P_Struct;
 
 typedef struct struct_array {

@@ -134,10 +134,14 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
         
         case StmtType_FuncDecl: {
             E_WriteF(emitter, "%.*s %.*s(", stmt->op.func_decl.type.size, stmt->op.func_decl.type.str, stmt->op.func_decl.name.size, stmt->op.func_decl.name.str);
+            string_list_node* curr_name = stmt->op.func_decl.param_names.first;
+            string_list_node* curr_type = stmt->op.func_decl.param_types.first;
             for (u32 i = 0; i < stmt->op.func_decl.arity; i++) {
-                E_WriteF(emitter, "%s %.*s", stmt->op.func_decl.param_types[i].str, stmt->op.func_decl.param_names[i].size, stmt->op.func_decl.param_names[i].str);
+                E_WriteF(emitter, "%.*s %.*s", curr_type->size, curr_type->str, curr_name->size, curr_name->str);
                 if (i != stmt->op.func_decl.arity - 1)
                     E_Write(emitter, ", ");
+                curr_name = curr_name->next;
+                curr_type = curr_type->next;
             }
             E_WriteLine(emitter, ") {");
             E_EmitStatementChain(emitter, stmt->op.func_decl.block, indent + 1);
@@ -146,10 +150,14 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
         
         case StmtType_StructDecl: {
             E_WriteLineF(emitter, "typedef struct %.*s {", stmt->op.struct_decl.name.size, stmt->op.struct_decl.name.str);
+            string_list_node* curr_name = stmt->op.struct_decl.member_names.first;
+            string_list_node* curr_type = stmt->op.struct_decl.member_types.first;
             for (u32 i = 0; i < stmt->op.struct_decl.member_count; i++) {
                 for (u32 idt = 0; idt < indent + 1; idt++)
                     E_Write(emitter, "\t");
-                E_WriteLineF(emitter, "%s %.*s;", stmt->op.struct_decl.member_types[i].str, stmt->op.struct_decl.member_names[i].size, stmt->op.struct_decl.member_names[i].str);
+                E_WriteLineF(emitter, "%.*s %.*s;", curr_type->size, curr_type->str, curr_name->size, curr_name->str);
+                curr_name = curr_name->next;
+                curr_type = curr_type->next;
             }
             E_WriteLineF(emitter, "} %.*s;", stmt->op.struct_decl.name.size, stmt->op.struct_decl.name.str);
         } break;
