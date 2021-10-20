@@ -74,9 +74,21 @@ command_list =
 			{ "parseronly.bat", .os = "win" },
 		},
 	},
+	{
+		.name = "generated",
+		.out = "*compilation*",
+		.footer_panel = true,
+		.save_dirty_files = true,
+		.cursor_at_end = false,
+		.cmd =
+		{
+			{ "clang generated.c -o generated.exe", .os = "win" },
+		},
+	},
 };
 
 fkey_command[1] = "build";
 fkey_command[2] = "run";
 fkey_command[3] = "lexeronly";
 fkey_command[4] = "parseronly";
+fkey_command[5] = "generated";

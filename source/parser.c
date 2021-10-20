@@ -742,7 +742,7 @@ static P_Expr* P_ExprBool(P_Parser* parser) {
 static P_Expr* P_ExprVar(P_Parser* parser) {
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     if (P_Match(parser, TokenType_OpenParenthesis)) {
-        P_Expr* params[256];
+        P_Expr* params[256] = {0};
         string_list param_types = {0};
         u32 call_arity = 0;
         while (!P_Match(parser, TokenType_CloseParenthesis)) {
@@ -754,6 +754,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             }
             
             params[call_arity] = P_Expression(parser);
+            if (params[call_arity] == nullptr) return nullptr;
             string_list_push(&parser->arena, &param_types, params[call_arity]->ret_type);
             call_arity++;
         }
@@ -805,6 +806,7 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
         P_Expr* name = left;
         
         P_Expr* xpr = P_Expression(parser);
+        if (xpr == nullptr) return nullptr;
         if (str_eq(xpr->ret_type, left->ret_type))
             return P_MakeAssignmentNode(parser, name, xpr);
         
