@@ -395,10 +395,10 @@ static P_ValueType P_TypeTokenToValueType(P_Parser* parser) {
 
 static string P_FuncNameMangle(P_Parser* parser, string name, u32 arity, string_list params, string additional_info) {
     string_list sl = {0};
-    string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "%.*s_%u", name.size, name.str, arity));
+    string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "%.*s_%u", (int)name.size, name.str, arity));
     string_list_node* curr = params.first;
     for (u32 i = 0; i < arity; i++) {
-        string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "%.*s", curr->size, curr->str));
+        string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "%.*s", (int)curr->size, curr->str));
         curr = curr->next;
     }
     
@@ -781,7 +781,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             }
             key.depth--;
         }
-        report_error(parser, str_lit("Undefined function %.*s with provided parameters\n"), name.size, name.str);
+        report_error(parser, str_lit("Undefined function %.*s with provided parameters\n"), (int)name.size, name.str);
         
     } else {
         
@@ -793,7 +793,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             }
             key.depth--;
         }
-        report_error(parser, str_lit("Undefined variable %.*s\n"), name.size, name.str);
+        report_error(parser, str_lit("Undefined variable %.*s\n"), (int)name.size, name.str);
         
     }
     return nullptr;
@@ -810,7 +810,7 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
         if (str_eq(xpr->ret_type, left->ret_type))
             return P_MakeAssignmentNode(parser, name, xpr);
         
-        report_error(parser, str_lit("Cannot assign %.*s to variable\n"), xpr->ret_type.size, xpr->ret_type.str);
+        report_error(parser, str_lit("Cannot assign %.*s to variable\n"), (int)xpr->ret_type.size, xpr->ret_type.str);
     }
     return nullptr;
 }
@@ -942,7 +942,7 @@ static P_Expr* P_ExprDot(P_Parser* parser, P_Expr* left) {
     string reqd = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     P_Struct* structure = struct_array_get(parser, type, parser->scope_depth);
     if (!member_exists(structure, reqd)) {
-        report_error(parser, str_lit("No member %.*s in struct %.*s\n"), reqd.size, reqd.str, type.size, type.str);
+        report_error(parser, str_lit("No member %.*s in struct %.*s\n"), (int)reqd.size, reqd.str, (int)type.size, type.str);
     }
     P_ValueType member_type = member_type_get(structure, reqd);
     
@@ -1086,17 +1086,13 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         }
     }
     
-    string actual_name = native ? name : P_FuncNameMangle(parser, name, arity, params, (string){0});
-    
-    // TODO(voxel): Change this bs
-    if (str_eq(actual_name, str_lit("main_0")))
-        actual_name = str_lit("main");
+    string actual_name = native || (str_eq(name, str_lit("main")) && arity == 0) ? name : P_FuncNameMangle(parser, name, arity, params, (string){0});
     
     func_entry_key key = (func_entry_key) { .name = actual_name, .depth = parser->scope_depth - 1 };
     // -1 Because the scope deptgh is changed by this point
     if (!func_hash_table_get(&parser->functions, key, &test)) {
         func_hash_table_set(&parser->functions, key, type);
-    } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), name.size, name.str);
+    } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), (int)name.size, name.str);
     
     // Block Stuff
     P_Stmt* func = nullptr;
@@ -1141,7 +1137,7 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name) {
     if (!var_hash_table_get(&parser->variables, key, &test)) {
         var_hash_table_set(&parser->variables, key, type);
     }
-    else report_error(parser, str_lit("Cannot redeclare variable %.*s\n"), name.size, name.str);
+    else report_error(parser, str_lit("Cannot redeclare variable %.*s\n"), (int)name.size, name.str);
     
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon after name\n"));
     return P_MakeVarDeclStmtNode(parser, type, name);
@@ -1152,7 +1148,7 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser) {
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     
     if (structure_exists(parser, name, parser->scope_depth))
-        report_error(parser, str_lit("Cannot redeclare structure with name %.*s\n"), name.size, name.str);
+        report_error(parser, str_lit("Cannot redeclare structure with name %.*s\n"), (int)name.size, name.str);
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Struct Name\n"));
     
     u64 idx = parser->structures.count;
@@ -1216,7 +1212,7 @@ static P_Stmt* P_StmtReturn(P_Parser* parser) {
     P_Expr* val = P_Expression(parser);
     if (val == nullptr) return nullptr;
     if (!str_eq(val->ret_type, parser->function_body_ret))
-        report_error(parser, str_lit("Function return type mismatch. Expected %.*s\n"), parser->function_body_ret.size, parser->function_body_ret.str);
+        report_error(parser, str_lit("Function return type mismatch. Expected %.*s\n"), (int)parser->function_body_ret.size, parser->function_body_ret.str);
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after return statement\n"));
     return P_MakeReturnStmtNode(parser, val);
 }
@@ -1355,7 +1351,9 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
 //~ API
 void P_Parse(P_Parser* parser) {
     P_Advance(parser);
+    
     parser->root = P_Declaration(parser);
+    
     P_Stmt* c = parser->root;
     while (parser->current.type != TokenType_EOF && !parser->had_error) {
         c->next = P_Declaration(parser);

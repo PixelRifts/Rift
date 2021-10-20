@@ -27,6 +27,7 @@ typedef char b8;
 
 #define null 0
 #define nullptr (void*)0
+#define trace printf("Trace\n")
 
 #define FATAL(s)            \
 do {                    \
