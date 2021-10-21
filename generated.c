@@ -2,10 +2,10 @@
 #include <stdbool.h>
 typedef const char* string;
 
-int two_0() {
-	return 0;
+void two_0() {
 }
 int main() {
+	int x = 10;
 	puts("Testing");
 	return 0;
 }

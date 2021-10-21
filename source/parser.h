@@ -73,8 +73,8 @@ struct P_Expr {
 typedef u32 P_StmtType;
 enum {
     StmtType_Expression, StmtType_Block, StmtType_Return, StmtType_If,
-    StmtType_IfElse, StmtType_While, StmtType_DoWhile,
-    StmtType_VarDecl, StmtType_FuncDecl, StmtType_NativeFuncDecl, StmtType_StructDecl,
+    StmtType_IfElse, StmtType_While, StmtType_DoWhile, StmtType_VarDecl,
+    StmtType_VarDeclAssign, StmtType_FuncDecl, StmtType_NativeFuncDecl, StmtType_StructDecl,
 };
 
 typedef struct P_Stmt P_Stmt;
@@ -88,6 +88,7 @@ struct P_Stmt {
         string native_func_decl;
         
         struct { P_ValueType type; string name; } var_decl;
+        struct { P_ValueType type; string name; P_Expr* val; } var_decl_assign;
         struct { string name; u32 arity; string_list param_types; string_list param_names; P_ValueType type; P_Stmt* block; } func_decl;
         struct { string name; u32 member_count; string_list member_types; string_list member_names; } struct_decl;
         

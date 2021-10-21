@@ -133,6 +133,12 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             E_WriteLine(emitter, ";");
         } break;
         
+        case StmtType_VarDeclAssign: {
+            E_WriteF(emitter, "%.*s %.*s = ", (int)stmt->op.var_decl_assign.type.size, stmt->op.var_decl_assign.type.str, (int)stmt->op.var_decl_assign.name.size, stmt->op.var_decl_assign.name.str);
+            E_EmitExpression(emitter, stmt->op.var_decl_assign.val);
+            E_WriteLine(emitter, ";");
+        } break;
+        
         case StmtType_FuncDecl: {
             E_WriteF(emitter, "%.*s %.*s(", (int)stmt->op.func_decl.type.size, stmt->op.func_decl.type.str, (int)stmt->op.func_decl.name.size, stmt->op.func_decl.name.str);
             string_list_node* curr_name = stmt->op.func_decl.param_names.first;

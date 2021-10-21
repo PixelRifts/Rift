@@ -18,6 +18,7 @@ static const string ValueType_Double = str_lit("double");
 static const string ValueType_String = str_lit("string");
 static const string ValueType_Char = str_lit("char");
 static const string ValueType_Bool = str_lit("bool");
+static const string ValueType_Void = str_lit("void");
 
 static const string ValueType_MaxCount = str_lit("max_ct");
 
@@ -247,7 +248,8 @@ void struct_array_free(struct_array* array) {
 void struct_array_add(struct_array* array, P_Struct structure) {
     if (array->count + 1 > array->capacity) {
         void* prev = array->elements;
-        array->elements = malloc(array->capacity * 2 * sizeof(P_Struct));
+        array->capacity = GROW_CAPACITY(array->capacity);
+        array->elements = malloc(array->capacity * sizeof(P_Struct));
         memmove(array->elements, prev, array->count * sizeof(P_Struct));
         free(prev);
     }
@@ -333,19 +335,6 @@ static void P_Consume(P_Parser* parser, L_TokenType type, string message) {
     report_error_at_current(parser, message);
 }
 
-static void P_ConsumeType(P_Parser* parser, string message) {
-    if (parser->current.type == TokenType_Int || parser->current.type == TokenType_Long ||
-        parser->current.type == TokenType_Float || parser->current.type == TokenType_Double || parser->current.type == TokenType_Bool || parser->current.type == TokenType_Char || parser->current.type == TokenType_String) { P_Advance(parser); return; }
-    if (parser->current.type == TokenType_Identifier) {
-        if (structure_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
-            P_Advance(parser);
-            return;
-        }
-    }
-    
-    report_error_at_current(parser, message);
-}
-
 static b8 P_Match(P_Parser* parser, L_TokenType expected) {
     if (parser->current.type != expected)
         return false;
@@ -370,6 +359,7 @@ static b8 P_IsTypeToken(P_Parser* parser) {
         P_Match(parser, TokenType_Double) ||
         P_Match(parser, TokenType_Char)   ||
         P_Match(parser, TokenType_Bool)   ||
+        P_Match(parser, TokenType_Void)   ||
         P_Match(parser, TokenType_String)) return true;
     if (parser->current.type == TokenType_Identifier) {
         if (structure_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
@@ -378,6 +368,20 @@ static b8 P_IsTypeToken(P_Parser* parser) {
         }
     }
     return false;
+}
+
+static void P_ConsumeType(P_Parser* parser, string message) {
+    if (parser->current.type == TokenType_Int || parser->current.type == TokenType_Long ||
+        parser->current.type == TokenType_Float || parser->current.type == TokenType_Double || parser->current.type == TokenType_Bool || parser->current.type == TokenType_Char ||
+        parser->current.type == TokenType_Void || parser->current.type == TokenType_String) { P_Advance(parser); return; }
+    if (parser->current.type == TokenType_Identifier) {
+        if (structure_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
+            P_Advance(parser);
+            return;
+        }
+    }
+    
+    report_error_at_current(parser, message);
 }
 
 static P_ValueType P_TypeTokenToValueType(P_Parser* parser) {
@@ -389,6 +393,7 @@ static P_ValueType P_TypeTokenToValueType(P_Parser* parser) {
         case TokenType_Char:   return ValueType_Char;
         case TokenType_Bool:   return ValueType_Bool;
         case TokenType_String: return ValueType_String;
+        case TokenType_Void:   return ValueType_Void;
     }
     return (P_ValueType) { .str = parser->previous.start, .size = parser->previous.length };
 }
@@ -667,6 +672,16 @@ static P_Stmt* P_MakeVarDeclStmtNode(P_Parser* parser, P_ValueType type, string 
     return stmt;
 }
 
+static P_Stmt* P_MakeVarDeclAssignStmtNode(P_Parser* parser, P_ValueType type, string name, P_Expr* val) {
+    P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
+    stmt->type = StmtType_VarDeclAssign;
+    stmt->next = nullptr;
+    stmt->op.var_decl_assign.type = type;
+    stmt->op.var_decl_assign.name = name;
+    stmt->op.var_decl_assign.val = val;
+    return stmt;
+}
+
 static P_Stmt* P_MakeStructDeclStmtNode(P_Parser* parser, string name, u32 count, string_list types, string_list names) {
     P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
     stmt->type = StmtType_StructDecl;
@@ -759,6 +774,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             call_arity++;
         }
         
+        // NOTE: this is also wack. But necessary. If the function is native, the name won't be mangled.
         string possible_name_one = P_FuncNameMangle(parser, name, call_arity, param_types, (string) {0});
         string possible_name_two = name;
         
@@ -1061,7 +1077,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     b8 prev_directly_in_func_body = parser->is_directly_in_func_body;
     
     if (!native) {
-        parser->all_code_paths_return = false;
+        parser->all_code_paths_return = str_eq(type, ValueType_Void);
         parser->encountered_return = false;
         parser->function_body_ret = type;
         parser->is_directly_in_func_body = true;
@@ -1138,8 +1154,18 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name) {
         var_hash_table_set(&parser->variables, key, type);
     }
     else report_error(parser, str_lit("Cannot redeclare variable %.*s\n"), (int)name.size, name.str);
+    if (str_eq(type, ValueType_Void))
+        report_error(parser, str_lit("Cannot declare variable of type: void\n"));
     
-    P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon after name\n"));
+    if (P_Match(parser, TokenType_Equal)) {
+        P_Expr* value = P_Expression(parser);
+        if (!str_eq(value->ret_type, type))
+            report_error(parser, str_lit("Cannot Assign Value of Type %.*s to variable of type %.*s"), (int)value->ret_type.size, value->ret_type.str, (int)type.size, type.str);
+        P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
+        return P_MakeVarDeclAssignStmtNode(parser, type, name, value);
+    }
+    
+    P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
     return P_MakeVarDeclStmtNode(parser, type, name);
 }
 
@@ -1513,6 +1539,14 @@ static void P_PrintAST_Indent(M_Arena* arena, P_Stmt* stmt, u8 indent) {
             for (u8 i = 0; i < indent; i++)
                 printf("  ");
             printf("%.*s: %s\n", (i32)stmt->op.var_decl.name.size, stmt->op.var_decl.name.str, stmt->op.var_decl.type.str);
+        } break;
+        
+        case StmtType_VarDeclAssign: {
+            printf("Variable Declaration:\n");
+            for (u8 i = 0; i < indent; i++)
+                printf("  ");
+            printf("%.*s: %s = \n", (i32)stmt->op.var_decl_assign.name.size, stmt->op.var_decl_assign.name.str, stmt->op.var_decl_assign.type.str);
+            P_PrintExprAST_Indent(arena, stmt->op.var_decl_assign.val, indent + 1);
         } break;
         
         case StmtType_FuncDecl: {

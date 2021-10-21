@@ -1,10 +1,10 @@
 int native puts(string s);
 
-int two() {
-    return 0;
+void two() {
 }
 
 int main() {
+	int x = 10;
 	puts("Testing");
     return 0;
 }
