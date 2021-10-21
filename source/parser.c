@@ -20,7 +20,7 @@ static const string ValueType_Char = str_lit("char");
 static const string ValueType_Bool = str_lit("bool");
 static const string ValueType_Void = str_lit("void");
 
-static const string ValueType_MaxCount = str_lit("max_ct");
+static const string ValueType_Tombstone = str_lit("tombstone");
 
 
 //~ Variable Hashtable
@@ -115,7 +115,7 @@ b8 var_hash_table_del(var_hash_table* table, var_entry_key key) {
     var_table_entry* entry = find_var_entry(table->entries, table->capacity, key);
     if (entry->key.name.size == 0) return false;
     entry->key = (var_entry_key) {0};
-    entry->value = ValueType_MaxCount;
+    entry->value = ValueType_Tombstone;
     return true;
 }
 
@@ -218,7 +218,7 @@ b8 func_hash_table_del(func_hash_table* table, func_entry_key key) {
     func_table_entry* entry = find_func_entry(table->entries, table->capacity, key);
     if (entry->key.name.size == 0) return false;
     entry->key = (func_entry_key) {0};
-    entry->value = ValueType_MaxCount;
+    entry->value = ValueType_Tombstone;
     return true;
 }
 
@@ -714,6 +714,18 @@ static P_Stmt* P_MakeNativeFuncStmtNode(P_Parser* parser, P_ValueType type, stri
     return stmt;
 }
 
+static P_PreStmt* P_MakePreFuncStmtNode(P_Parser* parser, P_ValueType type, string name, u32 arity, string_list param_types, string_list param_names) {
+    P_PreStmt* stmt = arena_alloc(&parser->arena, sizeof(P_PreStmt));
+    stmt->type = PreStmtType_ForwardDecl;
+    stmt->next = nullptr;
+    stmt->op.forward_decl.type = type;
+    stmt->op.forward_decl.name = name;
+    stmt->op.forward_decl.arity = arity;
+    stmt->op.forward_decl.param_types = param_types;
+    stmt->op.forward_decl.param_names = param_names;
+    return stmt;
+}
+
 //~ Expressions
 static P_Expr* P_ExprPrecedence(P_Parser* parser, P_Precedence precedence);
 static P_ParseRule* P_GetRule(L_TokenType type);
@@ -1067,8 +1079,6 @@ static P_Stmt* P_Statement(P_Parser* parser);
 static P_Stmt* P_Declaration(P_Parser* parser);
 
 static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b8 native) {
-    P_ValueType test;
-    
     string_list params = {0};
     string_list param_names = {0};
     u32 arity = 0;
@@ -1104,11 +1114,15 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     
     string actual_name = native || (str_eq(name, str_lit("main")) && arity == 0) ? name : P_FuncNameMangle(parser, name, arity, params, (string){0});
     
-    func_entry_key key = (func_entry_key) { .name = actual_name, .depth = parser->scope_depth - 1 };
-    // -1 Because the scope deptgh is changed by this point
-    if (!func_hash_table_get(&parser->functions, key, &test)) {
-        func_hash_table_set(&parser->functions, key, type);
-    } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), (int)name.size, name.str);
+    // Don't try to add the main functions since the get added during preparsing
+    if (parser->scope_depth != 1 || native) {
+        func_entry_key key = (func_entry_key) { .name = actual_name, .depth = parser->scope_depth - 1 };
+        // -1 Because the scope depth is changed by this point
+        P_ValueType test;
+        if (!func_hash_table_get(&parser->functions, key, &test)) {
+            func_hash_table_set(&parser->functions, key, type);
+        } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), (int)name.size, name.str);
+    }
     
     // Block Stuff
     P_Stmt* func = nullptr;
@@ -1374,8 +1388,107 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
     return s;
 }
 
+//~ Pre-Parsing
+static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name) {
+    P_ValueType test;
+    
+    string_list params = {0};
+    string_list param_names = {0};
+    u32 arity = 0;
+    
+    while (!P_Match(parser, TokenType_CloseParenthesis)) {
+        P_ConsumeType(parser, str_lit("Expected type\n"));
+        P_ValueType param_type = P_TypeTokenToValueType(parser);
+        string_list_push(&parser->arena, &params, param_type);
+        
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected param name\n"));
+        string param_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        string_list_push(&parser->arena, &param_names, param_name);
+        
+        var_hash_table_set(&parser->variables, (var_entry_key) { .name = param_name, .depth = parser->scope_depth }, param_type);
+        
+        arity++;
+        if (!P_Match(parser, TokenType_Comma)) {
+            P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after parameters\n"));
+            break;
+        }
+    }
+    
+    string actual_name = (str_eq(name, str_lit("main")) && arity == 0) ? name : P_FuncNameMangle(parser, name, arity, params, (string){0});
+    
+    func_entry_key key = (func_entry_key) { .name = actual_name, .depth = 0 };
+    
+    if (!func_hash_table_get(&parser->functions, key, &test)) {
+        func_hash_table_set(&parser->functions, key, type);
+    } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), (int)name.size, name.str);
+    
+    P_PreStmt* func = P_MakePreFuncStmtNode(parser, type, actual_name, arity, params, param_names);
+    
+    P_Consume(parser, TokenType_OpenBrace, str_lit("Expected {\n"));
+    
+    while (!P_Match(parser, TokenType_CloseBrace)) {
+        P_Advance(parser);
+        if (P_Match(parser, TokenType_EOF)) {
+            report_error(parser, str_lit("Unterminated function block\n"));
+        }
+    }
+    
+    return func;
+}
+
+static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
+    if (P_IsTypeToken(parser)) {
+        P_ValueType type = P_TypeTokenToValueType(parser);
+        if (P_Match(parser, TokenType_Native)) {
+            while (!P_Match(parser, TokenType_CloseParenthesis)) {
+                if (P_Match(parser, TokenType_EOF))
+                    return nullptr;
+                P_Advance(parser);
+            }
+            P_Consume(parser, TokenType_Semicolon, str_lit("Expected ;\n"));
+            return nullptr;
+        }
+        
+        if (!P_Match(parser, TokenType_Identifier)) return nullptr;
+        
+        string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        if (P_Match(parser, TokenType_OpenParenthesis)) {
+            return P_PreFuncDecl(parser, type, name);
+        }
+    }
+    return nullptr;
+}
+
 //~ API
+void P_PreParse(P_Parser* parser) {
+    L_Initialize(&parser->lexer, parser->source);
+    P_Advance(parser);
+    
+    parser->pre_root = P_PreDeclaration(parser);
+    while (parser->pre_root == nullptr) {
+        if (parser->current.type == TokenType_EOF)
+            return;
+        parser->pre_root = P_PreDeclaration(parser);
+    }
+    
+    P_PreStmt* c = parser->pre_root;
+    
+    while (parser->current.type != TokenType_EOF && !parser->had_error) {
+        P_PreStmt* tmp = P_PreDeclaration(parser);
+        if (tmp != nullptr) {
+            c->next = tmp;
+            c = c->next;
+        } else P_Advance(parser);
+    }
+    
+    P_ValueType v;
+    if (!func_hash_table_get(&parser->functions, (func_entry_key) { .name = str_lit("main"), .depth = 0 }, &v)) {
+        report_error(parser, str_lit("No main function definition found\n"));
+    }
+}
+
 void P_Parse(P_Parser* parser) {
+    L_Initialize(&parser->lexer, parser->source);
     P_Advance(parser);
     
     parser->root = P_Declaration(parser);
@@ -1385,16 +1498,11 @@ void P_Parse(P_Parser* parser) {
         c->next = P_Declaration(parser);
         c = c->next;
     }
-    
-    P_ValueType v;
-    if (!func_hash_table_get(&parser->functions, (func_entry_key) { .name = str_lit("main"), .depth = 0 }, &v)) {
-        report_error(parser, str_lit("No main function definition found\n"));
-    }
 }
 
 void P_Initialize(P_Parser* parser, string source) {
     arena_init(&parser->arena);
-    L_Initialize(&parser->lexer, source);
+    parser->source = source;
     parser->root = nullptr;
     parser->current = (L_Token) {0};
     parser->previous = (L_Token) {0};

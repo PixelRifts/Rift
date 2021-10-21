@@ -152,6 +152,8 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
                     curr_type = curr_type->next;
                 }
             }
+            if (stmt->op.func_decl.arity == 0)
+                E_Write(emitter, "void");
             E_WriteLine(emitter, ") {");
             E_EmitStatementChain(emitter, stmt->op.func_decl.block, indent + 1);
             E_WriteLine(emitter, "}");
@@ -210,6 +212,36 @@ static void E_EmitStatementChain(E_Emitter* emitter, P_Stmt* stmts, u32 indent) 
     }
 }
 
+static void E_EmitPreStatement(E_Emitter* emitter, P_PreStmt* stmt, u32 indent) {
+    for (int i = 0; i < indent; i++) E_Write(emitter, "\t");
+    
+    switch (stmt->type) {
+        case PreStmtType_ForwardDecl: {
+            E_WriteF(emitter, "%.*s %.*s(", (int)stmt->op.forward_decl.type.size, stmt->op.forward_decl.type.str, (int)stmt->op.forward_decl.name.size, stmt->op.forward_decl.name.str);
+            string_list_node* curr_name = stmt->op.forward_decl.param_names.first;
+            string_list_node* curr_type = stmt->op.forward_decl.param_types.first;
+            if (stmt->op.forward_decl.arity != 0) {
+                for (u32 i = 0; i < stmt->op.forward_decl.arity; i++) {
+                    E_WriteF(emitter, "%.*s %.*s", curr_type->size, curr_type->str, curr_name->size, curr_name->str);
+                    if (i != stmt->op.forward_decl.arity - 1)
+                        E_Write(emitter, ", ");
+                    curr_name = curr_name->next;
+                    curr_type = curr_type->next;
+                }
+            }
+            if (stmt->op.forward_decl.arity == 0)
+                E_Write(emitter, "void");
+            E_WriteLine(emitter, ");");
+        }
+    }
+}
+
+static void E_EmitPreStatementChain(E_Emitter* emitter, P_PreStmt* stmts, u32 indent) {
+    for (P_PreStmt* stmt = stmts; stmt != nullptr; stmt = stmt->next) {
+        E_EmitPreStatement(emitter, stmt, indent);
+    }
+}
+
 void E_Initialize(E_Emitter* emitter, string source) {
     P_Initialize(&emitter->parser, source);
     emitter->line = 0;
@@ -218,6 +250,13 @@ void E_Initialize(E_Emitter* emitter, string source) {
 
 void E_Emit(E_Emitter* emitter) {
     E_BeginEmitting(emitter);
+    P_PreParse(&emitter->parser);
+    if (!emitter->parser.had_error)
+        E_EmitPreStatementChain(emitter, emitter->parser.pre_root, 0);
+    else return;
+    
+    E_WriteLine(emitter, "");
+    
     P_Parse(&emitter->parser);
     if (!emitter->parser.had_error)
         E_EmitStatementChain(emitter, emitter->parser.root, 0);

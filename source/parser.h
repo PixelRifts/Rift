@@ -99,6 +99,20 @@ struct P_Stmt {
     } op;
 };
 
+typedef u32 P_PreStmtType;
+enum {
+    PreStmtType_ForwardDecl
+};
+
+typedef struct P_PreStmt P_PreStmt;
+struct P_PreStmt {
+    P_PreStmtType type;
+    P_PreStmt* next;
+    union {
+        struct { string name; u32 arity; string_list param_types; string_list param_names; P_ValueType type; } forward_decl;
+    } op;
+};
+
 typedef struct var_entry_key {
     string name;
     u32 depth;
@@ -167,7 +181,9 @@ void struct_array_add(struct_array* array, P_Struct structure);
 typedef struct P_Parser {
     M_Arena arena;
     L_Lexer lexer;
+    string source;
     
+    P_PreStmt* pre_root;
     P_Stmt* root;
     
     L_Token current;
@@ -189,6 +205,7 @@ typedef struct P_Parser {
 
 void P_Advance(P_Parser* parser);
 void P_Initialize(P_Parser* parser, string source);
+void P_PreParse(P_Parser* parser);
 void P_Parse(P_Parser* parser);
 void P_Free(P_Parser* parser);
 void P_PrintExprAST(P_Expr* expr);

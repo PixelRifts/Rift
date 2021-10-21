@@ -1,7 +1,7 @@
 @ECHO off
 SetLocal EnableDelayedExpansion
 
-SET cc=clang
+SET cc=gcc
 
 del /f generated.c
 

@@ -2,9 +2,9 @@
 #include <stdbool.h>
 typedef const char* string;
 
-void two_0() {
-}
-int main() {
+int main(void);
+
+int main(void) {
 	int x = 10;
 	puts("Testing");
 	return 0;
