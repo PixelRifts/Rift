@@ -7,7 +7,7 @@
 
 #include "operator_bindings.h"
 
-
+//~ Inbuilt Value Types
 static const string ValueType_Invalid = str_lit("INVALID");
 
 static const string ValueType_Integer = str_lit("int");
@@ -21,7 +21,6 @@ static const string ValueType_Bool = str_lit("bool");
 static const string ValueType_Void = str_lit("void");
 
 static const string ValueType_Tombstone = str_lit("tombstone");
-
 
 //~ Variable Hashtable
 static u32 hash_var_key(var_entry_key k) {
@@ -233,47 +232,47 @@ void func_hash_table_add_all(func_hash_table* from, func_hash_table* to) {
 }
 
 //~ Struct List
-void struct_array_init(struct_array* array) {
-    array->elements = calloc(8, sizeof(P_Struct));
+void type_array_init(type_array* array) {
+    array->elements = calloc(8, sizeof(P_Container));
     array->count = 0;
     array->capacity = 8;
 }
 
-void struct_array_free(struct_array* array) {
+void type_array_free(type_array* array) {
     free(array->elements);
     array->count = 0;
     array->capacity = 0;
 }
 
-void struct_array_add(struct_array* array, P_Struct structure) {
+void type_array_add(type_array* array, P_Container structure) {
     if (array->count + 1 > array->capacity) {
         void* prev = array->elements;
         array->capacity = GROW_CAPACITY(array->capacity);
-        array->elements = malloc(array->capacity * sizeof(P_Struct));
-        memmove(array->elements, prev, array->count * sizeof(P_Struct));
+        array->elements = malloc(array->capacity * sizeof(P_Container));
+        memmove(array->elements, prev, array->count * sizeof(P_Container));
         free(prev);
     }
     *(array->elements + array->count) = structure;
     array->count++;
 }
 
-static P_Struct* struct_array_get(P_Parser* parser, string struct_name, u32 depth) {
-    for (u32 i = 0; i < parser->structures.count; i++) {
-        if (str_eq(struct_name, parser->structures.elements[i].name) && parser->structures.elements[i].depth <= depth)
-            return &parser->structures.elements[i];
+static P_Container* type_array_get(P_Parser* parser, string struct_name, u32 depth) {
+    for (u32 i = 0; i < parser->types.count; i++) {
+        if (str_eq(struct_name, parser->types.elements[i].name) && parser->types.elements[i].depth <= depth)
+            return &parser->types.elements[i];
     }
     return nullptr;
 }
 
-static b8 structure_exists(P_Parser* parser, string struct_name, u32 depth) {
-    for (u32 i = 0; i < parser->structures.count; i++) {
-        if (str_eq(struct_name, parser->structures.elements[i].name) && parser->structures.elements[i].depth <= depth)
+static b8 container_type_exists(P_Parser* parser, string struct_name, u32 depth) {
+    for (u32 i = 0; i < parser->types.count; i++) {
+        if (str_eq(struct_name, parser->types.elements[i].name) && parser->types.elements[i].depth <= depth)
             return true;
     }
     return false;
 }
 
-static P_ValueType member_type_get(P_Struct* structure, string reqd) {
+static P_ValueType member_type_get(P_Container* structure, string reqd) {
     string_list_node* curr = structure->member_names.first;
     string_list_node* type = structure->member_types.first;
     for (u32 i = 0; i < structure->member_count; i++) {
@@ -287,7 +286,7 @@ static P_ValueType member_type_get(P_Struct* structure, string reqd) {
     return ValueType_Invalid;
 }
 
-static b8 member_exists(P_Struct* structure, string reqd) {
+static b8 member_exists(P_Container* structure, string reqd) {
     string_list_node* curr = structure->member_names.first;
     for (u32 i = 0; i < structure->member_count; i++) {
         if (curr->size == reqd.size) {
@@ -321,6 +320,7 @@ static void report_error_at(P_Parser* parser, L_Token* token, string message, ..
 
 //~ Elpers
 void P_Advance(P_Parser* parser) {
+    parser->previous_two = parser->current;
     parser->previous = parser->current;
     
     while (true) {
@@ -362,7 +362,7 @@ static b8 P_IsTypeToken(P_Parser* parser) {
         P_Match(parser, TokenType_Void)   ||
         P_Match(parser, TokenType_String)) return true;
     if (parser->current.type == TokenType_Identifier) {
-        if (structure_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
+        if (container_type_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
             P_Advance(parser);
             return true;
         }
@@ -375,7 +375,7 @@ static void P_ConsumeType(P_Parser* parser, string message) {
         parser->current.type == TokenType_Float || parser->current.type == TokenType_Double || parser->current.type == TokenType_Bool || parser->current.type == TokenType_Char ||
         parser->current.type == TokenType_Void || parser->current.type == TokenType_String) { P_Advance(parser); return; }
     if (parser->current.type == TokenType_Identifier) {
-        if (structure_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
+        if (container_type_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
             P_Advance(parser);
             return;
         }
@@ -400,14 +400,14 @@ static P_ValueType P_TypeTokenToValueType(P_Parser* parser) {
 
 static string P_FuncNameMangle(P_Parser* parser, string name, u32 arity, string_list params, string additional_info) {
     string_list sl = {0};
-    string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "%.*s_%u", (int)name.size, name.str, arity));
+    string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "%.*s_%u", (i32)name.size, name.str, arity));
     string_list_node* curr = params.first;
     for (u32 i = 0; i < arity; i++) {
-        string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "%.*s", (int)curr->size, curr->str));
+        string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "%.*s", (i32)curr->size, curr->str));
         curr = curr->next;
     }
     
-    if (additional_info.size != 0) string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "_%s", additional_info));
+    if (additional_info.size != 0) string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "_%s", additional_info.str));
     return string_list_flatten(&parser->arena, &sl);
 }
 
@@ -582,12 +582,31 @@ static P_Expr* P_MakeDotNode(P_Parser* parser, P_ValueType type, P_Expr* left, s
     return expr;
 }
 
+static P_Expr* P_MakeEnumDotNode(P_Parser* parser, P_ValueType type, string left, string right) {
+    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+    expr->type = ExprType_EnumDot;
+    expr->ret_type = type;
+    expr->can_assign = true;
+    expr->op.enum_dot.left = left;
+    expr->op.enum_dot.right = right;
+    return expr;
+}
+
 static P_Expr* P_MakeVariableNode(P_Parser* parser, string name, P_ValueType type) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_Variable;
     expr->ret_type = type;
     expr->can_assign = true;
     expr->op.variable = name;
+    return expr;
+}
+
+static P_Expr* P_MakeTypenameNode(P_Parser* parser, string name) {
+    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+    expr->type = ExprType_Typename;
+    expr->ret_type = ValueType_Invalid;
+    expr->can_assign = true;
+    expr->op.typename = name;
     return expr;
 }
 
@@ -682,6 +701,16 @@ static P_Stmt* P_MakeVarDeclAssignStmtNode(P_Parser* parser, P_ValueType type, s
     return stmt;
 }
 
+static P_Stmt* P_MakeEnumDeclStmtNode(P_Parser* parser, string name, u32 count, string_list names) {
+    P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
+    stmt->type = StmtType_EnumDecl;
+    stmt->next = nullptr;
+    stmt->op.enum_decl.name = name;
+    stmt->op.enum_decl.member_count = count;
+    stmt->op.enum_decl.member_names = names;
+    return stmt;
+}
+
 static P_Stmt* P_MakeStructDeclStmtNode(P_Parser* parser, string name, u32 count, string_list types, string_list names) {
     P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
     stmt->type = StmtType_StructDecl;
@@ -693,7 +722,7 @@ static P_Stmt* P_MakeStructDeclStmtNode(P_Parser* parser, string name, u32 count
     return stmt;
 }
 
-static P_Stmt* P_MakeFuncStmtNode(P_Parser* parser, P_ValueType type, string name, u32 arity, string_list param_types, string_list param_names) {
+static P_Stmt* P_MakeFuncStmtNode(P_Parser* parser, P_ValueType type, string name, u32 arity, string_list param_types, string_list param_names, b8 varargs) {
     P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
     stmt->type = StmtType_FuncDecl;
     stmt->next = nullptr;
@@ -703,6 +732,7 @@ static P_Stmt* P_MakeFuncStmtNode(P_Parser* parser, P_ValueType type, string nam
     stmt->op.func_decl.param_types = param_types;
     stmt->op.func_decl.param_names = param_names;
     stmt->op.func_decl.block = nullptr;
+    stmt->op.func_decl.varargs = varargs;
     return stmt;
 }
 
@@ -786,15 +816,18 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             call_arity++;
         }
         
-        // NOTE: this is also wack. But necessary. If the function is native, the name won't be mangled.
+        // NOTE(voxel): this is also wack. But necessary.
         string possible_name_one = P_FuncNameMangle(parser, name, call_arity, param_types, (string) {0});
+        // NOTE(voxel): If the function is native, the name won't be mangled.
         string possible_name_two = name;
         
+        // FIXME(voxel): memcpy wack
         P_Expr** param_buffer = arena_alloc(&parser->arena, call_arity * sizeof(P_Expr*));
         memcpy(param_buffer, params, call_arity * sizeof(P_Expr*));
         
         func_entry_key key = { .name = possible_name_one, .depth = parser->scope_depth };
         P_ValueType value = ValueType_Invalid;
+        
         while (key.depth != -1) {
             if (func_hash_table_get(&parser->functions, key, &value)) {
                 return P_MakeFuncCallNode(parser, possible_name_one, value, param_buffer, call_arity);
@@ -809,7 +842,26 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             }
             key.depth--;
         }
-        report_error(parser, str_lit("Undefined function %.*s with provided parameters\n"), (int)name.size, name.str);
+        
+        // NOTE(voxel): If there are varargs, it can be any subset of the current args
+        string possible_name_three = {0};
+        u32 i = call_arity;
+        while (i != 1) {
+            possible_name_three = P_FuncNameMangle(parser, name, i, param_types, str_lit("varargs"));
+            
+            key.name = possible_name_three;
+            key.depth = parser->scope_depth;
+            while (key.depth != -1) {
+                if (func_hash_table_get(&parser->functions, key, &value)) {
+                    return P_MakeFuncCallNode(parser, possible_name_three, value, param_buffer, call_arity);
+                }
+                key.depth--;
+            }
+            
+            i--;
+        }
+        
+        report_error(parser, str_lit("Undefined function %.*s with provided parameters\n"), (i32)name.size, name.str);
         
     } else {
         
@@ -821,8 +873,13 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             }
             key.depth--;
         }
-        report_error(parser, str_lit("Undefined variable %.*s\n"), (int)name.size, name.str);
         
+        P_Container* type = type_array_get(parser, name, parser->scope_depth);
+        if (type != nullptr) {
+            return P_MakeTypenameNode(parser, name);
+        }
+        
+        report_error(parser, str_lit("Undefined variable %.*s\n"), (i32)name.size, name.str);
     }
     return nullptr;
 }
@@ -838,7 +895,7 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
         if (str_eq(xpr->ret_type, left->ret_type))
             return P_MakeAssignmentNode(parser, name, xpr);
         
-        report_error(parser, str_lit("Cannot assign %.*s to variable\n"), (int)xpr->ret_type.size, xpr->ret_type.str);
+        report_error(parser, str_lit("Cannot assign %.*s to variable\n"), (i32)xpr->ret_type.size, xpr->ret_type.str);
     }
     return nullptr;
 }
@@ -959,22 +1016,46 @@ static P_Expr* P_ExprBinary(P_Parser* parser, P_Expr* left) {
 }
 
 static P_Expr* P_ExprDot(P_Parser* parser, P_Expr* left) {
-    P_ValueType type = left->ret_type;
-    
-    if (!structure_exists(parser, type, parser->scope_depth)) {
-        report_error(parser, str_lit("Cannot apply . operator\n"));
-        return nullptr;
+    if (left != nullptr) {
+        if (left->type == ExprType_Typename) {
+            if (!container_type_exists(parser, left->op.typename, parser->scope_depth)) {
+                report_error(parser, str_lit("%.*s Is not a namespace or enum.\n"));
+                return nullptr;
+            }
+            
+            P_Consume(parser, TokenType_Identifier, str_lit("Expected Member name after .\n"));
+            string reqd = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+            P_Container* type = type_array_get(parser, left->op.typename, parser->scope_depth);
+            if (!member_exists(type, reqd)) {
+                report_error(parser, str_lit("No member %.*s in enum %.*s\n"), (i32)reqd.size, reqd.str, (i32)left->op.typename.size, left->op.typename.str);
+            }
+            
+            // NOTE(voxel): This is always ValueType_Integer for now.
+            // NOTE(voxel): But if I wanna support enums of different types, this will be different
+            P_ValueType member_type = member_type_get(type, reqd);
+            return P_MakeEnumDotNode(parser, member_type, left->op.typename, reqd);
+            
+        } else {
+            P_ValueType valtype = left->ret_type;
+            
+            if (!container_type_exists(parser, valtype, parser->scope_depth)) {
+                report_error(parser, str_lit("Cannot apply . operator\n"));
+                return nullptr;
+            }
+            
+            P_Consume(parser, TokenType_Identifier, str_lit("Expected Member name after .\n"));
+            string reqd = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+            P_Container* type = type_array_get(parser, valtype, parser->scope_depth);
+            if (!member_exists(type, reqd)) {
+                report_error(parser, str_lit("No member %.*s in struct %.*s\n"), (i32)reqd.size, reqd.str, (i32)valtype.size, valtype.str);
+            }
+            P_ValueType member_type = member_type_get(type, reqd);
+            return P_MakeDotNode(parser, member_type, left, reqd);
+        }
     }
     
-    P_Consume(parser, TokenType_Identifier, str_lit("Expected Member name after .\n"));
-    string reqd = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
-    P_Struct* structure = struct_array_get(parser, type, parser->scope_depth);
-    if (!member_exists(structure, reqd)) {
-        report_error(parser, str_lit("No member %.*s in struct %.*s\n"), (int)reqd.size, reqd.str, (int)type.size, type.str);
-    }
-    P_ValueType member_type = member_type_get(structure, reqd);
-    
-    return P_MakeDotNode(parser, member_type, left, reqd);
+    report_error(parser, str_lit("Cannot apply . operator\n"));
+    return nullptr;
 }
 
 P_ParseRule parse_rules[] = {
@@ -1082,6 +1163,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     string_list params = {0};
     string_list param_names = {0};
     u32 arity = 0;
+    b8 varargs = false;
     
     P_ValueType prev_function_body_ret = parser->function_body_ret;
     b8 prev_directly_in_func_body = parser->is_directly_in_func_body;
@@ -1095,6 +1177,25 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     parser->scope_depth++;
     
     while (!P_Match(parser, TokenType_CloseParenthesis)) {
+        if (P_Match(parser, TokenType_Dot)) {
+            P_Consume(parser, TokenType_Dot, str_lit("Expected .. after .\n"));
+            P_Consume(parser, TokenType_Dot, str_lit("Expected .. after .\n"));
+            
+            if (arity == 0)
+                report_error(parser, str_lit("Only varargs function not allowed\n"));
+            
+            string_list_push(&parser->arena, &params, str_lit("..."));
+            
+            P_Consume(parser, TokenType_Identifier, str_lit("Expected param name\n"));
+            varargs = true;
+            string varargs_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+            string_list_push(&parser->arena, &param_names, varargs_name);
+            
+            P_Consume(parser, TokenType_CloseParenthesis, str_lit("Varargs can only be the last argument for a function\n"));
+            arity++;
+            break;
+        }
+        
         P_ConsumeType(parser, str_lit("Expected type\n"));
         P_ValueType param_type = P_TypeTokenToValueType(parser);
         string_list_push(&parser->arena, &params, param_type);
@@ -1112,16 +1213,17 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         }
     }
     
-    string actual_name = native || (str_eq(name, str_lit("main")) && arity == 0) ? name : P_FuncNameMangle(parser, name, arity, params, (string){0});
+    // NOTE(voxel): `varargs ? arity - 1 : arity` so that it doesnt include the ... parameter in the mangled name
+    string actual_name = native || (str_eq(name, str_lit("main")) && arity == 0) ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, varargs ? str_lit("varargs") : (string){0});
     
-    // Don't try to add the main functions since the get added during preparsing
+    // Don't try to add the outer scope functions since the get added during preparsing
     if (parser->scope_depth != 1 || native) {
         func_entry_key key = (func_entry_key) { .name = actual_name, .depth = parser->scope_depth - 1 };
         // -1 Because the scope depth is changed by this point
         P_ValueType test;
         if (!func_hash_table_get(&parser->functions, key, &test)) {
             func_hash_table_set(&parser->functions, key, type);
-        } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), (int)name.size, name.str);
+        } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), (i32)name.size, name.str);
     }
     
     // Block Stuff
@@ -1130,7 +1232,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     if (!native) {
         P_Consume(parser, TokenType_OpenBrace, str_lit("Expected {\n"));
         
-        func = P_MakeFuncStmtNode(parser, type, actual_name, arity, params, param_names);
+        func = P_MakeFuncStmtNode(parser, type, actual_name, arity, params, param_names, varargs);
         
         P_Stmt* curr = nullptr;
         while (!P_Match(parser, TokenType_CloseBrace)) {
@@ -1167,14 +1269,14 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name) {
     if (!var_hash_table_get(&parser->variables, key, &test)) {
         var_hash_table_set(&parser->variables, key, type);
     }
-    else report_error(parser, str_lit("Cannot redeclare variable %.*s\n"), (int)name.size, name.str);
+    else report_error(parser, str_lit("Cannot redeclare variable %.*s\n"), (i32)name.size, name.str);
     if (str_eq(type, ValueType_Void))
         report_error(parser, str_lit("Cannot declare variable of type: void\n"));
     
     if (P_Match(parser, TokenType_Equal)) {
         P_Expr* value = P_Expression(parser);
         if (!str_eq(value->ret_type, type))
-            report_error(parser, str_lit("Cannot Assign Value of Type %.*s to variable of type %.*s"), (int)value->ret_type.size, value->ret_type.str, (int)type.size, type.str);
+            report_error(parser, str_lit("Cannot Assign Value of Type %.*s to variable of type %.*s\n"), (i32)value->ret_type.size, value->ret_type.str, (i32)type.size, type.str);
         P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
         return P_MakeVarDeclAssignStmtNode(parser, type, name, value);
     }
@@ -1187,12 +1289,12 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser) {
     P_Consume(parser, TokenType_Identifier, str_lit("Expected Struct name after keyword 'struct'\n"));
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     
-    if (structure_exists(parser, name, parser->scope_depth))
-        report_error(parser, str_lit("Cannot redeclare structure with name %.*s\n"), (int)name.size, name.str);
+    if (container_type_exists(parser, name, parser->scope_depth))
+        report_error(parser, str_lit("Cannot redeclare type with name %.*s\n"), (i32)name.size, name.str);
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Struct Name\n"));
     
-    u64 idx = parser->structures.count;
-    struct_array_add(&parser->structures, (P_Struct) { .name = name, .depth = parser->scope_depth });
+    u64 idx = parser->types.count;
+    type_array_add(&parser->types, (P_Container) { .type = ContainerType_Struct, .name = name, .depth = parser->scope_depth });
     u32 tmp_member_count = 0;
     string_list member_names = {0};
     string_list member_types = {0};
@@ -1211,11 +1313,43 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser) {
             report_error(parser, str_lit("Unterminated block for structure definition\n"));
     }
     
-    parser->structures.elements[idx].member_count = tmp_member_count;
-    parser->structures.elements[idx].member_types = member_types;
-    parser->structures.elements[idx].member_names = member_names;
+    parser->types.elements[idx].member_count = tmp_member_count;
+    parser->types.elements[idx].member_types = member_types;
+    parser->types.elements[idx].member_names = member_names;
     
     return P_MakeStructDeclStmtNode(parser, name, tmp_member_count, member_types, member_names);
+}
+
+static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser) {
+    P_Consume(parser, TokenType_Identifier, str_lit("Expected Enum name after keyword 'enum'\n"));
+    string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    if (container_type_exists(parser, name, parser->scope_depth))
+        report_error(parser, str_lit("Cannot redeclare type with name %.*s\n"), (i32)name.size, name.str);
+    P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Enum Name\n"));
+    
+    u64 idx = parser->types.count;
+    type_array_add(&parser->types, (P_Container) { .type = ContainerType_Enum, .name = name, .depth = parser->scope_depth });
+    u32 member_count = 0;
+    string_list member_names = {0};
+    string_list member_types = {0};
+    
+    while (!P_Match(parser, TokenType_CloseBrace)) {
+        string_list_push(&parser->arena, &member_types, ValueType_Integer);
+        
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
+        string_list_push(&parser->arena, &member_names, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
+        
+        member_count++;
+        if (P_Match(parser, TokenType_CloseBrace)) break;
+        if (parser->current.type == TokenType_EOF)
+            report_error(parser, str_lit("Unterminated block for enum definition\n"));
+    }
+    
+    parser->types.elements[idx].member_count = member_count;
+    parser->types.elements[idx].member_types = member_types;
+    parser->types.elements[idx].member_names = member_names;
+    
+    return P_MakeEnumDeclStmtNode(parser, name, member_count, member_names);
 }
 
 static P_Stmt* P_StmtBlock(P_Parser* parser) {
@@ -1252,7 +1386,7 @@ static P_Stmt* P_StmtReturn(P_Parser* parser) {
     P_Expr* val = P_Expression(parser);
     if (val == nullptr) return nullptr;
     if (!str_eq(val->ret_type, parser->function_body_ret))
-        report_error(parser, str_lit("Function return type mismatch. Expected %.*s\n"), (int)parser->function_body_ret.size, parser->function_body_ret.str);
+        report_error(parser, str_lit("Function return type mismatch. Expected %.*s\n"), (i32)parser->function_body_ret.size, parser->function_body_ret.str);
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after return statement\n"));
     return P_MakeReturnStmtNode(parser, val);
 }
@@ -1381,6 +1515,8 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
         }
     } else if (P_Match(parser, TokenType_Struct)) {
         s = P_StmtStructureDecl(parser);
+    } else if (P_Match(parser, TokenType_Enum)) {
+        s = P_StmtEnumerationDecl(parser);
     } else
         s = P_Statement(parser);
     
@@ -1395,8 +1531,28 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
     string_list params = {0};
     string_list param_names = {0};
     u32 arity = 0;
+    b8 varargs = false;
     
     while (!P_Match(parser, TokenType_CloseParenthesis)) {
+        if (P_Match(parser, TokenType_Dot)) {
+            P_Consume(parser, TokenType_Dot, str_lit("Expected .. after .\n"));
+            P_Consume(parser, TokenType_Dot, str_lit("Expected .. after .\n"));
+            
+            if (arity == 0)
+                report_error(parser, str_lit("Only varargs function not allowed\n"));
+            
+            string_list_push(&parser->arena, &params, str_lit("..."));
+            
+            P_Consume(parser, TokenType_Identifier, str_lit("Expected param name\n"));
+            varargs = true;
+            string varargs_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+            string_list_push(&parser->arena, &param_names, varargs_name);
+            
+            P_Consume(parser, TokenType_CloseParenthesis, str_lit("Varargs can only be the last argument for a function\n"));
+            arity++;
+            break;
+        }
+        
         P_ConsumeType(parser, str_lit("Expected type\n"));
         P_ValueType param_type = P_TypeTokenToValueType(parser);
         string_list_push(&parser->arena, &params, param_type);
@@ -1414,13 +1570,15 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
         }
     }
     
-    string actual_name = (str_eq(name, str_lit("main")) && arity == 0) ? name : P_FuncNameMangle(parser, name, arity, params, (string){0});
+    string actual_name = (str_eq(name, str_lit("main")) && arity == 0) ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, varargs ? str_lit("varargs") : (string){0});
     
-    func_entry_key key = (func_entry_key) { .name = actual_name, .depth = 0 };
+    string cached_name = (str_eq(name, str_lit("main")) && arity == 0) ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, varargs ? str_lit("varargs") : (string){0});
+    
+    func_entry_key key = (func_entry_key) { .name = cached_name, .depth = 0 };
     
     if (!func_hash_table_get(&parser->functions, key, &test)) {
         func_hash_table_set(&parser->functions, key, type);
-    } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), (int)name.size, name.str);
+    } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), (i32)name.size, name.str);
     
     P_PreStmt* func = P_MakePreFuncStmtNode(parser, type, actual_name, arity, params, param_names);
     
@@ -1445,7 +1603,6 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
                     return nullptr;
                 P_Advance(parser);
             }
-            P_Consume(parser, TokenType_Semicolon, str_lit("Expected ;\n"));
             return nullptr;
         }
         
@@ -1466,6 +1623,7 @@ void P_PreParse(P_Parser* parser) {
     
     parser->pre_root = P_PreDeclaration(parser);
     while (parser->pre_root == nullptr) {
+        P_Advance(parser);
         if (parser->current.type == TokenType_EOF)
             return;
         parser->pre_root = P_PreDeclaration(parser);
@@ -1515,13 +1673,13 @@ void P_Initialize(P_Parser* parser, string source) {
     parser->all_code_paths_return = false;
     var_hash_table_init(&parser->variables);
     func_hash_table_init(&parser->functions);
-    struct_array_init(&parser->structures);
+    type_array_init(&parser->types);
 }
 
 void P_Free(P_Parser* parser) {
     var_hash_table_free(&parser->variables);
     func_hash_table_free(&parser->functions);
-    struct_array_free(&parser->structures);
+    type_array_free(&parser->types);
     arena_free(&parser->arena);
 }
 
@@ -1547,11 +1705,11 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
         } break;
         
         case ExprType_StringLit: {
-            printf("%.*s [String]\n", (int)expr->op.string_lit.size, expr->op.string_lit.str);
+            printf("%.*s [String]\n", (i32)expr->op.string_lit.size, expr->op.string_lit.str);
         } break;
         
         case ExprType_CharLit: {
-            printf("%.*s [Char]\n", (int)expr->op.char_lit.size, expr->op.char_lit.str);
+            printf("%.*s [Char]\n", (i32)expr->op.char_lit.size, expr->op.char_lit.str);
         } break;
         
         case ExprType_BoolLit: {
@@ -1565,7 +1723,7 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
         } break;
         
         case ExprType_Variable: {
-            printf("%.*s\n", (int)expr->op.variable.size, expr->op.variable.str);
+            printf("%.*s\n", (i32)expr->op.variable.size, expr->op.variable.str);
         } break;
         
         case ExprType_Unary: {
@@ -1588,6 +1746,10 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
         case ExprType_Dot: {
             printf(".%.*s [Member Access]\n", (i32)expr->op.dot.right.size, expr->op.dot.right.str);
             P_PrintExprAST_Indent(arena, expr->op.dot.left, indent + 1);
+        } break;
+        
+        case ExprType_EnumDot: {
+            printf("%.*s.%.*s [Enum Access]\n", (i32)expr->op.enum_dot.left.size, expr->op.enum_dot.left.str, (i32)expr->op.enum_dot.right.size, expr->op.enum_dot.right.str);
         } break;
     }
 }
@@ -1674,6 +1836,18 @@ static void P_PrintAST_Indent(M_Arena* arena, P_Stmt* stmt, u8 indent) {
                 
                 curr = curr->next;
                 type = type->next;
+            }
+        } break;
+        
+        case StmtType_EnumDecl: {
+            printf("Enum Declaration: %s\n", stmt->op.enum_decl.name.str);
+            string_list_node* curr = stmt->op.enum_decl.member_names.first;
+            for (u32 i = 0; i < stmt->op.enum_decl.member_count; i++) {
+                for (u8 idt = 0; idt < indent + 1; idt++)
+                    printf("  ");
+                printf("%.*s\n", (i32)curr->size, curr->str);
+                
+                curr = curr->next;
             }
         } break;
         

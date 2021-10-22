@@ -28,6 +28,7 @@ static void E_WriteLineF(E_Emitter* emitter, const char* text, ...) {
 static void E_BeginEmitting(E_Emitter* emitter) {
     E_WriteLine(emitter, "#include <stdio.h>");
     E_WriteLine(emitter, "#include <stdbool.h>");
+    E_WriteLine(emitter, "#include <stdarg.h>");
     E_WriteLine(emitter, "typedef const char* string;");
     E_WriteLine(emitter, "");
 }
@@ -59,11 +60,11 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
         } break;
         
         case ExprType_CharLit: {
-            E_WriteF(emitter, "%.*s", (int)expr->op.char_lit.size, expr->op.char_lit.str);
+            E_WriteF(emitter, "%.*s", (i32)expr->op.char_lit.size, expr->op.char_lit.str);
         } break;
         
         case ExprType_StringLit: {
-            E_WriteF(emitter, "%.*s", (int)expr->op.string_lit.size, expr->op.string_lit.str);
+            E_WriteF(emitter, "%.*s", (i32)expr->op.string_lit.size, expr->op.string_lit.str);
         } break;
         
         case ExprType_Assignment: {
@@ -88,11 +89,11 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
         } break;
         
         case ExprType_Variable: {
-            E_WriteF(emitter, "%.*s", (int)expr->op.variable.size, expr->op.variable.str);
+            E_WriteF(emitter, "%.*s", (i32)expr->op.variable.size, expr->op.variable.str);
         } break;
         
         case ExprType_FuncCall: {
-            E_WriteF(emitter, "%.*s(", (int)expr->op.func_call.name.size, expr->op.func_call.name.str);
+            E_WriteF(emitter, "%.*s(", (i32)expr->op.func_call.name.size, expr->op.func_call.name.str);
             for (u32 i = 0; i < expr->op.func_call.call_arity; i++) {
                 E_EmitExpression(emitter, expr->op.func_call.params[i]);
                 if (i != expr->op.func_call.call_arity - 1)
@@ -103,7 +104,11 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
         
         case ExprType_Dot: {
             E_EmitExpression(emitter, expr->op.dot.left);
-            E_WriteF(emitter, ".%.*s", (int)expr->op.dot.right.size, expr->op.dot.right.str);
+            E_WriteF(emitter, ".%.*s", (i32)expr->op.dot.right.size, expr->op.dot.right.str);
+        } break;
+        
+        case ExprType_EnumDot: {
+            E_WriteF(emitter, "_enum_%.*s_%.*s", (i32)expr->op.enum_dot.left.size, expr->op.enum_dot.left.str, (i32)expr->op.enum_dot.right.size, expr->op.enum_dot.right.str);
         } break;
     }
 }
@@ -129,25 +134,41 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
         } break;
         
         case StmtType_VarDecl: {
-            E_WriteF(emitter, "%.*s %.*s", (int)stmt->op.var_decl.type.size, stmt->op.var_decl.type.str, (int)stmt->op.var_decl.name.size, stmt->op.var_decl.name.str);
+            E_WriteF(emitter, "%.*s %.*s", (i32)stmt->op.var_decl.type.size, stmt->op.var_decl.type.str, (i32)stmt->op.var_decl.name.size, stmt->op.var_decl.name.str);
             E_WriteLine(emitter, ";");
         } break;
         
         case StmtType_VarDeclAssign: {
-            E_WriteF(emitter, "%.*s %.*s = ", (int)stmt->op.var_decl_assign.type.size, stmt->op.var_decl_assign.type.str, (int)stmt->op.var_decl_assign.name.size, stmt->op.var_decl_assign.name.str);
+            E_WriteF(emitter, "%.*s %.*s = ", (i32)stmt->op.var_decl_assign.type.size, stmt->op.var_decl_assign.type.str, (i32)stmt->op.var_decl_assign.name.size, stmt->op.var_decl_assign.name.str);
             E_EmitExpression(emitter, stmt->op.var_decl_assign.val);
             E_WriteLine(emitter, ";");
         } break;
         
         case StmtType_FuncDecl: {
-            E_WriteF(emitter, "%.*s %.*s(", (int)stmt->op.func_decl.type.size, stmt->op.func_decl.type.str, (int)stmt->op.func_decl.name.size, stmt->op.func_decl.name.str);
+            E_WriteF(emitter, "%.*s %.*s(", (i32)stmt->op.func_decl.type.size, stmt->op.func_decl.type.str, (i32)stmt->op.func_decl.name.size, stmt->op.func_decl.name.str);
             string_list_node* curr_name = stmt->op.func_decl.param_names.first;
             string_list_node* curr_type = stmt->op.func_decl.param_types.first;
+            
+            string arg_before_varargs;
+            string varargs;
+            
             if (stmt->op.func_decl.arity != 0) {
                 for (u32 i = 0; i < stmt->op.func_decl.arity; i++) {
-                    E_WriteF(emitter, "%.*s %.*s", curr_type->size, curr_type->str, curr_name->size, curr_name->str);
+                    if (str_eq((string) { .str = curr_type->str, .size = curr_type->size }, str_lit("..."))) {
+                        E_WriteF(emitter, "%.*s", (i32)curr_type->size, curr_type->str);
+                        varargs = (string) { .str = curr_name->str, .size = curr_name->size };
+                        break;
+                    }
+                    
+                    E_WriteF(emitter, "%.*s %.*s", (i32)curr_type->size, curr_type->str, (i32)curr_name->size, curr_name->str);
                     if (i != stmt->op.func_decl.arity - 1)
                         E_Write(emitter, ", ");
+                    
+                    if (stmt->op.func_decl.varargs) {
+                        if (i == stmt->op.func_decl.arity - 2)
+                            arg_before_varargs = (string) { .str = curr_name->str, .size = curr_name->size };
+                    }
+                    
                     curr_name = curr_name->next;
                     curr_type = curr_type->next;
                 }
@@ -155,22 +176,46 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             if (stmt->op.func_decl.arity == 0)
                 E_Write(emitter, "void");
             E_WriteLine(emitter, ") {");
+            
+            if (stmt->op.func_decl.varargs) {
+                E_WriteLineF(emitter, "va_list %.*s;", (i32)varargs.size, varargs.str);
+                E_WriteLineF(emitter, "va_start(%.*s, %.*s);", (i32)varargs.size, varargs.str, (i32)arg_before_varargs.size, arg_before_varargs.str);
+            }
+            
             E_EmitStatementChain(emitter, stmt->op.func_decl.block, indent + 1);
+            
+            if (stmt->op.func_decl.varargs)
+                E_WriteLineF(emitter, "va_end(%.*s);", (i32)varargs.size, varargs.str);
+            
+            
             E_WriteLine(emitter, "}");
         } break;
         
         case StmtType_StructDecl: {
-            E_WriteLineF(emitter, "typedef struct %.*s {", stmt->op.struct_decl.name.size, stmt->op.struct_decl.name.str);
+            E_WriteLineF(emitter, "typedef struct %.*s {", (i32)stmt->op.struct_decl.name.size, stmt->op.struct_decl.name.str);
             string_list_node* curr_name = stmt->op.struct_decl.member_names.first;
             string_list_node* curr_type = stmt->op.struct_decl.member_types.first;
             for (u32 i = 0; i < stmt->op.struct_decl.member_count; i++) {
                 for (u32 idt = 0; idt < indent + 1; idt++)
                     E_Write(emitter, "\t");
-                E_WriteLineF(emitter, "%.*s %.*s;", (int)curr_type->size, curr_type->str, (int)curr_name->size, curr_name->str);
+                E_WriteLineF(emitter, "%.*s %.*s;", (i32)curr_type->size, curr_type->str, (i32)curr_name->size, curr_name->str);
                 curr_name = curr_name->next;
                 curr_type = curr_type->next;
             }
-            E_WriteLineF(emitter, "} %.*s;", (int)stmt->op.struct_decl.name.size, stmt->op.struct_decl.name.str);
+            E_WriteLineF(emitter, "} %.*s;", (i32)stmt->op.struct_decl.name.size, stmt->op.struct_decl.name.str);
+        } break;
+        
+        case StmtType_EnumDecl: {
+            E_WriteLineF(emitter, "typedef int %.*s;", (i32)stmt->op.enum_decl.name.size, stmt->op.enum_decl.name.str);
+            E_WriteLineF(emitter, "enum %.*s {", (i32)stmt->op.enum_decl.name.size, stmt->op.enum_decl.name.str);
+            string_list_node* curr_name = stmt->op.enum_decl.member_names.first;
+            for (u32 i = 0; i < stmt->op.enum_decl.member_count; i++) {
+                for (u32 idt = 0; idt < indent + 1; idt++)
+                    E_Write(emitter, "\t");
+                E_WriteLineF(emitter, "_enum_%.*s_%.*s,", (i32)stmt->op.enum_decl.name.size, stmt->op.enum_decl.name.str, (i32)curr_name->size, curr_name->str);
+                curr_name = curr_name->next;
+            }
+            E_WriteLineF(emitter, "};", (i32)stmt->op.enum_decl.name.size, stmt->op.enum_decl.name.str);
         } break;
         
         case StmtType_If: {
@@ -217,12 +262,16 @@ static void E_EmitPreStatement(E_Emitter* emitter, P_PreStmt* stmt, u32 indent) 
     
     switch (stmt->type) {
         case PreStmtType_ForwardDecl: {
-            E_WriteF(emitter, "%.*s %.*s(", (int)stmt->op.forward_decl.type.size, stmt->op.forward_decl.type.str, (int)stmt->op.forward_decl.name.size, stmt->op.forward_decl.name.str);
+            E_WriteF(emitter, "%.*s %.*s(", (i32)stmt->op.forward_decl.type.size, stmt->op.forward_decl.type.str, (i32)stmt->op.forward_decl.name.size, stmt->op.forward_decl.name.str);
             string_list_node* curr_name = stmt->op.forward_decl.param_names.first;
             string_list_node* curr_type = stmt->op.forward_decl.param_types.first;
             if (stmt->op.forward_decl.arity != 0) {
                 for (u32 i = 0; i < stmt->op.forward_decl.arity; i++) {
-                    E_WriteF(emitter, "%.*s %.*s", curr_type->size, curr_type->str, curr_name->size, curr_name->str);
+                    if (str_eq((string) { .str = curr_type->str, .size = curr_type->size }, str_lit("..."))) {
+                        E_WriteF(emitter, "%.*s", (i32)curr_type->size, curr_type->str);
+                        break;
+                    }
+                    E_WriteF(emitter, "%.*s %.*s", (i32)curr_type->size, curr_type->str, (i32)curr_name->size, curr_name->str);
                     if (i != stmt->op.forward_decl.arity - 1)
                         E_Write(emitter, ", ");
                     curr_name = curr_name->next;

@@ -1,7 +1,11 @@
-int native puts(string s);
+void native printf(string format, ... data);
 
 int main() {
 	int x = 10;
-	puts("Testing");
+    printf("%d\n", x);
     return 0;
+}
+
+int two(int count, ... others) {
+	return count;
 }

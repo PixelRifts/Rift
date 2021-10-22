@@ -43,9 +43,9 @@ typedef string P_ValueType;
 typedef u32 P_ExprType;
 enum {
     ExprType_IntLit, ExprType_LongLit, ExprType_FloatLit, ExprType_DoubleLit,
-    ExprType_StringLit, ExprType_CharLit, ExprType_BoolLit,
+    ExprType_StringLit, ExprType_CharLit, ExprType_BoolLit, ExprType_Typename,
     ExprType_Unary, ExprType_Binary, ExprType_Assignment, ExprType_Variable,
-    ExprType_FuncCall, ExprType_Dot
+    ExprType_FuncCall, ExprType_Dot, ExprType_EnumDot
 };
 
 typedef struct P_Expr P_Expr;
@@ -61,9 +61,11 @@ struct P_Expr {
         b8     bool_lit;
         string char_lit; // Is a string for transpiling reasons. :(
         string string_lit;
+        string typename;
         struct { L_TokenType operator; P_Expr* left; P_Expr* right; } binary;
         struct { L_TokenType operator; P_Expr* operand; } unary;
         struct { P_Expr* left; string right; } dot;
+        struct { string left; string right; } enum_dot;
         struct { P_Expr* name; P_Expr* value; } assignment;
         string variable;
         struct { string name; P_Expr** params; u32 call_arity; } func_call;
@@ -74,7 +76,7 @@ typedef u32 P_StmtType;
 enum {
     StmtType_Expression, StmtType_Block, StmtType_Return, StmtType_If,
     StmtType_IfElse, StmtType_While, StmtType_DoWhile, StmtType_VarDecl,
-    StmtType_VarDeclAssign, StmtType_FuncDecl, StmtType_NativeFuncDecl, StmtType_StructDecl,
+    StmtType_VarDeclAssign, StmtType_FuncDecl, StmtType_NativeFuncDecl, StmtType_StructDecl, StmtType_EnumDecl,
 };
 
 typedef struct P_Stmt P_Stmt;
@@ -89,8 +91,9 @@ struct P_Stmt {
         
         struct { P_ValueType type; string name; } var_decl;
         struct { P_ValueType type; string name; P_Expr* val; } var_decl_assign;
-        struct { string name; u32 arity; string_list param_types; string_list param_names; P_ValueType type; P_Stmt* block; } func_decl;
+        struct { string name; u32 arity; string_list param_types; string_list param_names; P_ValueType type; P_Stmt* block; b8 varargs; } func_decl;
         struct { string name; u32 member_count; string_list member_types; string_list member_names; } struct_decl;
+        struct { string name; u32 member_count; string_list member_names; } enum_decl;
         
         struct { P_Expr* condition; P_Stmt* then; } if_s;
         struct { P_Expr* condition; P_Stmt* then; P_Stmt* else_s; } if_else;
@@ -160,23 +163,30 @@ b8   func_hash_table_set(func_hash_table* table, func_entry_key key, P_ValueType
 b8   func_hash_table_del(func_hash_table* table, func_entry_key key);
 void func_hash_table_add_all(func_hash_table* from, func_hash_table* to);
 
-typedef struct P_Struct {
+
+typedef u32 P_ContainerType;
+enum {
+    ContainerType_Enum, ContainerType_Struct,
+};
+
+typedef struct P_Container {
+    P_ContainerType type;
     string name;
     u32 depth;
     u32 member_count;
     string_list member_types;
     string_list member_names;
-} P_Struct;
+} P_Container;
 
-typedef struct struct_array {
+typedef struct type_array {
     u32 capacity;
     u32 count;
-    P_Struct* elements;
-} struct_array;
+    P_Container* elements;
+} type_array;
 
-void struct_array_init(struct_array* array);
-void struct_array_free(struct_array* array);
-void struct_array_add(struct_array* array, P_Struct structure);
+void type_array_init(type_array* array);
+void type_array_free(type_array* array);
+void type_array_add(type_array* array, P_Container structure);
 
 typedef struct P_Parser {
     M_Arena arena;
@@ -188,11 +198,12 @@ typedef struct P_Parser {
     
     L_Token current;
     L_Token previous;
+    L_Token previous_two;
     
     u32 scope_depth;
     var_hash_table variables;
     func_hash_table functions;
-    struct_array structures;
+    type_array types;
     
     b8 had_error;
     b8 panik_mode;
