@@ -8,12 +8,13 @@ int two_1int_varargs(int count, ...);
 
 int main(void) {
 	int x = 10;
-	printf("%d\n", x);
+	printf("test\n", 10);
+	two_1int_varargs(1, 0, 10, 29, 39);
 	return 0;
 }
 int two_1int_varargs(int count, ...) {
-    va_list others;
-    va_start(others, count);
-    va_end(others);
+va_list others;
+va_start(others, count);
 	return count;
+va_end(others);
 }

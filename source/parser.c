@@ -145,7 +145,7 @@ static func_table_entry* find_func_entry(func_table_entry* entries, i32 cap, fun
     while (true) {
         func_table_entry* entry = &entries[idx];
         if (entry->key.name.size == 0) {
-            if (entry->value.size == 0)
+            if (entry->value.value.size == 0)
                 return tombstone_e != nullptr ? tombstone_e : entry;
             else
                 if (tombstone_e == nullptr) tombstone_e = entry;
@@ -188,7 +188,7 @@ void func_hash_table_free(func_hash_table* table) {
     table->entries = nullptr;
 }
 
-b8 func_hash_table_get(func_hash_table* table, func_entry_key key, P_ValueType* value) {
+b8 func_hash_table_get(func_hash_table* table, func_entry_key key, func_entry_val* value) {
     if (table->count == 0) return false;
     func_table_entry* entry = find_func_entry(table->entries, table->capacity, key);
     if (entry->key.name.size == 0) return false;
@@ -196,7 +196,7 @@ b8 func_hash_table_get(func_hash_table* table, func_entry_key key, P_ValueType* 
     return true;
 }
 
-b8 func_hash_table_set(func_hash_table* table, func_entry_key key, P_ValueType  value) {
+b8 func_hash_table_set(func_hash_table* table, func_entry_key key, func_entry_val value) {
     if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
         i32 cap = GROW_CAPACITY(table->capacity);
         func_table_adjust_cap(table, cap);
@@ -204,7 +204,7 @@ b8 func_hash_table_set(func_hash_table* table, func_entry_key key, P_ValueType  
     
     func_table_entry* entry = find_func_entry(table->entries, table->capacity, key);
     b8 is_new_key = entry->key.name.size == 0;
-    if (is_new_key && entry->value.size == 0)
+    if (is_new_key && entry->value.value.size == 0)
         table->count++;
     
     entry->key = key;
@@ -217,7 +217,7 @@ b8 func_hash_table_del(func_hash_table* table, func_entry_key key) {
     func_table_entry* entry = find_func_entry(table->entries, table->capacity, key);
     if (entry->key.name.size == 0) return false;
     entry->key = (func_entry_key) {0};
-    entry->value = ValueType_Tombstone;
+    entry->value = (func_entry_val) { .value = ValueType_Tombstone, .is_native = false };
     return true;
 }
 
@@ -818,42 +818,32 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         
         // NOTE(voxel): this is also wack. But necessary.
         string possible_name_one = P_FuncNameMangle(parser, name, call_arity, param_types, (string) {0});
-        // NOTE(voxel): If the function is native, the name won't be mangled.
-        string possible_name_two = name;
         
         // FIXME(voxel): memcpy wack
         P_Expr** param_buffer = arena_alloc(&parser->arena, call_arity * sizeof(P_Expr*));
         memcpy(param_buffer, params, call_arity * sizeof(P_Expr*));
         
         func_entry_key key = { .name = possible_name_one, .depth = parser->scope_depth };
-        P_ValueType value = ValueType_Invalid;
+        func_entry_val value = {0};
         
         while (key.depth != -1) {
             if (func_hash_table_get(&parser->functions, key, &value)) {
-                return P_MakeFuncCallNode(parser, possible_name_one, value, param_buffer, call_arity);
-            }
-            key.depth--;
-        }
-        key.name = possible_name_two;
-        key.depth = parser->scope_depth;
-        while (key.depth != -1) {
-            if (func_hash_table_get(&parser->functions, key, &value)) {
-                return P_MakeFuncCallNode(parser, possible_name_two, value, param_buffer, call_arity);
+                return P_MakeFuncCallNode(parser, value.is_native ? name : possible_name_one, value.value, param_buffer, call_arity);
             }
             key.depth--;
         }
         
         // NOTE(voxel): If there are varargs, it can be any subset of the current args
-        string possible_name_three = {0};
+        string possible_name_two = {0};
         u32 i = call_arity;
-        while (i != 1) {
-            possible_name_three = P_FuncNameMangle(parser, name, i, param_types, str_lit("varargs"));
+        while (i != 0) {
+            possible_name_two = P_FuncNameMangle(parser, name, i, param_types, str_lit("varargs"));
             
-            key.name = possible_name_three;
+            key.name = possible_name_two;
             key.depth = parser->scope_depth;
             while (key.depth != -1) {
                 if (func_hash_table_get(&parser->functions, key, &value)) {
-                    return P_MakeFuncCallNode(parser, possible_name_three, value, param_buffer, call_arity);
+                    return P_MakeFuncCallNode(parser, value.is_native ? name : possible_name_two, value.value, param_buffer, call_arity);
                 }
                 key.depth--;
             }
@@ -1213,16 +1203,21 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         }
     }
     
+    string additional = {0};
+    if (varargs) additional = str_cat(&parser->arena, additional, str_lit("varargs"));
+    
     // NOTE(voxel): `varargs ? arity - 1 : arity` so that it doesnt include the ... parameter in the mangled name
-    string actual_name = native || (str_eq(name, str_lit("main")) && arity == 0) ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, varargs ? str_lit("varargs") : (string){0});
+    // Also, this is a stupid ternary chain.
+    string actual_name = (str_eq(name, str_lit("main")) && arity == 0)
+        ? name :  P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, additional);
     
     // Don't try to add the outer scope functions since the get added during preparsing
     if (parser->scope_depth != 1 || native) {
         func_entry_key key = (func_entry_key) { .name = actual_name, .depth = parser->scope_depth - 1 };
         // -1 Because the scope depth is changed by this point
-        P_ValueType test;
+        func_entry_val test = {0};
         if (!func_hash_table_get(&parser->functions, key, &test)) {
-            func_hash_table_set(&parser->functions, key, type);
+            func_hash_table_set(&parser->functions, key, (func_entry_val) { .value = type, .is_native = native });
         } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), (i32)name.size, name.str);
     }
     
@@ -1526,8 +1521,6 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
 
 //~ Pre-Parsing
 static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name) {
-    P_ValueType test;
-    
     string_list params = {0};
     string_list param_names = {0};
     u32 arity = 0;
@@ -1570,14 +1563,15 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
         }
     }
     
-    string actual_name = (str_eq(name, str_lit("main")) && arity == 0) ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, varargs ? str_lit("varargs") : (string){0});
+    string additional = {0};
+    if (varargs) additional = str_cat(&parser->arena, additional, str_lit("varargs"));
     
-    string cached_name = (str_eq(name, str_lit("main")) && arity == 0) ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, varargs ? str_lit("varargs") : (string){0});
+    string actual_name = (str_eq(name, str_lit("main")) && arity == 0) ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, additional);
     
-    func_entry_key key = (func_entry_key) { .name = cached_name, .depth = 0 };
-    
+    func_entry_key key = (func_entry_key) { .name = actual_name, .depth = 0 };
+    func_entry_val test;
     if (!func_hash_table_get(&parser->functions, key, &test)) {
-        func_hash_table_set(&parser->functions, key, type);
+        func_hash_table_set(&parser->functions, key, (func_entry_val) { .value = type, .is_native = false });
     } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), (i32)name.size, name.str);
     
     P_PreStmt* func = P_MakePreFuncStmtNode(parser, type, actual_name, arity, params, param_names);
@@ -1639,7 +1633,7 @@ void P_PreParse(P_Parser* parser) {
         } else P_Advance(parser);
     }
     
-    P_ValueType v;
+    func_entry_val v = {0};
     if (!func_hash_table_get(&parser->functions, (func_entry_key) { .name = str_lit("main"), .depth = 0 }, &v)) {
         report_error(parser, str_lit("No main function definition found\n"));
     }

@@ -1,8 +1,9 @@
-void native printf(string format, ... data);
+void native printf(string format, ... rest);
 
 int main() {
 	int x = 10;
-    printf("%d\n", x);
+    printf("test\n", 10);
+	two(1, 0, 10, 29, 39);
     return 0;
 }
 

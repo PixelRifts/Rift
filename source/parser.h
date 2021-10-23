@@ -145,9 +145,14 @@ typedef struct func_entry_key {
     u32 depth;
 } func_entry_key;
 
+typedef struct func_entry_val {
+    P_ValueType value;
+    b8 is_native;
+} func_entry_val;
+
 typedef struct func_table_entry {
     func_entry_key key;
-    P_ValueType value;
+    func_entry_val value;
 } func_table_entry;
 
 typedef struct func_hash_table {
@@ -158,8 +163,8 @@ typedef struct func_hash_table {
 
 void func_hash_table_init(func_hash_table* table);
 void func_hash_table_free(func_hash_table* table);
-b8   func_hash_table_get(func_hash_table* table, func_entry_key key, P_ValueType* value);
-b8   func_hash_table_set(func_hash_table* table, func_entry_key key, P_ValueType  value);
+b8   func_hash_table_get(func_hash_table* table, func_entry_key key, func_entry_val* value);
+b8   func_hash_table_set(func_hash_table* table, func_entry_key key, func_entry_val  value);
 b8   func_hash_table_del(func_hash_table* table, func_entry_key key);
 void func_hash_table_add_all(func_hash_table* from, func_hash_table* to);
 
