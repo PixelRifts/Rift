@@ -31,11 +31,14 @@ typedef string_const_list string_list;
 //-
 
 #define str_lit(s) (string_const) { .str = (u8*)(s), .size = sizeof(s) - 1 }
+#define str_expand(s) (i32)(s).size, (s).str
+#define str_node_expand(s) (i32)(s)->size, (s)->str
+
 string_const str_alloc(M_Arena* arena, u64 size); // NOTE(EVERYONE): this will try to get one extra byte for \0
 string_const str_copy(M_Arena* arena, string_const other);
 string_const str_cat(M_Arena* arena, string_const a, string_const b);
 string_const str_from_format(M_Arena* arena, const char* format, ...);
-b8 str_eq(string_const a, string_const b); // NOTE(voxel): Absolute comparison
+b8 str_eq(string_const a, string_const b); // NOTE(voxel): Absolute comparison no fuzz
 u64 str_find_first(string_const str, string_const needle, u32 offset);
 
 void string_list_push_node(string_const_list* list, string_const_list_node* node);

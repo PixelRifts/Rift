@@ -1,12 +1,12 @@
 void native printf(string format, ... rest);
 
 int main() {
-	int x = 10;
+	long x = 10l;
     printf("test\n", 10);
-	two(1, 0, 10, 29, 39);
+	two(1l, 0, 10, 29, 39);
     return 0;
 }
 
-int two(int count, ... others) {
+long two(long count, ... others) {
 	return count;
 }

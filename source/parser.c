@@ -400,10 +400,10 @@ static P_ValueType P_TypeTokenToValueType(P_Parser* parser) {
 
 static string P_FuncNameMangle(P_Parser* parser, string name, u32 arity, string_list params, string additional_info) {
     string_list sl = {0};
-    string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "%.*s_%u", (i32)name.size, name.str, arity));
+    string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "%.*s_%u", str_expand(name), arity));
     string_list_node* curr = params.first;
     for (u32 i = 0; i < arity; i++) {
-        string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "%.*s", (i32)curr->size, curr->str));
+        string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "%.*s", str_node_expand(curr)));
         curr = curr->next;
     }
     
@@ -851,7 +851,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             i--;
         }
         
-        report_error(parser, str_lit("Undefined function %.*s with provided parameters\n"), (i32)name.size, name.str);
+        report_error(parser, str_lit("Undefined function %.*s with provided parameters\n"), str_expand(name));
         
     } else {
         
@@ -869,7 +869,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             return P_MakeTypenameNode(parser, name);
         }
         
-        report_error(parser, str_lit("Undefined variable %.*s\n"), (i32)name.size, name.str);
+        report_error(parser, str_lit("Undefined variable %.*s\n"), str_expand(name));
     }
     return nullptr;
 }
@@ -885,7 +885,7 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
         if (str_eq(xpr->ret_type, left->ret_type))
             return P_MakeAssignmentNode(parser, name, xpr);
         
-        report_error(parser, str_lit("Cannot assign %.*s to variable\n"), (i32)xpr->ret_type.size, xpr->ret_type.str);
+        report_error(parser, str_lit("Cannot assign %.*s to variable\n"), str_expand(xpr->ret_type));
     }
     return nullptr;
 }
@@ -1017,7 +1017,7 @@ static P_Expr* P_ExprDot(P_Parser* parser, P_Expr* left) {
             string reqd = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
             P_Container* type = type_array_get(parser, left->op.typename, parser->scope_depth);
             if (!member_exists(type, reqd)) {
-                report_error(parser, str_lit("No member %.*s in enum %.*s\n"), (i32)reqd.size, reqd.str, (i32)left->op.typename.size, left->op.typename.str);
+                report_error(parser, str_lit("No member %.*s in enum %.*s\n"), str_expand(reqd), str_expand(left->op.typename));
             }
             
             // NOTE(voxel): This is always ValueType_Integer for now.
@@ -1037,7 +1037,7 @@ static P_Expr* P_ExprDot(P_Parser* parser, P_Expr* left) {
             string reqd = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
             P_Container* type = type_array_get(parser, valtype, parser->scope_depth);
             if (!member_exists(type, reqd)) {
-                report_error(parser, str_lit("No member %.*s in struct %.*s\n"), (i32)reqd.size, reqd.str, (i32)valtype.size, valtype.str);
+                report_error(parser, str_lit("No member %.*s in struct %.*s\n"), str_expand(reqd), str_expand(valtype));
             }
             P_ValueType member_type = member_type_get(type, reqd);
             return P_MakeDotNode(parser, member_type, left, reqd);
@@ -1218,7 +1218,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         func_entry_val test = {0};
         if (!func_hash_table_get(&parser->functions, key, &test)) {
             func_hash_table_set(&parser->functions, key, (func_entry_val) { .value = type, .is_native = native });
-        } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), (i32)name.size, name.str);
+        } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), str_expand(name));
     }
     
     // Block Stuff
@@ -1264,14 +1264,14 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name) {
     if (!var_hash_table_get(&parser->variables, key, &test)) {
         var_hash_table_set(&parser->variables, key, type);
     }
-    else report_error(parser, str_lit("Cannot redeclare variable %.*s\n"), (i32)name.size, name.str);
+    else report_error(parser, str_lit("Cannot redeclare variable %.*s\n"), str_expand(name));
     if (str_eq(type, ValueType_Void))
         report_error(parser, str_lit("Cannot declare variable of type: void\n"));
     
     if (P_Match(parser, TokenType_Equal)) {
         P_Expr* value = P_Expression(parser);
         if (!str_eq(value->ret_type, type))
-            report_error(parser, str_lit("Cannot Assign Value of Type %.*s to variable of type %.*s\n"), (i32)value->ret_type.size, value->ret_type.str, (i32)type.size, type.str);
+            report_error(parser, str_lit("Cannot Assign Value of Type %.*s to variable of type %.*s\n"), str_expand(value->ret_type), str_expand(type));
         P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
         return P_MakeVarDeclAssignStmtNode(parser, type, name, value);
     }
@@ -1285,7 +1285,7 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser) {
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     
     if (container_type_exists(parser, name, parser->scope_depth))
-        report_error(parser, str_lit("Cannot redeclare type with name %.*s\n"), (i32)name.size, name.str);
+        report_error(parser, str_lit("Cannot redeclare type with name %.*s\n"), str_expand(name));
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Struct Name\n"));
     
     u64 idx = parser->types.count;
@@ -1319,7 +1319,7 @@ static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser) {
     P_Consume(parser, TokenType_Identifier, str_lit("Expected Enum name after keyword 'enum'\n"));
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     if (container_type_exists(parser, name, parser->scope_depth))
-        report_error(parser, str_lit("Cannot redeclare type with name %.*s\n"), (i32)name.size, name.str);
+        report_error(parser, str_lit("Cannot redeclare type with name %.*s\n"), str_expand(name));
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Enum Name\n"));
     
     u64 idx = parser->types.count;
@@ -1381,7 +1381,7 @@ static P_Stmt* P_StmtReturn(P_Parser* parser) {
     P_Expr* val = P_Expression(parser);
     if (val == nullptr) return nullptr;
     if (!str_eq(val->ret_type, parser->function_body_ret))
-        report_error(parser, str_lit("Function return type mismatch. Expected %.*s\n"), (i32)parser->function_body_ret.size, parser->function_body_ret.str);
+        report_error(parser, str_lit("Function return type mismatch. Expected %.*s\n"), str_expand(parser->function_body_ret));
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after return statement\n"));
     return P_MakeReturnStmtNode(parser, val);
 }
@@ -1572,7 +1572,7 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
     func_entry_val test;
     if (!func_hash_table_get(&parser->functions, key, &test)) {
         func_hash_table_set(&parser->functions, key, (func_entry_val) { .value = type, .is_native = false });
-    } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), (i32)name.size, name.str);
+    } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), str_expand(name));
     
     P_PreStmt* func = P_MakePreFuncStmtNode(parser, type, actual_name, arity, params, param_names);
     
@@ -1699,11 +1699,11 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
         } break;
         
         case ExprType_StringLit: {
-            printf("%.*s [String]\n", (i32)expr->op.string_lit.size, expr->op.string_lit.str);
+            printf("%.*s [String]\n", str_expand(expr->op.string_lit));
         } break;
         
         case ExprType_CharLit: {
-            printf("%.*s [Char]\n", (i32)expr->op.char_lit.size, expr->op.char_lit.str);
+            printf("%.*s [Char]\n", str_expand(expr->op.char_lit));
         } break;
         
         case ExprType_BoolLit: {
@@ -1717,7 +1717,7 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
         } break;
         
         case ExprType_Variable: {
-            printf("%.*s\n", (i32)expr->op.variable.size, expr->op.variable.str);
+            printf("%.*s\n", str_expand(expr->op.variable));
         } break;
         
         case ExprType_Unary: {
@@ -1738,12 +1738,12 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
         } break;
         
         case ExprType_Dot: {
-            printf(".%.*s [Member Access]\n", (i32)expr->op.dot.right.size, expr->op.dot.right.str);
+            printf(".%.*s [Member Access]\n", str_expand(expr->op.dot.right));
             P_PrintExprAST_Indent(arena, expr->op.dot.left, indent + 1);
         } break;
         
         case ExprType_EnumDot: {
-            printf("%.*s.%.*s [Enum Access]\n", (i32)expr->op.enum_dot.left.size, expr->op.enum_dot.left.str, (i32)expr->op.enum_dot.right.size, expr->op.enum_dot.right.str);
+            printf("%.*s.%.*s [Enum Access]\n", str_expand(expr->op.enum_dot.left), str_expand(expr->op.enum_dot.right));
         } break;
     }
 }
@@ -1802,14 +1802,14 @@ static void P_PrintAST_Indent(M_Arena* arena, P_Stmt* stmt, u8 indent) {
             printf("Variable Declaration:\n");
             for (u8 i = 0; i < indent; i++)
                 printf("  ");
-            printf("%.*s: %s\n", (i32)stmt->op.var_decl.name.size, stmt->op.var_decl.name.str, stmt->op.var_decl.type.str);
+            printf("%.*s: %.*s\n", str_expand(stmt->op.var_decl.name), str_expand(stmt->op.var_decl.type));
         } break;
         
         case StmtType_VarDeclAssign: {
             printf("Variable Declaration:\n");
             for (u8 i = 0; i < indent; i++)
                 printf("  ");
-            printf("%.*s: %s = \n", (i32)stmt->op.var_decl_assign.name.size, stmt->op.var_decl_assign.name.str, stmt->op.var_decl_assign.type.str);
+            printf("%.*s: %.*s = \n", str_expand(stmt->op.var_decl_assign.name), str_expand(stmt->op.var_decl_assign.type));
             P_PrintExprAST_Indent(arena, stmt->op.var_decl_assign.val, indent + 1);
         } break;
         
@@ -1826,7 +1826,7 @@ static void P_PrintAST_Indent(M_Arena* arena, P_Stmt* stmt, u8 indent) {
             for (u32 i = 0; i < stmt->op.struct_decl.member_count; i++) {
                 for (u8 idt = 0; idt < indent + 1; idt++)
                     printf("  ");
-                printf("%.*s: %.*s\n", (i32)curr->size, curr->str, (i32)type->size, type->str);
+                printf("%.*s: %.*s\n", str_node_expand(curr), str_node_expand(type));
                 
                 curr = curr->next;
                 type = type->next;
@@ -1839,7 +1839,7 @@ static void P_PrintAST_Indent(M_Arena* arena, P_Stmt* stmt, u8 indent) {
             for (u32 i = 0; i < stmt->op.enum_decl.member_count; i++) {
                 for (u8 idt = 0; idt < indent + 1; idt++)
                     printf("  ");
-                printf("%.*s\n", (i32)curr->size, curr->str);
+                printf("%.*s\n", str_node_expand(curr));
                 
                 curr = curr->next;
             }
