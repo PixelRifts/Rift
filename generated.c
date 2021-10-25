@@ -4,7 +4,7 @@
 typedef const char* string;
 
 int main(void);
-long long two_1long_varargs(long long count, long long others);
+long long two_1long_varargs(long long count, ...);
 
 int main(void) {
 	long long x = 10;

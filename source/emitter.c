@@ -280,8 +280,8 @@ static void E_EmitPreStatement(E_Emitter* emitter, P_PreStmt* stmt, u32 indent) 
             string_list_node* curr_name = stmt->op.forward_decl.param_names.first;
             string_list_node* curr_type = stmt->op.forward_decl.param_types.first;
             if (stmt->op.forward_decl.arity != 0) {
-                P_ValueType c_type = type_map((P_ValueType) { .str = curr_type->str, .size = curr_type->size });
                 for (u32 i = 0; i < stmt->op.forward_decl.arity; i++) {
+                    P_ValueType c_type = type_map((P_ValueType) { .str = curr_type->str, .size = curr_type->size });
                     if (str_eq(c_type, str_lit("..."))) {
                         E_WriteF(emitter, "%.*s", str_expand(c_type));
                         break;
