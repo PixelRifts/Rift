@@ -1110,6 +1110,7 @@ static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser) {
         
         member_count++;
         if (P_Match(parser, TokenType_CloseBrace)) break;
+        P_Consume(parser, TokenType_Comma, str_lit("Expected comma before next member"));
         if (parser->current.type == TokenType_EOF)
             report_error(parser, str_lit("Unterminated block for enum definition\n"));
     }
