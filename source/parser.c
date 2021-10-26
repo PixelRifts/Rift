@@ -20,242 +20,27 @@ static const string ValueType_Char = str_lit("char");
 static const string ValueType_Bool = str_lit("bool");
 static const string ValueType_Void = str_lit("void");
 
-static const string ValueType_Tombstone = str_lit("tombstone");
-
-//~ Variable Hashtable
-static u32 hash_var_key(var_entry_key k) {
-    u32 hash = 2166136261u;
-    for (u32 i = 0; i < k.name.size; i++) {
-        hash ^= k.name.str[i];
-        hash *= 16777619;
-    }
-    hash += k.depth;
-    return hash;
-}
-
-static var_table_entry* find_var_entry(var_table_entry* entries, i32 cap, var_entry_key key) {
-    u32 idx = hash_var_key(key) % cap;
-    var_table_entry* tombstone_e = nullptr;
+//~ Errors
+static void report_error_at(P_Parser* parser, L_Token* token, string message, ...) {
+    if (parser->panik_mode) exit(1);
     
-    while (true) {
-        var_table_entry* entry = &entries[idx];
-        if (entry->key.name.size == 0) {
-            if (entry->value.size == 0)
-                return tombstone_e != nullptr ? tombstone_e : entry;
-            else
-                if (tombstone_e == nullptr) tombstone_e = entry;
-        } else if (entry->key.name.size == key.name.size)
-            if (memcmp(entry->key.name.str, key.name.str, key.name.size) == 0 && entry->key.depth == key.depth) {
-            return entry;
-        }
-        idx = (idx + 1) % cap;
-    }
-}
-
-static void var_table_adjust_cap(var_hash_table* table, i32 cap) {
-    var_table_entry* entries = malloc(sizeof(var_table_entry) * cap);
-    memset(entries, 0, sizeof(var_table_entry) * cap);
+    fprintf(stderr, "Error:%d: ", token->line);
+    if (token->type != TokenType_Error && token->type != TokenType_EOF)
+        fprintf(stderr, "At '%.*s' ", token->length, token->start);
     
-    table->count = 0;
-    for (u32 i = 0; i < table->capacity; i++) {
-        var_table_entry* entry = &table->entries[i];
-        if (entry->key.name.size == 0) continue;
-        
-        var_table_entry* dest = find_var_entry(entries, cap, entry->key);
-        dest->key = entry->key;
-        dest->value = entry->value;
-        table->count++;
-    }
+    va_list args;
+    va_start(args, message);
+    vfprintf(stderr, (char*)message.str, args);
+    va_end(args);
     
-    free(table->entries);
-    table->entries = entries;
-    table->capacity = cap;
+    parser->had_error = true;
+    parser->panik_mode = true;
 }
 
-void var_hash_table_init(var_hash_table* table) {
-    table->count = 0;
-    table->capacity = 0;
-    table->entries = nullptr;
-}
+#define report_error(parser, message, ...) report_error_at(parser, &parser->previous, message, ##__VA_ARGS__)
+#define report_error_at_current(parser, message, ...) report_error_at(parser, &parser->current, message, ##__VA_ARGS__)
 
-void var_hash_table_free(var_hash_table* table) {
-    free(table->entries);
-    table->count = 0;
-    table->capacity = 0;
-    table->entries = nullptr;
-}
-
-b8 var_hash_table_get(var_hash_table* table, var_entry_key key, P_ValueType* value) {
-    if (table->count == 0) return false;
-    var_table_entry* entry = find_var_entry(table->entries, table->capacity, key);
-    if (entry->key.name.size == 0) return false;
-    *value = entry->value;
-    return true;
-}
-
-b8 var_hash_table_set(var_hash_table* table, var_entry_key key, P_ValueType value) {
-    if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
-        i32 cap = GROW_CAPACITY(table->capacity);
-        var_table_adjust_cap(table, cap);
-    }
-    
-    var_table_entry* entry = find_var_entry(table->entries, table->capacity, key);
-    b8 is_new_key = entry->key.name.size == 0;
-    if (is_new_key && entry->value.size == 0)
-        table->count++;
-    
-    entry->key = key;
-    entry->value = value;
-    return is_new_key;
-}
-
-b8 var_hash_table_del(var_hash_table* table, var_entry_key key) {
-    if (table->count == 0) return false;
-    var_table_entry* entry = find_var_entry(table->entries, table->capacity, key);
-    if (entry->key.name.size == 0) return false;
-    entry->key = (var_entry_key) {0};
-    entry->value = ValueType_Tombstone;
-    return true;
-}
-
-void var_hash_table_add_all(var_hash_table* from, var_hash_table* to) {
-    for (u32 i = 0; i < from->capacity; i++) {
-        var_table_entry* entry = &from->entries[i];
-        if (entry->key.name.size != 0) {
-            var_hash_table_set(to, entry->key, entry->value);
-        }
-    }
-}
-
-//~ Function hashtable
-static u32 hash_func_key(func_entry_key k) {
-    u32 hash = 2166136261u;
-    for (u32 i = 0; i < k.name.size; i++) {
-        hash ^= k.name.str[i];
-        hash *= 16777619;
-    }
-    hash += k.depth;
-    return hash;
-}
-
-static func_table_entry* find_func_entry(func_table_entry* entries, i32 cap, func_entry_key key) {
-    u32 idx = hash_func_key(key) % cap;
-    func_table_entry* tombstone_e = nullptr;
-    
-    while (true) {
-        func_table_entry* entry = &entries[idx];
-        if (entry->key.name.size == 0) {
-            if (entry->value.value.size == 0)
-                return tombstone_e != nullptr ? tombstone_e : entry;
-            else
-                if (tombstone_e == nullptr) tombstone_e = entry;
-        } else if (str_eq(entry->key.name, key.name) && entry->key.depth == key.depth)
-            return entry;
-        idx = (idx + 1) % cap;
-    }
-}
-
-static void func_table_adjust_cap(func_hash_table* table, i32 cap) {
-    func_table_entry* entries = malloc(sizeof(func_table_entry) * cap);
-    memset(entries, 0, sizeof(func_table_entry) * cap);
-    
-    table->count = 0;
-    for (u32 i = 0; i < table->capacity; i++) {
-        func_table_entry* entry = &table->entries[i];
-        if (entry->key.name.size == 0) continue;
-        
-        func_table_entry* dest = find_func_entry(entries, cap, entry->key);
-        dest->key = entry->key;
-        dest->value = entry->value;
-        table->count++;
-    }
-    
-    free(table->entries);
-    table->entries = entries;
-    table->capacity = cap;
-}
-
-void func_hash_table_init(func_hash_table* table) {
-    table->count = 0;
-    table->capacity = 0;
-    table->entries = nullptr;
-}
-
-void func_hash_table_free(func_hash_table* table) {
-    free(table->entries);
-    table->count = 0;
-    table->capacity = 0;
-    table->entries = nullptr;
-}
-
-b8 func_hash_table_get(func_hash_table* table, func_entry_key key, func_entry_val* value) {
-    if (table->count == 0) return false;
-    func_table_entry* entry = find_func_entry(table->entries, table->capacity, key);
-    if (entry->key.name.size == 0) return false;
-    *value = entry->value;
-    return true;
-}
-
-b8 func_hash_table_set(func_hash_table* table, func_entry_key key, func_entry_val value) {
-    if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
-        i32 cap = GROW_CAPACITY(table->capacity);
-        func_table_adjust_cap(table, cap);
-    }
-    
-    func_table_entry* entry = find_func_entry(table->entries, table->capacity, key);
-    b8 is_new_key = entry->key.name.size == 0;
-    if (is_new_key && entry->value.value.size == 0)
-        table->count++;
-    
-    entry->key = key;
-    entry->value = value;
-    return is_new_key;
-}
-
-b8 func_hash_table_del(func_hash_table* table, func_entry_key key) {
-    if (table->count == 0) return false;
-    func_table_entry* entry = find_func_entry(table->entries, table->capacity, key);
-    if (entry->key.name.size == 0) return false;
-    entry->key = (func_entry_key) {0};
-    entry->value = (func_entry_val) { .value = ValueType_Tombstone, .is_native = false };
-    return true;
-}
-
-
-void func_hash_table_add_all(func_hash_table* from, func_hash_table* to) {
-    for (u32 i = 0; i < from->capacity; i++) {
-        func_table_entry* entry = &from->entries[i];
-        if (entry->key.name.size != 0) {
-            func_hash_table_set(to, entry->key, entry->value);
-        }
-    }
-}
-
-//~ Struct List
-void type_array_init(type_array* array) {
-    array->elements = calloc(8, sizeof(P_Container));
-    array->count = 0;
-    array->capacity = 8;
-}
-
-void type_array_free(type_array* array) {
-    free(array->elements);
-    array->count = 0;
-    array->capacity = 0;
-}
-
-void type_array_add(type_array* array, P_Container structure) {
-    if (array->count + 1 > array->capacity) {
-        void* prev = array->elements;
-        array->capacity = GROW_CAPACITY(array->capacity);
-        array->elements = malloc(array->capacity * sizeof(P_Container));
-        memmove(array->elements, prev, array->count * sizeof(P_Container));
-        free(prev);
-    }
-    *(array->elements + array->count) = structure;
-    array->count++;
-}
-
+//~ Elpers
 static P_Container* type_array_get(P_Parser* parser, string struct_name, u32 depth) {
     for (u32 i = 0; i < parser->types.count; i++) {
         if (str_eq(struct_name, parser->types.elements[i].name) && parser->types.elements[i].depth <= depth)
@@ -298,27 +83,6 @@ static b8 member_exists(P_Container* structure, string reqd) {
     return false;
 }
 
-//~ Errors
-static void report_error_at(P_Parser* parser, L_Token* token, string message, ...) {
-    if (parser->panik_mode) exit(1);
-    
-    fprintf(stderr, "Error:%d: ", token->line);
-    if (token->type != TokenType_Error && token->type != TokenType_EOF)
-        fprintf(stderr, "At '%.*s' ", token->length, token->start);
-    
-    va_list args;
-    va_start(args, message);
-    vfprintf(stderr, (char*)message.str, args);
-    va_end(args);
-    
-    parser->had_error = true;
-    parser->panik_mode = true;
-}
-
-#define report_error(parser, message, ...) report_error_at(parser, &parser->previous, message, ##__VA_ARGS__)
-#define report_error_at_current(parser, message, ...) report_error_at(parser, &parser->current, message, ##__VA_ARGS__)
-
-//~ Elpers
 void P_Advance(P_Parser* parser) {
     parser->previous_two = parser->current;
     parser->previous = parser->current;
@@ -798,7 +562,9 @@ static P_Expr* P_ExprBool(P_Parser* parser) {
 
 static P_Expr* P_ExprVar(P_Parser* parser) {
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    
     if (P_Match(parser, TokenType_OpenParenthesis)) {
+        // If I find a (, its a function call
         P_Expr* params[256] = {0};
         string_list param_types = {0};
         u32 call_arity = 0;
@@ -817,6 +583,12 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         }
         
         // NOTE(voxel): this is also wack. But necessary.
+        
+        // HELP(anyone): This feels like a stupid way of doing it.
+        // HELP(anyone): Testing all possible mangled names until we get a match is O(1) time complexity but...
+        // HELP(anyone): is still slower than O(n) when the program is small.
+        // HELP(anyone): The other way is to do a linear search through the elements but it defeats the purpose of using a hashmap
+        
         string possible_name_one = P_FuncNameMangle(parser, name, call_arity, param_types, (string) {0});
         
         // FIXME(voxel): memcpy wack
@@ -1209,7 +981,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     // NOTE(voxel): `varargs ? arity - 1 : arity` so that it doesnt include the ... parameter in the mangled name
     // Also, this is a stupid ternary chain.
     string actual_name = (str_eq(name, str_lit("main")) && arity == 0)
-        ? name :  P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, additional);
+        ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, additional);
     
     // Don't try to add the outer scope functions since the get added during preparsing
     if (parser->scope_depth != 1 || native) {
@@ -1294,6 +1066,7 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser) {
     string_list member_names = {0};
     string_list member_types = {0};
     
+    // Parse Members
     while (!P_Match(parser, TokenType_CloseBrace)) {
         P_ConsumeType(parser, str_lit("Expected Type or }\n"));
         string_list_push(&parser->arena, &member_types, P_TypeTokenToValueType(parser));
@@ -1328,6 +1101,7 @@ static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser) {
     string_list member_names = {0};
     string_list member_types = {0};
     
+    // Parse Members
     while (!P_Match(parser, TokenType_CloseBrace)) {
         string_list_push(&parser->arena, &member_types, ValueType_Integer);
         
