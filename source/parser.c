@@ -563,8 +563,8 @@ static P_Expr* P_ExprBool(P_Parser* parser) {
 static P_Expr* P_ExprVar(P_Parser* parser) {
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     
+    // If I find a (, its a function call
     if (P_Match(parser, TokenType_OpenParenthesis)) {
-        // If I find a (, its a function call
         P_Expr* params[256] = {0};
         string_list param_types = {0};
         u32 call_arity = 0;
@@ -589,33 +589,28 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         // HELP(anyone): is still slower than O(n) when the program is small.
         // HELP(anyone): The other way is to do a linear search through the elements but it defeats the purpose of using a hashmap
         
-        string possible_name_one = P_FuncNameMangle(parser, name, call_arity, param_types, (string) {0});
-        
         // FIXME(voxel): memcpy wack
         P_Expr** param_buffer = arena_alloc(&parser->arena, call_arity * sizeof(P_Expr*));
         memcpy(param_buffer, params, call_arity * sizeof(P_Expr*));
         
-        func_entry_key key = { .name = possible_name_one, .depth = parser->scope_depth };
-        func_entry_val value = {0};
+        func_entry_key key = { .name = name, .depth = parser->scope_depth };
+        func_entry_val* value = nullptr;
         
         while (key.depth != -1) {
-            if (func_hash_table_get(&parser->functions, key, &value)) {
-                return P_MakeFuncCallNode(parser, value.is_native ? name : possible_name_one, value.value, param_buffer, call_arity);
+            if (func_hash_table_get(&parser->functions, key, param_types, 0, &value)) {
+                return P_MakeFuncCallNode(parser, value->is_native ? name : value->mangled_name, value->value, param_buffer, call_arity);
             }
             key.depth--;
         }
         
         // NOTE(voxel): If there are varargs, it can be any subset of the current args
-        string possible_name_two = {0};
+        key.name = name;
         u32 i = call_arity;
         while (i != 0) {
-            possible_name_two = P_FuncNameMangle(parser, name, i, param_types, str_lit("varargs"));
-            
-            key.name = possible_name_two;
             key.depth = parser->scope_depth;
             while (key.depth != -1) {
-                if (func_hash_table_get(&parser->functions, key, &value)) {
-                    return P_MakeFuncCallNode(parser, value.is_native ? name : possible_name_two, value.value, param_buffer, call_arity);
+                if (func_hash_table_get(&parser->functions, key, param_types, call_arity - i, &value)) {
+                    return P_MakeFuncCallNode(parser, value->mangled_name, value->value, param_buffer, call_arity);
                 }
                 key.depth--;
             }
@@ -977,19 +972,21 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     
     string additional = {0};
     if (varargs) additional = str_cat(&parser->arena, additional, str_lit("varargs"));
-    
-    // NOTE(voxel): `varargs ? arity - 1 : arity` so that it doesnt include the ... parameter in the mangled name
-    // Also, this is a stupid ternary chain.
-    string actual_name = (str_eq(name, str_lit("main")) && arity == 0)
-        ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, additional);
+    string mangled = native || str_eq(str_lit("main"), name) ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, additional);
     
     // Don't try to add the outer scope functions since the get added during preparsing
     if (parser->scope_depth != 1 || native) {
-        func_entry_key key = (func_entry_key) { .name = actual_name, .depth = parser->scope_depth - 1 };
+        func_entry_key key = (func_entry_key) { .name = name, .depth = parser->scope_depth - 1 };
         // -1 Because the scope depth is changed by this point
-        func_entry_val test = {0};
-        if (!func_hash_table_get(&parser->functions, key, &test)) {
-            func_hash_table_set(&parser->functions, key, (func_entry_val) { .value = type, .is_native = native });
+        
+        func_entry_val* test = nullptr;
+        if (!func_hash_table_get(&parser->functions, key, params, 0, &test)) {
+            func_entry_val* val = arena_alloc(&parser->arena, sizeof(func_entry_val)); val->value = type;
+            val->is_native = native;
+            val->param_types = params;
+            val->mangled_name = mangled;
+            
+            func_hash_table_set(&parser->functions, key, val);
         } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), str_expand(name));
     }
     
@@ -999,7 +996,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     if (!native) {
         P_Consume(parser, TokenType_OpenBrace, str_lit("Expected {\n"));
         
-        func = P_MakeFuncStmtNode(parser, type, actual_name, arity, params, param_names, varargs);
+        func = P_MakeFuncStmtNode(parser, type, mangled, arity, params, param_names, varargs);
         
         P_Stmt* curr = nullptr;
         while (!P_Match(parser, TokenType_CloseBrace)) {
@@ -1023,7 +1020,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         if (!parser->all_code_paths_return) report_error(parser, str_lit("Not all code paths return a value\n"));
     } else {
         P_Consume(parser, TokenType_Semicolon, str_lit("Can't have function body on a native function\n"));
-        func = P_MakeNativeFuncStmtNode(parser, type, actual_name, arity, params, param_names);
+        func = P_MakeNativeFuncStmtNode(parser, type, name, arity, params, param_names);
     }
     parser->scope_depth--;
     
@@ -1341,15 +1338,20 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
     string additional = {0};
     if (varargs) additional = str_cat(&parser->arena, additional, str_lit("varargs"));
     
-    string actual_name = (str_eq(name, str_lit("main")) && arity == 0) ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, additional);
+    string mangled = str_eq(str_lit("main"), name) ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, additional);
     
-    func_entry_key key = (func_entry_key) { .name = actual_name, .depth = 0 };
-    func_entry_val test;
-    if (!func_hash_table_get(&parser->functions, key, &test)) {
-        func_hash_table_set(&parser->functions, key, (func_entry_val) { .value = type, .is_native = false });
+    func_entry_key key = (func_entry_key) { .name = name, .depth = 0 };
+    func_entry_val* test = nullptr;
+    if (!func_hash_table_get(&parser->functions, key, params, 0, &test)) {
+        func_entry_val* val = arena_alloc(&parser->arena, sizeof(func_entry_val));
+        val->value = type;
+        val->is_native = false;
+        val->param_types = params;
+        val->mangled_name = mangled;
+        func_hash_table_set(&parser->functions, key, val);
     } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), str_expand(name));
     
-    P_PreStmt* func = P_MakePreFuncStmtNode(parser, type, actual_name, arity, params, param_names);
+    P_PreStmt* func = P_MakePreFuncStmtNode(parser, type, mangled, arity, params, param_names);
     
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected {\n"));
     
@@ -1408,8 +1410,8 @@ void P_PreParse(P_Parser* parser) {
         } else P_Advance(parser);
     }
     
-    func_entry_val v = {0};
-    if (!func_hash_table_get(&parser->functions, (func_entry_key) { .name = str_lit("main"), .depth = 0 }, &v)) {
+    func_entry_val* v = nullptr;
+    if (!func_hash_table_get(&parser->functions, (func_entry_key) { .name = str_lit("main"), .depth = 0 }, (string_list){0}, 0, &v)) {
         report_error(parser, str_lit("No main function definition found\n"));
     }
 }

@@ -6,11 +6,6 @@ typedef const char* string;
 int main(void);
 long long two_1long_varargs(long long count, ...);
 
-typedef int yolo;
-enum yolo {
-	_enum_yolo_y,
-	_enum_yolo_z,
-};
 int main(void) {
 	long long x = 10;
 	printf("test\n", 10);

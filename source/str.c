@@ -90,6 +90,38 @@ void string_list_push(M_Arena* arena, string_const_list* list, string_const str)
     string_list_push_node(list, node);
 }
 
+b8 string_list_equals(string_const_list* a, string_const_list* b) {
+    if (a->total_size != b->total_size) return false;
+    if (a->node_count != b->node_count) return false;
+    string_const_list_node* curr_a = a->first;
+    string_const_list_node* curr_b = b->first;
+    
+    while (curr_a != nullptr || curr_b != nullptr) {
+        if (curr_a->size != curr_b->size) return false;
+        if (memcmp(curr_a->str, curr_b->str, curr_b->size) != 0) return false;
+        
+        curr_a = curr_a->next;
+        curr_b = curr_b->next;
+    }
+    return true;
+}
+
+b8 string_list_sub_equals(string_const_list* a, string_const_list* b, u32 part) {
+    string_const_list_node* curr_a = a->first;
+    string_const_list_node* curr_b = b->first;
+    u32 i = 0;
+    while (i < a->node_count - part) {
+        if (curr_a->size != curr_b->size) return false;
+        if (memcmp(curr_a->str, curr_b->str, curr_b->size) != 0) return false;
+        
+        curr_a = curr_a->next;
+        curr_b = curr_b->next;
+        
+        i++;
+    }
+    return true;
+}
+
 string_const string_list_flatten(M_Arena* arena, string_const_list* list) {
     string_const final = str_alloc(arena, list->total_size);
     u64 current_offset = 0;

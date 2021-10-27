@@ -1,6 +1,9 @@
 #include "data_structures.h"
 
+
 static const string ValueType_Tombstone = str_lit("tombstone");
+static const func_entry_val tombstone = { .value = str_lit("tombstone"), .is_native = false };
+
 
 //~ Variable Hashtable
 static u32 hash_var_key(var_entry_key k) {
@@ -125,7 +128,7 @@ static func_table_entry* find_func_entry(func_table_entry* entries, i32 cap, fun
     while (true) {
         func_table_entry* entry = &entries[idx];
         if (entry->key.name.size == 0) {
-            if (entry->value.value.size == 0)
+            if (entry->value == nullptr)
                 return tombstone_e != nullptr ? tombstone_e : entry;
             else
                 if (tombstone_e == nullptr) tombstone_e = entry;
@@ -168,15 +171,27 @@ void func_hash_table_free(func_hash_table* table) {
     table->entries = nullptr;
 }
 
-b8 func_hash_table_get(func_hash_table* table, func_entry_key key, func_entry_val* value) {
+// Part decides how many params at the end don't get checked for varargs
+b8 func_hash_table_get(func_hash_table* table, func_entry_key key, string_list param_types, u32 part, func_entry_val** value) {
     if (table->count == 0) return false;
     func_table_entry* entry = find_func_entry(table->entries, table->capacity, key);
     if (entry->key.name.size == 0) return false;
+    func_entry_val* c = entry->value;
+    
+    b8 found = false;
+    while (c != nullptr) {
+        if (string_list_sub_equals(&c->param_types, &param_types, part)) {
+            found = true;
+            break;
+        }
+        c = c->next;
+    }
+    
     *value = entry->value;
-    return true;
+    return found;
 }
 
-b8 func_hash_table_set(func_hash_table* table, func_entry_key key, func_entry_val value) {
+b8 func_hash_table_set(func_hash_table* table, func_entry_key key, func_entry_val* value) {
     if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
         i32 cap = GROW_CAPACITY(table->capacity);
         func_table_adjust_cap(table, cap);
@@ -184,11 +199,25 @@ b8 func_hash_table_set(func_hash_table* table, func_entry_key key, func_entry_va
     
     func_table_entry* entry = find_func_entry(table->entries, table->capacity, key);
     b8 is_new_key = entry->key.name.size == 0;
-    if (is_new_key && entry->value.value.size == 0)
+    if (is_new_key && entry->value == nullptr) {
+        entry->key = key;
+        entry->value = value;
         table->count++;
+    } else {
+        func_entry_val* c = entry->value;
+        b8 found = false;
+        while (true) {
+            if (string_list_equals(&c->param_types, &value->param_types)) {
+                found = true;
+                break;
+            }
+            if (c->next == nullptr) break;
+            c = c->next;
+        }
+        if (found) c = value;
+        else c->next = value;
+    }
     
-    entry->key = key;
-    entry->value = value;
     return is_new_key;
 }
 
@@ -197,7 +226,7 @@ b8 func_hash_table_del(func_hash_table* table, func_entry_key key) {
     func_table_entry* entry = find_func_entry(table->entries, table->capacity, key);
     if (entry->key.name.size == 0) return false;
     entry->key = (func_entry_key) {0};
-    entry->value = (func_entry_val) { .value = ValueType_Tombstone, .is_native = false };
+    entry->value = &tombstone;
     return true;
 }
 

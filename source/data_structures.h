@@ -36,17 +36,22 @@ void var_hash_table_add_all(var_hash_table* from, var_hash_table* to);
 
 typedef struct func_entry_key {
     string name;
-    u32 depth;
+    i32 depth;
 } func_entry_key;
 
+// Values are in a linked list. this feels evil
 typedef struct func_entry_val {
     P_ValueType value;
+    string mangled_name;
+    string_list param_types;
     b8 is_native;
+    
+    struct func_entry_val* next;
 } func_entry_val;
 
 typedef struct func_table_entry {
-    func_entry_key key;
-    func_entry_val value;
+    func_entry_key  key;
+    func_entry_val* value;
 } func_table_entry;
 
 typedef struct func_hash_table {
@@ -57,8 +62,9 @@ typedef struct func_hash_table {
 
 void func_hash_table_init(func_hash_table* table);
 void func_hash_table_free(func_hash_table* table);
-b8   func_hash_table_get(func_hash_table* table, func_entry_key key, func_entry_val* value);
-b8   func_hash_table_set(func_hash_table* table, func_entry_key key, func_entry_val  value);
+// Part decides how many params at the end don't get checked for varargs
+b8   func_hash_table_get(func_hash_table* table, func_entry_key key, string_list param_types, u32 part, func_entry_val** value);
+b8   func_hash_table_set(func_hash_table* table, func_entry_key key, func_entry_val* value);
 b8   func_hash_table_del(func_hash_table* table, func_entry_key key);
 void func_hash_table_add_all(func_hash_table* from, func_hash_table* to);
 

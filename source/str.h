@@ -43,6 +43,8 @@ u64 str_find_first(string_const str, string_const needle, u32 offset);
 
 void string_list_push_node(string_const_list* list, string_const_list_node* node);
 void string_list_push(M_Arena* arena, string_const_list* list, string_const str);
+b8   string_list_equals(string_const_list* a, string_const_list* b);
+b8   string_list_sub_equals(string_const_list* a, string_const_list* b, u32 part);
 string_const string_list_flatten(M_Arena* arena, string_const_list* list);
 
 #endif //STR_H
