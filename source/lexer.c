@@ -18,6 +18,7 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_Minus: return str_lit("-");
         case TokenType_Star: return str_lit("*");
         case TokenType_Slash: return str_lit("/");
+        case TokenType_Percent: return str_lit("%");
         case TokenType_PlusPlus: return str_lit("++");
         case TokenType_MinusMinus: return str_lit("--");
         case TokenType_Backslash: return str_lit("\\");
@@ -31,6 +32,7 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_MinusEqual: return str_lit("-=");
         case TokenType_StarEqual: return str_lit("*=");
         case TokenType_SlashEqual: return str_lit("/=");
+        case TokenType_PercentEqual: return str_lit("%=");
         case TokenType_AmpersandEqual: return str_lit("&=");
         case TokenType_PipeEqual: return str_lit("|=");
         case TokenType_HatEqual: return str_lit("^=");
@@ -294,6 +296,7 @@ L_Token L_LexToken(L_Lexer* lexer) {
         case '-':
         return L_TripleHandle(lexer, '=', TokenType_MinusEqual, '-', TokenType_MinusMinus, TokenType_Minus);
         case '*':  return L_DoubleHandle(lexer, '=', TokenType_StarEqual, TokenType_Star);
+        case '%':  return L_DoubleHandle(lexer, '=', TokenType_PercentEqual, TokenType_Percent);
         case '<':  return L_DoubleHandle(lexer, '=', TokenType_LessEqual, TokenType_Less);
         case '>':  return L_DoubleHandle(lexer, '=', TokenType_GreaterEqual, TokenType_Greater);
         

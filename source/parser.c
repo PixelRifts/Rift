@@ -262,13 +262,13 @@ static void P_BindDouble(P_Parser* parser, P_Expr* left, P_Expr* right, P_Binary
 
 // Basic Max function
 static P_ValueType P_GetNumberBinaryValType(P_Expr* a, P_Expr* b) {
-    if (type_check(a->ret_type, ValueType_Double) || type_check(b->ret_type, ValueType_Double))
+    if (str_eq(a->ret_type, ValueType_Double) || str_eq(b->ret_type, ValueType_Double))
         return ValueType_Double;
-    if (type_check(a->ret_type, ValueType_Float) || type_check(b->ret_type, ValueType_Float))
+    if (str_eq(a->ret_type, ValueType_Float) || str_eq(b->ret_type, ValueType_Float))
         return ValueType_Float;
-    if (type_check(a->ret_type, ValueType_Long) || type_check(b->ret_type, ValueType_Long))
+    if (str_eq(a->ret_type, ValueType_Long) || str_eq(b->ret_type, ValueType_Long))
         return ValueType_Long;
-    if (type_check(a->ret_type, ValueType_Integer) || type_check(b->ret_type, ValueType_Integer))
+    if (str_eq(a->ret_type, ValueType_Integer) || str_eq(b->ret_type, ValueType_Integer))
         return ValueType_Integer;
     return ValueType_Invalid;
 }
@@ -779,6 +779,11 @@ static P_Expr* P_ExprBinary(P_Parser* parser, P_Expr* left) {
             ret_type = P_GetNumberBinaryValType(left, right);
         } break;
         
+        case TokenType_Percent: {
+            P_BindDouble(parser, left, right, pairs_operator_arithmetic, sizeof(pairs_operator_arithmetic), str_lit("Cannot apply binary operator % to %s and %s\n"));
+            ret_type = P_GetNumberBinaryValType(left, right);
+        } break;
+        
         case TokenType_Hat: {
             P_BindDouble(parser, left, right, pairs_operator_bin, sizeof(pairs_operator_bin), str_lit("Cannot apply binary operator ^ to %s and %s\n"));
             ret_type = P_GetNumberBinaryValType(left, right);
@@ -895,6 +900,7 @@ P_ParseRule parse_rules[] = {
     [TokenType_Minus]            = { P_ExprUnary, P_ExprBinary, Prec_Term },
     [TokenType_Star]             = { nullptr, P_ExprBinary, Prec_Factor },
     [TokenType_Slash]            = { nullptr, P_ExprBinary, Prec_Factor },
+    [TokenType_Percent]          = { nullptr, P_ExprBinary, Prec_Factor },
     [TokenType_PlusPlus]         = { nullptr, nullptr, Prec_None },
     [TokenType_MinusMinus]       = { nullptr, nullptr, Prec_None },
     [TokenType_Backslash]        = { nullptr, nullptr, Prec_None },
@@ -908,6 +914,7 @@ P_ParseRule parse_rules[] = {
     [TokenType_MinusEqual]       = { nullptr, nullptr, Prec_None },
     [TokenType_StarEqual]        = { nullptr, nullptr, Prec_None },
     [TokenType_SlashEqual]       = { nullptr, nullptr, Prec_None },
+    [TokenType_PercentEqual]     = { nullptr, nullptr, Prec_None },
     [TokenType_AmpersandEqual]   = { nullptr, nullptr, Prec_None },
     [TokenType_PipeEqual]        = { nullptr, nullptr, Prec_None },
     [TokenType_HatEqual]         = { nullptr, nullptr, Prec_None },

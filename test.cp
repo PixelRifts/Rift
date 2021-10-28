@@ -4,7 +4,7 @@ int main() {
 	long x = 10l;
     lmao(54);
     print((double)54);
-    print(54);
+    print(10 % 3);
     return 0;
 }
 

@@ -5,16 +5,29 @@ typedef const char* string;
 
 int main(void);
 
-typedef int test_enum;
-enum test_enum {
-	_enum_test_enum_first,
-	_enum_test_enum_second,
-	_enum_test_enum_third,
-};
 int main(void) {
-	int f = _enum_test_enum_first;
-	int s = _enum_test_enum_second;
-	int t = _enum_test_enum_third;
-	printf("test_enum: (%d, %d, %d)", f, s, t);
+	int i = 1;
+	while ((i<=100))
+		{
+			if ((((i%3)==0)&&((i%5)!=0)))
+				{
+					printf("Fizz\n");
+}
+else
+				if ((((i%5)==0)&&((i%3)!=0)))
+					{
+						printf("Buzz\n");
+}
+else
+					if ((((i%3)==0)&&((i%5)==0)))
+						{
+							printf("FizzBuzz\n");
+}
+else
+						{
+							printf("%d\n", i);
+}
+			i = (i+1);
+}
 	return 0;
 }
