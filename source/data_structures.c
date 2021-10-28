@@ -1,9 +1,6 @@
 #include "data_structures.h"
 
-
-static const string ValueType_Tombstone = str_lit("tombstone");
 static const func_entry_val tombstone = { .value = str_lit("tombstone"), .is_native = false };
-
 
 //~ Variable Hashtable
 static u32 hash_var_key(var_entry_key k) {
@@ -117,7 +114,6 @@ static u32 hash_func_key(func_entry_key k) {
         hash ^= k.name.str[i];
         hash *= 16777619;
     }
-    hash += k.depth;
     return hash;
 }
 
@@ -171,23 +167,49 @@ void func_hash_table_free(func_hash_table* table) {
     table->entries = nullptr;
 }
 
-// Part decides how many params at the end don't get checked for varargs
-b8 func_hash_table_get(func_hash_table* table, func_entry_key key, string_list param_types, u32 part, func_entry_val** value) {
+b8 func_hash_table_get(func_hash_table* table, func_entry_key key, string_list param_types, func_entry_val** value, u32* subset_match) {
     if (table->count == 0) return false;
     func_table_entry* entry = find_func_entry(table->entries, table->capacity, key);
     if (entry->key.name.size == 0) return false;
     func_entry_val* c = entry->value;
     
+    u32 ctr = 0;
     b8 found = false;
     while (c != nullptr) {
-        if (string_list_sub_equals(&c->param_types, &param_types, part)) {
+        // If it wants more parameters than currently provided, just continue;
+        if (c->param_types.node_count > param_types.node_count) {
+            c = c->next;
+            continue;
+        }
+        
+        ctr = 0;
+        // Check string_list equals. (can be a subset, so not using string_list_equals)
+        string_list_node* curr_test = c->param_types.first;
+        string_list_node* curr = param_types.first;
+        while (!(curr_test == nullptr || curr == nullptr)) {
+            
+            if (!str_str_node_eq(str_lit("..."), curr_test)) {
+                if (!node_type_check(curr, curr_test)) break;
+                ctr++;
+                curr_test = curr_test->next;
+                curr = curr->next;
+            } else {
+                curr = curr->next;
+            }
+            
+        }
+        
+        // If the while loop exited normally, we found a type match
+        if (curr_test == nullptr || curr == nullptr) {
             found = true;
             break;
-        }
-        c = c->next;
+        } else c = c->next;
     }
     
-    *value = entry->value;
+    if (found) {
+        *value = c;
+        *subset_match = ctr;
+    }
     return found;
 }
 

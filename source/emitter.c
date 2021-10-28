@@ -76,8 +76,13 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
         
         case ExprType_Assignment: {
             E_EmitExpression(emitter, expr->op.assignment.name);
-            E_WriteF(emitter, " = ");
+            E_Write(emitter, " = ");
             E_EmitExpression(emitter, expr->op.assignment.value);
+        } break;
+        
+        case ExprType_Cast: {
+            E_WriteF(emitter, "(%.*s)", str_expand(expr->ret_type));
+            E_EmitExpression(emitter, expr->op.cast);
         } break;
         
         case ExprType_Binary: {

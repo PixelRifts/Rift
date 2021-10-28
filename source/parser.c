@@ -6,19 +6,7 @@
 #include <string.h>
 
 #include "operator_bindings.h"
-
-//~ Inbuilt Value Types
-static const string ValueType_Invalid = str_lit("INVALID");
-
-static const string ValueType_Integer = str_lit("int");
-static const string ValueType_Long = str_lit("long");
-static const string ValueType_Float = str_lit("float");
-static const string ValueType_Double = str_lit("double");
-
-static const string ValueType_String = str_lit("string");
-static const string ValueType_Char = str_lit("char");
-static const string ValueType_Bool = str_lit("bool");
-static const string ValueType_Void = str_lit("void");
+#include "types.h"
 
 //~ Errors
 static void report_error_at(P_Parser* parser, L_Token* token, string message, ...) {
@@ -148,6 +136,65 @@ static void P_ConsumeType(P_Parser* parser, string message) {
     report_error_at_current(parser, message);
 }
 
+static P_ValueType type_heirarchy[] = {
+    str_lit("double"),
+    str_lit("float"),
+    str_lit("long"),
+    str_lit("int"),
+    str_lit("char"),
+};
+u32 type_heirarchy_length = 5;
+
+b8 type_check(P_ValueType a, P_ValueType expected) {
+    if (str_eq(a, expected)) return true;
+    
+    // Implicit cast thingy
+    i32 perm = -1;
+    for (u32 i = 0; i < type_heirarchy_length; i++) {
+        if (str_eq(type_heirarchy[i], expected)) {
+            perm = i;
+            break;
+        }
+    }
+    if (perm != -1) {
+        u32 other = -1;
+        for (u32 i = 0; i < type_heirarchy_length; i++) {
+            if (str_eq(type_heirarchy[i], a)) {
+                other = i;
+                break;
+            }
+        }
+        return perm < other;
+    }
+    
+    return false;
+}
+
+b8 node_type_check(string_list_node* a, string_list_node* expected) {
+    if (str_node_eq(a, expected)) return true;
+    
+    // Implicit cast thingy
+    i32 perm = -1;
+    for (u32 i = 0; i < type_heirarchy_length; i++) {
+        if (str_str_node_eq(type_heirarchy[i], expected)) {
+            perm = i;
+            break;
+        }
+    }
+    if (perm != -1) {
+        i32 other = -1;
+        for (u32 i = 0; i < type_heirarchy_length; i++) {
+            if (str_str_node_eq(type_heirarchy[i], a)) {
+                other = i;
+                break;
+            }
+        }
+        return perm < other;
+    }
+    
+    return false;
+}
+
 static P_ValueType P_TypeTokenToValueType(P_Parser* parser) {
     switch (parser->previous.type) {
         case TokenType_Int:    return ValueType_Integer;
@@ -178,18 +225,18 @@ static string P_FuncNameMangle(P_Parser* parser, string name, u32 arity, string_
 //~ Binding
 static b8 P_CheckValueType(P_ValueTypeCollection expected, P_ValueType type) {
     if (expected == ValueTypeCollection_Number) {
-        if (str_eq(type, ValueType_Integer) || str_eq(type, ValueType_Long) || str_eq(type, ValueType_Float) || str_eq(type, ValueType_Double))
+        if (type_check(type, ValueType_Integer) || type_check(type, ValueType_Long) || type_check(type, ValueType_Float) || type_check(type, ValueType_Double))
             return true;
     } else if (expected == ValueTypeCollection_WholeNumber) {
-        if (str_eq(type, ValueType_Integer) || str_eq(type, ValueType_Long)) return true;
+        if (type_check(type, ValueType_Integer) || type_check(type, ValueType_Long)) return true;
     } else if (expected == ValueTypeCollection_DecimalNumber) {
-        if (str_eq(type, ValueType_Double) || str_eq(type, ValueType_Float)) return true;
+        if (type_check(type, ValueType_Double) || type_check(type, ValueType_Float)) return true;
     } else if (expected == ValueTypeCollection_String) {
-        if (str_eq(type, ValueType_String)) return true;
+        if (type_check(type, ValueType_String)) return true;
     } else if (expected == ValueTypeCollection_Char) {
-        if (str_eq(type, ValueType_Char)) return true;
+        if (type_check(type, ValueType_Char)) return true;
     } else if (expected == ValueTypeCollection_Bool) {
-        if (str_eq(type, ValueType_Bool)) return true;
+        if (type_check(type, ValueType_Bool)) return true;
     }
     return false;
 }
@@ -215,13 +262,13 @@ static void P_BindDouble(P_Parser* parser, P_Expr* left, P_Expr* right, P_Binary
 
 // Basic Max function
 static P_ValueType P_GetNumberBinaryValType(P_Expr* a, P_Expr* b) {
-    if (str_eq(a->ret_type, ValueType_Double) || str_eq(b->ret_type, ValueType_Double))
+    if (type_check(a->ret_type, ValueType_Double) || type_check(b->ret_type, ValueType_Double))
         return ValueType_Double;
-    if (str_eq(a->ret_type, ValueType_Float) || str_eq(b->ret_type, ValueType_Float))
+    if (type_check(a->ret_type, ValueType_Float) || type_check(b->ret_type, ValueType_Float))
         return ValueType_Float;
-    if (str_eq(a->ret_type, ValueType_Long) || str_eq(b->ret_type, ValueType_Long))
+    if (type_check(a->ret_type, ValueType_Long) || type_check(b->ret_type, ValueType_Long))
         return ValueType_Long;
-    if (str_eq(a->ret_type, ValueType_Integer) || str_eq(b->ret_type, ValueType_Integer))
+    if (type_check(a->ret_type, ValueType_Integer) || type_check(b->ret_type, ValueType_Integer))
         return ValueType_Integer;
     return ValueType_Invalid;
 }
@@ -333,6 +380,15 @@ static P_Expr* P_MakeAssignmentNode(P_Parser* parser, P_Expr* name, P_Expr* valu
     expr->can_assign = false;
     expr->op.assignment.name = name;
     expr->op.assignment.value = value;
+    return expr;
+}
+
+static P_Expr* P_MakeCastNode(P_Parser* parser, P_ValueType type, P_Expr* to_be_casted) {
+    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+    expr->type = ExprType_Cast;
+    expr->ret_type = type;
+    expr->can_assign = false;
+    expr->op.cast = to_be_casted;
     return expr;
 }
 
@@ -582,13 +638,6 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             call_arity++;
         }
         
-        // NOTE(voxel): this is also wack. But necessary.
-        
-        // HELP(anyone): This feels like a stupid way of doing it.
-        // HELP(anyone): Testing all possible mangled names until we get a match is O(1) time complexity but...
-        // HELP(anyone): is still slower than O(n) when the program is small.
-        // HELP(anyone): The other way is to do a linear search through the elements but it defeats the purpose of using a hashmap
-        
         // FIXME(voxel): memcpy wack
         P_Expr** param_buffer = arena_alloc(&parser->arena, call_arity * sizeof(P_Expr*));
         memcpy(param_buffer, params, call_arity * sizeof(P_Expr*));
@@ -596,15 +645,16 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         func_entry_key key = { .name = name, .depth = parser->scope_depth };
         func_entry_val* value = nullptr;
         
+        u32 subset_match = 1024; // Invalid cuz max param count is 256
         while (key.depth != -1) {
-            if (func_hash_table_get(&parser->functions, key, param_types, 0, &value)) {
+            if (func_hash_table_get(&parser->functions, key, param_types, &value, &subset_match)) {
                 return P_MakeFuncCallNode(parser, value->is_native ? name : value->mangled_name, value->value, param_buffer, call_arity);
             }
             key.depth--;
         }
         
         // NOTE(voxel): If there are varargs, it can be any subset of the current args
-        key.name = name;
+        /*key.name = name;
         u32 i = call_arity;
         while (i != 0) {
             key.depth = parser->scope_depth;
@@ -616,7 +666,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             }
             
             i--;
-        }
+        }*/
         
         report_error(parser, str_lit("Undefined function %.*s with provided parameters\n"), str_expand(name));
         
@@ -641,6 +691,11 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
     return nullptr;
 }
 
+static P_Expr* P_ExprPrimitiveTypename(P_Parser* parser) {
+    string type = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    return P_MakeTypenameNode(parser, type);
+}
+
 static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
     if (left != nullptr) {
         if (!left->can_assign)
@@ -649,7 +704,7 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
         
         P_Expr* xpr = P_Expression(parser);
         if (xpr == nullptr) return nullptr;
-        if (str_eq(xpr->ret_type, left->ret_type))
+        if (type_check(xpr->ret_type, left->ret_type))
             return P_MakeAssignmentNode(parser, name, xpr);
         
         report_error(parser, str_lit("Cannot assign %.*s to variable\n"), str_expand(xpr->ret_type));
@@ -659,6 +714,16 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
 
 static P_Expr* P_ExprGroup(P_Parser* parser) {
     P_Expr* in = P_Expression(parser);
+    
+    // Explicit Cast syntax
+    if (in->type == ExprType_Typename) {
+        P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after typename\n"));
+        P_Expr* to_be_casted = P_Expression(parser);
+        if (!type_check(to_be_casted->ret_type, in->op.typename))
+            report_error(parser, str_lit("Cannot cast from %.*s to %.*s\n"), str_expand(to_be_casted->ret_type), str_expand(in->op.typename));
+        return P_MakeCastNode(parser, in->op.typename, to_be_casted);
+    }
+    
     P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression\n"));
     return in;
 }
@@ -877,12 +942,12 @@ P_ParseRule parse_rules[] = {
     [TokenType_While]            = { nullptr, nullptr, Prec_None },
     [TokenType_True]             = { P_ExprBool, nullptr, Prec_None },
     [TokenType_False]            = { P_ExprBool, nullptr, Prec_None },
-    [TokenType_Int]              = { nullptr, nullptr, Prec_None },
-    [TokenType_Float]            = { nullptr, nullptr, Prec_None },
-    [TokenType_Bool]             = { nullptr, nullptr, Prec_None },
-    [TokenType_Double]           = { nullptr, nullptr, Prec_None },
-    [TokenType_Char]             = { nullptr, nullptr, Prec_None },
-    [TokenType_Long]             = { nullptr, nullptr, Prec_None },
+    [TokenType_Int]              = { P_ExprPrimitiveTypename, nullptr, Prec_None },
+    [TokenType_Float]            = { P_ExprPrimitiveTypename, nullptr, Prec_None },
+    [TokenType_Bool]             = { P_ExprPrimitiveTypename, nullptr, Prec_None },
+    [TokenType_Double]           = { P_ExprPrimitiveTypename, nullptr, Prec_None },
+    [TokenType_Char]             = { P_ExprPrimitiveTypename, nullptr, Prec_None },
+    [TokenType_Long]             = { P_ExprPrimitiveTypename, nullptr, Prec_None },
     [TokenType_Void]             = { nullptr, nullptr, Prec_None },
     [TokenType_TokenTypeCount]   = { nullptr, nullptr, Prec_None },
 };
@@ -926,7 +991,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     b8 prev_directly_in_func_body = parser->is_directly_in_func_body;
     
     if (!native) {
-        parser->all_code_paths_return = str_eq(type, ValueType_Void);
+        parser->all_code_paths_return = type_check(type, ValueType_Void);
         parser->encountered_return = false;
         parser->function_body_ret = type;
         parser->is_directly_in_func_body = true;
@@ -979,8 +1044,9 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         func_entry_key key = (func_entry_key) { .name = name, .depth = parser->scope_depth - 1 };
         // -1 Because the scope depth is changed by this point
         
+        u32 subset_match = 1024;
         func_entry_val* test = nullptr;
-        if (!func_hash_table_get(&parser->functions, key, params, 0, &test)) {
+        if (!func_hash_table_get(&parser->functions, key, params, &test, &subset_match)) {
             func_entry_val* val = arena_alloc(&parser->arena, sizeof(func_entry_val)); val->value = type;
             val->is_native = native;
             val->param_types = params;
@@ -1034,12 +1100,12 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name) {
         var_hash_table_set(&parser->variables, key, type);
     }
     else report_error(parser, str_lit("Cannot redeclare variable %.*s\n"), str_expand(name));
-    if (str_eq(type, ValueType_Void))
+    if (type_check(type, ValueType_Void))
         report_error(parser, str_lit("Cannot declare variable of type: void\n"));
     
     if (P_Match(parser, TokenType_Equal)) {
         P_Expr* value = P_Expression(parser);
-        if (!str_eq(value->ret_type, type))
+        if (!type_check(value->ret_type, type))
             report_error(parser, str_lit("Cannot Assign Value of Type %.*s to variable of type %.*s\n"), str_expand(value->ret_type), str_expand(type));
         P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
         return P_MakeVarDeclAssignStmtNode(parser, type, name, value);
@@ -1152,7 +1218,7 @@ static P_Stmt* P_StmtReturn(P_Parser* parser) {
     
     P_Expr* val = P_Expression(parser);
     if (val == nullptr) return nullptr;
-    if (!str_eq(val->ret_type, parser->function_body_ret))
+    if (!type_check(val->ret_type, parser->function_body_ret))
         report_error(parser, str_lit("Function return type mismatch. Expected %.*s\n"), str_expand(parser->function_body_ret));
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after return statement\n"));
     return P_MakeReturnStmtNode(parser, val);
@@ -1161,7 +1227,7 @@ static P_Stmt* P_StmtReturn(P_Parser* parser) {
 static P_Stmt* P_StmtIf(P_Parser* parser) {
     P_Consume(parser, TokenType_OpenParenthesis, str_lit("Expected ( after if\n"));
     P_Expr* condition = P_Expression(parser);
-    if (!str_eq(condition->ret_type, ValueType_Bool)) {
+    if (!type_check(condition->ret_type, ValueType_Bool)) {
         report_error(parser, str_lit("If statement condition doesn't resolve to boolean\n"));
     }
     P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression"));
@@ -1191,7 +1257,7 @@ static P_Stmt* P_StmtIf(P_Parser* parser) {
 static P_Stmt* P_StmtWhile(P_Parser* parser) {
     P_Consume(parser, TokenType_OpenParenthesis, str_lit("Expected ( after while\n"));
     P_Expr* condition = P_Expression(parser);
-    if (!str_eq(condition->ret_type, ValueType_Bool)) {
+    if (!type_check(condition->ret_type, ValueType_Bool)) {
         report_error(parser, str_lit("While loop condition doesn't resolve to boolean\n"));
     }
     P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression\n"));
@@ -1227,7 +1293,7 @@ static P_Stmt* P_StmtDoWhile(P_Parser* parser) {
     P_Consume(parser, TokenType_While, str_lit("Expected 'while'"));
     P_Consume(parser, TokenType_OpenParenthesis, str_lit("Expected ( after while\n"));
     P_Expr* condition = P_Expression(parser);
-    if (!str_eq(condition->ret_type, ValueType_Bool)) {
+    if (!type_check(condition->ret_type, ValueType_Bool)) {
         report_error(parser, str_lit("While loop condition doesn't resolve to boolean\n"));
     }
     P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression"));
@@ -1248,7 +1314,7 @@ static P_Stmt* P_StmtExpression(P_Parser* parser) {
 }
 
 static P_Stmt* P_Statement(P_Parser* parser) {
-    if (!str_eq(parser->function_body_ret, ValueType_Invalid)) {
+    if (!type_check(parser->function_body_ret, ValueType_Invalid)) {
         if (P_Match(parser, TokenType_OpenBrace))
             return P_StmtBlock(parser);
         if (P_Match(parser, TokenType_Return))
@@ -1326,8 +1392,6 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
         string param_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
         string_list_push(&parser->arena, &param_names, param_name);
         
-        var_hash_table_set(&parser->variables, (var_entry_key) { .name = param_name, .depth = parser->scope_depth }, param_type);
-        
         arity++;
         if (!P_Match(parser, TokenType_Comma)) {
             P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after parameters\n"));
@@ -1340,9 +1404,10 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
     
     string mangled = str_eq(str_lit("main"), name) ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, additional);
     
+    u32 subset_match = 1024;
     func_entry_key key = (func_entry_key) { .name = name, .depth = 0 };
     func_entry_val* test = nullptr;
-    if (!func_hash_table_get(&parser->functions, key, params, 0, &test)) {
+    if (!func_hash_table_get(&parser->functions, key, params, &test, &subset_match)) {
         func_entry_val* val = arena_alloc(&parser->arena, sizeof(func_entry_val));
         val->value = type;
         val->is_native = false;
@@ -1410,8 +1475,9 @@ void P_PreParse(P_Parser* parser) {
         } else P_Advance(parser);
     }
     
+    u32 subset_match = 1024;
     func_entry_val* v = nullptr;
-    if (!func_hash_table_get(&parser->functions, (func_entry_key) { .name = str_lit("main"), .depth = 0 }, (string_list){0}, 0, &v)) {
+    if (!func_hash_table_get(&parser->functions, (func_entry_key) { .name = str_lit("main"), .depth = 0 }, (string_list){0}, &v, &subset_match)) {
         report_error(parser, str_lit("No main function definition found\n"));
     }
 }
@@ -1491,6 +1557,11 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
             P_PrintExprAST_Indent(arena, expr->op.assignment.name, indent + 1);
             printf("=\n");
             P_PrintExprAST_Indent(arena, expr->op.assignment.value, indent + 1);
+        } break;
+        
+        case ExprType_Cast: {
+            printf("(%.*s) Cast\n", str_expand(expr->ret_type));
+            P_PrintExprAST_Indent(arena, expr->op.cast, indent + 1);
         } break;
         
         case ExprType_Variable: {

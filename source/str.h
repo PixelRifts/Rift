@@ -38,13 +38,15 @@ string_const str_alloc(M_Arena* arena, u64 size); // NOTE(EVERYONE): this will t
 string_const str_copy(M_Arena* arena, string_const other);
 string_const str_cat(M_Arena* arena, string_const a, string_const b);
 string_const str_from_format(M_Arena* arena, const char* format, ...);
-b8 str_eq(string_const a, string_const b); // NOTE(voxel): Absolute comparison no fuzz
 u64 str_find_first(string_const str, string_const needle, u32 offset);
+
+b8 str_eq(string_const a, string_const b); // NOTE(voxel): Absolute comparison (string, string)
+b8 str_str_node_eq(string_const a, string_const_list_node* b); // NOTE(voxel): Absolute comparison (string, node)
+b8 str_node_eq(string_const_list_node* a, string_const_list_node* b); // NOTE(voxel): Absolute comparison (node, node)
 
 void string_list_push_node(string_const_list* list, string_const_list_node* node);
 void string_list_push(M_Arena* arena, string_const_list* list, string_const str);
 b8   string_list_equals(string_const_list* a, string_const_list* b);
-b8   string_list_sub_equals(string_const_list* a, string_const_list* b, u32 part);
 string_const string_list_flatten(M_Arena* arena, string_const_list* list);
 
 #endif //STR_H

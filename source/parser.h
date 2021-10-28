@@ -6,6 +6,7 @@
 #include "lexer.h"
 #include "defines.h"
 #include "str.h"
+#include "types.h"
 
 typedef u32 P_Precedence;
 enum {
@@ -35,14 +36,12 @@ enum {
     ValueTypeCollection_Bool,
 };
 
-typedef string P_ValueType;
-
 typedef u32 P_ExprType;
 enum {
     ExprType_IntLit, ExprType_LongLit, ExprType_FloatLit, ExprType_DoubleLit,
     ExprType_StringLit, ExprType_CharLit, ExprType_BoolLit, ExprType_Typename,
     ExprType_Unary, ExprType_Binary, ExprType_Assignment, ExprType_Variable,
-    ExprType_FuncCall, ExprType_Dot, ExprType_EnumDot
+    ExprType_FuncCall, ExprType_Dot, ExprType_EnumDot, ExprType_Cast
 };
 
 typedef struct P_Expr P_Expr;
@@ -59,6 +58,7 @@ struct P_Expr {
         string char_lit; // Is a string for transpiling reasons. :(
         string string_lit;
         string typename;
+        P_Expr* cast;
         struct { L_TokenType operator; P_Expr* left; P_Expr* right; } binary;
         struct { L_TokenType operator; P_Expr* operand; } unary;
         struct { P_Expr* left; string right; } dot;

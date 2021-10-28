@@ -47,6 +47,16 @@ b8 str_eq(string_const a, string_const b) {
     return memcmp(a.str, b.str, b.size) == 0;
 }
 
+b8 str_str_node_eq(string_const a, string_const_list_node* b) {
+    if (a.size != b->size) return false;
+    return memcmp(a.str, b->str, a.size) == 0;
+}
+
+b8 str_node_eq(string_const_list_node* a, string_const_list_node* b) {
+    if (a->size != b->size) return false;
+    return memcmp(a->str, b->str, b->size) == 0;
+}
+
 u64 str_find_first(string_const str, string_const needle, u32 offset) {
     u64 i = 0;
     if (needle.size > 0) {
@@ -102,22 +112,6 @@ b8 string_list_equals(string_const_list* a, string_const_list* b) {
         
         curr_a = curr_a->next;
         curr_b = curr_b->next;
-    }
-    return true;
-}
-
-b8 string_list_sub_equals(string_const_list* a, string_const_list* b, u32 part) {
-    string_const_list_node* curr_a = a->first;
-    string_const_list_node* curr_b = b->first;
-    u32 i = 0;
-    while (i < a->node_count - part) {
-        if (curr_a->size != curr_b->size) return false;
-        if (memcmp(curr_a->str, curr_b->str, curr_b->size) != 0) return false;
-        
-        curr_a = curr_a->next;
-        curr_b = curr_b->next;
-        
-        i++;
     }
     return true;
 }
