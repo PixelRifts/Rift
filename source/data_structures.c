@@ -177,7 +177,7 @@ b8 func_hash_table_get(func_hash_table* table, func_entry_key key, string_list p
     b8 found = false;
     while (c != nullptr) {
         // If it wants more parameters than currently provided, just continue;
-        if (c->param_types.node_count > param_types.node_count) {
+        if (c->param_types.node_count - 1 > param_types.node_count) {
             c = c->next;
             continue;
         }

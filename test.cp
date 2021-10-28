@@ -2,9 +2,9 @@ void native printf(string format, ... rest);
 
 int main() {
 	long x = 10l;
-    printf("test\n", 10);
     lmao(54);
-	two(1, 0, 10, 29, 39);
+    print((double)54);
+    print(54);
     return 0;
 }
 
@@ -13,6 +13,6 @@ int lmao(int x) {
 	return x;
 }
 
-long two(long count, ... others) {
-	return count;
+void print(double count) {
+	printf("%f\n", count);
 }
