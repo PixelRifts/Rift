@@ -157,7 +157,7 @@ b8 type_check(P_ValueType a, P_ValueType expected) {
         }
     }
     if (perm != -1) {
-        u32 other = -1;
+        i32 other = -1;
         for (u32 i = 0; i < type_heirarchy_length; i++) {
             if (str_eq(type_heirarchy[i], a)) {
                 other = i;

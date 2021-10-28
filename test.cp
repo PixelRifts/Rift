@@ -5,7 +5,7 @@ int main() {
     lmao(54);
     print((double)54);
     print(10 % 3);
-    return 0;
+    return "ufahskfghj";
 }
 
 int lmao(int x) {
