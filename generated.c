@@ -4,6 +4,8 @@
 typedef const char* string;
 
 int main(void);
-int lmao_1int(int x);
-void print_1double(double count);
 
+int main(void) {
+	int* x;
+	return 0;
+}

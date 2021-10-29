@@ -291,25 +291,28 @@ L_Token L_LexToken(L_Lexer* lexer) {
         case '~':  return L_DoubleHandle(lexer, '=', TokenType_TildeEqual, TokenType_Tilde);
         case '^':  return L_DoubleHandle(lexer, '=', TokenType_HatEqual, TokenType_Hat);
         case '&':  return L_TripleHandle(lexer, '=', TokenType_AmpersandEqual, '&', TokenType_AmpersandAmpersand, TokenType_Ampersand);
-        case '+':
-        return L_TripleHandle(lexer, '=', TokenType_PlusEqual, '+', TokenType_PlusPlus, TokenType_Plus);
-        case '-':
-        return L_TripleHandle(lexer, '=', TokenType_MinusEqual, '-', TokenType_MinusMinus, TokenType_Minus);
+        case '+': return L_TripleHandle(lexer, '=', TokenType_PlusEqual, '+', TokenType_PlusPlus, TokenType_Plus);
+        case '-': return L_TripleHandle(lexer, '=', TokenType_MinusEqual, '-', TokenType_MinusMinus, TokenType_Minus);
         case '*':  return L_DoubleHandle(lexer, '=', TokenType_StarEqual, TokenType_Star);
         case '%':  return L_DoubleHandle(lexer, '=', TokenType_PercentEqual, TokenType_Percent);
         case '<':  return L_DoubleHandle(lexer, '=', TokenType_LessEqual, TokenType_Less);
         case '>':  return L_DoubleHandle(lexer, '=', TokenType_GreaterEqual, TokenType_Greater);
         
         case '/':  {
-            if (L_PeekNext(lexer) == '/') {
-                while (L_Peek(lexer) != '\n' && !L_Bound(lexer)) L_Advance(lexer);
-            } else if (L_PeekNext(lexer) == '*') {
+            if (L_Peek(lexer) == '/') {
+                while (L_Peek(lexer) != '\n' && !L_Bound(lexer))
+                    L_Advance(lexer);
+                return L_LexToken(lexer);
+            } else if (L_Peek(lexer) == '*') {
                 // TODO(voxel): Record the position of the /* here to be reported as error for unterminated comment block
                 L_Advance(lexer);
                 while (!(L_Peek(lexer) == '*' && L_PeekNext(lexer) == '/')) {
                     L_Advance(lexer);
                     if (L_Bound(lexer)) return L_ErrorToken(lexer, str_lit("Unterminated Comment Block\n"));
                 }
+                L_Advance(lexer);
+                L_Advance(lexer);
+                return L_LexToken(lexer);
             } else {
                 return L_DoubleHandle(lexer, '=', TokenType_SlashEqual, TokenType_Slash);
             }

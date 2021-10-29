@@ -105,35 +105,61 @@ static void P_Sync(P_Parser* parser) {
 }
 
 static b8 P_IsTypeToken(P_Parser* parser) {
-    if (P_Match(parser, TokenType_Int)    ||
-        P_Match(parser, TokenType_Long)   ||
-        P_Match(parser, TokenType_Float)  ||
-        P_Match(parser, TokenType_Double) ||
-        P_Match(parser, TokenType_Char)   ||
-        P_Match(parser, TokenType_Bool)   ||
-        P_Match(parser, TokenType_Void)   ||
-        P_Match(parser, TokenType_String)) return true;
+    if (parser->current.type == TokenType_Int    ||
+        parser->current.type == TokenType_Long   ||
+        parser->current.type == TokenType_Float  ||
+        parser->current.type == TokenType_Double ||
+        parser->current.type == TokenType_Char   ||
+        parser->current.type == TokenType_Bool   ||
+        parser->current.type == TokenType_Void   ||
+        parser->current.type == TokenType_String) return true;
     if (parser->current.type == TokenType_Identifier) {
         if (container_type_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
-            P_Advance(parser);
             return true;
         }
     }
     return false;
 }
 
-static void P_ConsumeType(P_Parser* parser, string message) {
+static b8 P_AppendTypeMods(string_list* comp, P_Parser* parser) {
+    if (parser->current.type == TokenType_Star) {
+        P_Advance(parser);
+        string_list_push(&parser->arena, comp, str_lit("*"));
+        P_AppendTypeMods(comp, parser);
+        return true;
+    } else if (parser->current.type == TokenType_OpenBracket) {
+        P_Advance(parser);
+        P_Consume(parser, TokenType_CloseBracket, str_lit("Required ] after [ in type declaration\n"));
+        string_list_push(&parser->arena, comp, str_lit("[]"));
+        P_AppendTypeMods(comp, parser);
+        return true;
+    }
+    return false;
+}
+
+static P_ValueType P_ConsumeType(P_Parser* parser, string message) {
     if (parser->current.type == TokenType_Int || parser->current.type == TokenType_Long ||
         parser->current.type == TokenType_Float || parser->current.type == TokenType_Double || parser->current.type == TokenType_Bool || parser->current.type == TokenType_Char ||
-        parser->current.type == TokenType_Void || parser->current.type == TokenType_String) { P_Advance(parser); return; }
+        parser->current.type == TokenType_Void || parser->current.type == TokenType_String) {
+        P_Advance(parser);
+        
+        string_list l = {0};
+        string_list_push(&parser->arena, &l, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
+        P_AppendTypeMods(&l, parser);
+        return string_list_flatten(&parser->arena, &l);
+    }
     if (parser->current.type == TokenType_Identifier) {
         if (container_type_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
             P_Advance(parser);
-            return;
+            string_list l = {0};
+            string_list_push(&parser->arena, &l, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
+            P_AppendTypeMods(&l, parser);
+            return string_list_flatten(&parser->arena, &l);
         }
     }
     
     report_error_at_current(parser, message);
+    return ValueType_Invalid;
 }
 
 static P_ValueType type_heirarchy[] = {
@@ -193,20 +219,6 @@ b8 node_type_check(string_list_node* a, string_list_node* expected) {
     }
     
     return false;
-}
-
-static P_ValueType P_TypeTokenToValueType(P_Parser* parser) {
-    switch (parser->previous.type) {
-        case TokenType_Int:    return ValueType_Integer;
-        case TokenType_Long:   return ValueType_Long;
-        case TokenType_Float:  return ValueType_Float;
-        case TokenType_Double: return ValueType_Double;
-        case TokenType_Char:   return ValueType_Char;
-        case TokenType_Bool:   return ValueType_Bool;
-        case TokenType_String: return ValueType_String;
-        case TokenType_Void:   return ValueType_Void;
-    }
-    return (P_ValueType) { .str = parser->previous.start, .size = parser->previous.length };
 }
 
 static string P_FuncNameMangle(P_Parser* parser, string name, u32 arity, string_list params, string additional_info) {
@@ -1025,8 +1037,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
             break;
         }
         
-        P_ConsumeType(parser, str_lit("Expected type\n"));
-        P_ValueType param_type = P_TypeTokenToValueType(parser);
+        P_ValueType param_type = P_ConsumeType(parser, str_lit("Expected type\n"));
         string_list_push(&parser->arena, &params, param_type);
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected param name\n"));
@@ -1138,8 +1149,7 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser) {
     
     // Parse Members
     while (!P_Match(parser, TokenType_CloseBrace)) {
-        P_ConsumeType(parser, str_lit("Expected Type or }\n"));
-        string_list_push(&parser->arena, &member_types, P_TypeTokenToValueType(parser));
+        string_list_push(&parser->arena, &member_types, P_ConsumeType(parser, str_lit("Expected Type or }\n")));
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
         string_list_push(&parser->arena, &member_names, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
@@ -1342,7 +1352,7 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
     P_Stmt* s;
     
     if (P_IsTypeToken(parser)) {
-        P_ValueType type = P_TypeTokenToValueType(parser);
+        P_ValueType type = P_ConsumeType(parser, str_lit("There's an error in the parser. (P_Declaration)\n"));
         b8 native = false;
         if (P_Match(parser, TokenType_Native)) native = true;
         P_Consume(parser, TokenType_Identifier, str_lit("Expected Identifier after variable type\n"));
@@ -1391,8 +1401,7 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
             break;
         }
         
-        P_ConsumeType(parser, str_lit("Expected type\n"));
-        P_ValueType param_type = P_TypeTokenToValueType(parser);
+        P_ValueType param_type = P_ConsumeType(parser, str_lit("Expected type\n"));
         string_list_push(&parser->arena, &params, param_type);
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected param name\n"));
@@ -1439,7 +1448,7 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
 
 static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
     if (P_IsTypeToken(parser)) {
-        P_ValueType type = P_TypeTokenToValueType(parser);
+        P_ValueType type = P_ConsumeType(parser, str_lit("This is an error in the Parser. (P_PreDeclaration)\n"));
         if (P_Match(parser, TokenType_Native)) {
             while (!P_Match(parser, TokenType_CloseParenthesis)) {
                 if (P_Match(parser, TokenType_EOF))
