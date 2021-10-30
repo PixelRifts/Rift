@@ -236,6 +236,23 @@ u32 type_heirarchy_length = 5;
 b8 type_check(P_ValueType a, P_ValueType expected) {
     if (str_eq(a.full_type, expected.full_type)) return true;
     
+    // Pointer testing [ any* -> void* ]
+    if (str_eq(expected.base_type, ValueType_Void.base_type)) {
+        if (is_ptr(expected)) {
+            if (is_ptr(a)) {
+                return true;
+            }
+        }
+    }
+    // Pointer testing [ void* -> any* ]
+    if (str_eq(a.base_type, ValueType_Void.base_type)) {
+        if (is_ptr(a)) {
+            if (is_ptr(expected)) {
+                return true;
+            }
+        }
+    }
+    
     // Implicit cast thingy
     i32 perm = -1;
     for (u32 i = 0; i < type_heirarchy_length; i++) {
@@ -305,18 +322,19 @@ static string P_FuncNameMangle(P_Parser* parser, string name, u32 arity, value_t
 //~ Binding
 static b8 P_CheckValueType(P_ValueTypeCollection expected, P_ValueType type) {
     if (expected == ValueTypeCollection_Number) {
-        if (type_check(type, ValueType_Integer) || type_check(type, ValueType_Long) || type_check(type, ValueType_Float) || type_check(type, ValueType_Double))
-            return true;
+        return (type_check(type, ValueType_Integer) || type_check(type, ValueType_Long) || type_check(type, ValueType_Float) || type_check(type, ValueType_Double));
+    } else if (expected == ValueTypeCollection_Pointer) {
+        return is_ptr(type);
     } else if (expected == ValueTypeCollection_WholeNumber) {
-        if (type_check(type, ValueType_Integer) || type_check(type, ValueType_Long)) return true;
+        return type_check(type, ValueType_Integer) || type_check(type, ValueType_Long);
     } else if (expected == ValueTypeCollection_DecimalNumber) {
-        if (type_check(type, ValueType_Double) || type_check(type, ValueType_Float)) return true;
+        return type_check(type, ValueType_Double) || type_check(type, ValueType_Float);
     } else if (expected == ValueTypeCollection_String) {
-        if (type_check(type, ValueType_String)) return true;
+        return type_check(type, ValueType_String);
     } else if (expected == ValueTypeCollection_Char) {
-        if (type_check(type, ValueType_Char)) return true;
+        return type_check(type, ValueType_Char);
     } else if (expected == ValueTypeCollection_Bool) {
-        if (type_check(type, ValueType_Bool)) return true;
+        return type_check(type, ValueType_Bool);
     }
     return false;
 }
@@ -341,14 +359,22 @@ static void P_BindDouble(P_Parser* parser, P_Expr* left, P_Expr* right, P_Binary
 }
 
 static P_ValueType P_GetNumberBinaryValType(P_Expr* a, P_Expr* b) {
-    if (str_eq(a->ret_type.full_type, ValueType_Double.full_type) || str_eq(b->ret_type.full_type, ValueType_Double.full_type))
-        return ValueType_Double;
-    if (str_eq(a->ret_type.full_type, ValueType_Float.full_type) || str_eq(b->ret_type.full_type, ValueType_Float.full_type))
-        return ValueType_Float;
-    if (str_eq(a->ret_type.full_type, ValueType_Long.full_type) || str_eq(b->ret_type.full_type, ValueType_Long.full_type))
-        return ValueType_Long;
-    if (str_eq(a->ret_type.full_type, ValueType_Integer.full_type) || str_eq(b->ret_type.full_type, ValueType_Integer.full_type))
-        return ValueType_Integer;
+    
+    // Pointer stuff
+    if (is_ptr(a->ret_type)) {
+        return a->ret_type;
+    } else if (is_ptr(b->ret_type)) {
+        return b->ret_type;
+    } else {
+        if (str_eq(a->ret_type.full_type, ValueType_Double.full_type) || str_eq(b->ret_type.full_type, ValueType_Double.full_type))
+            return ValueType_Double;
+        if (str_eq(a->ret_type.full_type, ValueType_Float.full_type) || str_eq(b->ret_type.full_type, ValueType_Float.full_type))
+            return ValueType_Float;
+        if (str_eq(a->ret_type.full_type, ValueType_Long.full_type) || str_eq(b->ret_type.full_type, ValueType_Long.full_type))
+            return ValueType_Long;
+        if (str_eq(a->ret_type.full_type, ValueType_Integer.full_type) || str_eq(b->ret_type.full_type, ValueType_Integer.full_type))
+            return ValueType_Integer;
+    }
     return ValueType_Invalid;
 }
 
@@ -432,6 +458,14 @@ static P_Expr* P_MakeBoolNode(P_Parser* parser, b8 value) {
     return expr;
 }
 
+static P_Expr* P_MakeNullptrNode(P_Parser* parser) {
+    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+    expr->type = ExprType_Nullptr;
+    expr->ret_type = ValueType_VoidPointer;
+    expr->can_assign = false;
+    return expr;
+}
+
 static P_Expr* P_MakeUnaryNode(P_Parser* parser, L_TokenType type, P_Expr* operand, P_ValueType ret_type) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_Unary;
@@ -488,6 +522,15 @@ static P_Expr* P_MakeAddrNode(P_Parser* parser, P_ValueType type, P_Expr* e) {
     expr->ret_type = type;
     expr->can_assign = false;
     expr->op.addr = e;
+    return expr;
+}
+
+static P_Expr* P_MakeDerefNode(P_Parser* parser, P_ValueType type, P_Expr* e) {
+    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+    expr->type = ExprType_Deref;
+    expr->ret_type = type;
+    expr->can_assign = true;
+    expr->op.deref = e;
     return expr;
 }
 
@@ -715,6 +758,10 @@ static P_Expr* P_ExprBool(P_Parser* parser) {
     return P_MakeBoolNode(parser, b);
 }
 
+static P_Expr* P_ExprNullptr(P_Parser* parser) {
+    return P_MakeNullptrNode(parser);
+}
+
 static P_Expr* P_ExprVar(P_Parser* parser) {
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     
@@ -775,7 +822,10 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         
         P_Container* type = type_array_get(parser, name, parser->scope_depth);
         if (type != nullptr) {
-            return P_MakeTypenameNode(parser, value_type_from_str(name));
+            type_mod_array mods = {0};
+            P_ConsumeTypeMods(parser, &mods);
+            u64 complete_length = ((u64)parser->previous.start + (u64)parser->previous.length) - (u64)name.str;
+            return P_MakeTypenameNode(parser, (P_ValueType) { .base_type = name, .full_type = (string) { .str = name.str, .size = complete_length }, .mods = mods.elements, .mod_ct = mods.count });
         }
         
         report_error(parser, str_lit("Undefined variable %.*s\n"), str_expand(name));
@@ -784,8 +834,14 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
 }
 
 static P_Expr* P_ExprPrimitiveTypename(P_Parser* parser) {
-    string type = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
-    return P_MakeTypenameNode(parser, value_type_from_str(type));
+    string base_type = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    
+    type_mod_array mods = {0};
+    P_ConsumeTypeMods(parser, &mods);
+    
+    u64 complete_length = ((u64)parser->previous.start + (u64)parser->previous.length) - (u64)base_type.str;
+    
+    return P_MakeTypenameNode(parser, (P_ValueType) { .base_type = base_type, .full_type = (string) { .str = base_type.str, .size = complete_length }, .mods = mods.elements, .mod_ct = mods.count });
 }
 
 static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
@@ -807,13 +863,25 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
 static P_Expr* P_ExprGroup(P_Parser* parser) {
     P_Expr* in = P_Expression(parser);
     
-    // Explicit Cast syntax
     if (in->type == ExprType_Typename) {
+        // Explicit Cast syntax
         P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after typename\n"));
         P_Expr* to_be_casted = P_Expression(parser);
-        if (!type_check(to_be_casted->ret_type, in->op.typename))
-            report_error(parser, str_lit("Cannot cast from %.*s to %.*s\n"), str_expand(to_be_casted->ret_type.full_type), str_expand(in->op.typename.full_type));
-        return P_MakeCastNode(parser, in->op.typename, to_be_casted);
+        
+        b8 allowed_cast = false;
+        if (!type_check(to_be_casted->ret_type, in->op.typename)) {
+            
+            if (is_ptr(in->op.typename)) {
+                if (is_ptr(to_be_casted->ret_type))
+                    allowed_cast = true;
+            }
+        } else allowed_cast = true;
+        
+        if (allowed_cast)
+            return P_MakeCastNode(parser, in->op.typename, to_be_casted);
+        
+        report_error(parser, str_lit("Cannot cast from %.*s to %.*s\n"), str_expand(to_be_casted->ret_type.full_type), str_expand(in->op.typename.full_type));
+        return nullptr;
     }
     
     P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression\n"));
@@ -821,9 +889,7 @@ static P_Expr* P_ExprGroup(P_Parser* parser) {
 }
 
 static P_Expr* P_ExprIndex(P_Parser* parser, P_Expr* left) {
-    if (left->ret_type.mod_ct == 0)
-        report_error(parser, str_lit("Cannot Apply [] operator to expression of type %.*s\n"), left->ret_type.full_type);
-    if (left->ret_type.mods[left->ret_type.mod_ct - 1].type != ValueTypeModType_Pointer)
+    if (!is_ptr(left->ret_type))
         report_error(parser, str_lit("Cannot Apply [] operator to expression of type %.*s\n"), left->ret_type.full_type);
     
     P_Expr* e = P_Expression(parser);
@@ -839,6 +905,16 @@ static P_Expr* P_ExprAddr(P_Parser* parser) {
     P_Expr* e = P_Expression(parser);
     P_ValueType ret = P_PushPointerType(parser, e->ret_type);
     return P_MakeAddrNode(parser, ret, e);
+}
+
+static P_Expr* P_ExprDeref(P_Parser* parser) {
+    P_Expr* e = P_Expression(parser);
+    
+    if (!is_ptr(e->ret_type))
+        report_error(parser, str_lit("Cannot Dereference expression of type %.*s\n"), str_expand(e->ret_type.full_type));
+    
+    P_ValueType ret = P_ReduceType(parser, e->ret_type);
+    return P_MakeDerefNode(parser, ret, e);
 }
 
 static P_Expr* P_ExprUnary(P_Parser* parser) {
@@ -873,27 +949,27 @@ static P_Expr* P_ExprBinary(P_Parser* parser, P_Expr* left) {
     P_ValueType ret_type;
     switch (op_type) {
         case TokenType_Plus: {
-            P_BindDouble(parser, left, right, pairs_operator_arithmetic, sizeof(pairs_operator_arithmetic), str_lit("Cannot apply binary operator + to %s and %s\n"));
+            P_BindDouble(parser, left, right, pairs_operator_arithmetic_term, sizeof(pairs_operator_arithmetic_term), str_lit("Cannot apply binary operator + to %s and %s\n"));
             ret_type = P_GetNumberBinaryValType(left, right);
         } break;
         
         case TokenType_Minus: {
-            P_BindDouble(parser, left, right, pairs_operator_arithmetic, sizeof(pairs_operator_arithmetic), str_lit("Cannot apply binary operator - to %s and %s\n"));
+            P_BindDouble(parser, left, right, pairs_operator_arithmetic_term, sizeof(pairs_operator_arithmetic_term), str_lit("Cannot apply binary operator - to %s and %s\n"));
             ret_type = P_GetNumberBinaryValType(left, right);
         } break;
         
         case TokenType_Star: {
-            P_BindDouble(parser, left, right, pairs_operator_arithmetic, sizeof(pairs_operator_arithmetic), str_lit("Cannot apply binary operator * to %s and %s\n"));
+            P_BindDouble(parser, left, right, pairs_operator_arithmetic_factor, sizeof(pairs_operator_arithmetic_factor), str_lit("Cannot apply binary operator * to %s and %s\n"));
             ret_type = P_GetNumberBinaryValType(left, right);
         } break;
         
         case TokenType_Slash: {
-            P_BindDouble(parser, left, right, pairs_operator_arithmetic, sizeof(pairs_operator_arithmetic), str_lit("Cannot apply binary operator / to %s and %s\n"));
+            P_BindDouble(parser, left, right, pairs_operator_arithmetic_factor, sizeof(pairs_operator_arithmetic_factor), str_lit("Cannot apply binary operator / to %s and %s\n"));
             ret_type = P_GetNumberBinaryValType(left, right);
         } break;
         
         case TokenType_Percent: {
-            P_BindDouble(parser, left, right, pairs_operator_arithmetic, sizeof(pairs_operator_arithmetic), str_lit("Cannot apply binary operator % to %s and %s\n"));
+            P_BindDouble(parser, left, right, pairs_operator_arithmetic_factor, sizeof(pairs_operator_arithmetic_factor), str_lit("Cannot apply binary operator % to %s and %s\n"));
             ret_type = P_GetNumberBinaryValType(left, right);
         } break;
         
@@ -1010,11 +1086,11 @@ P_ParseRule parse_rules[] = {
     [TokenType_LongLit]            = { P_ExprLong,    nullptr, Prec_None, Prec_None },
     [TokenType_StringLit]          = { P_ExprString,  nullptr, Prec_None, Prec_None },
     [TokenType_CharLit]            = { P_ExprChar,    nullptr, Prec_None, Prec_None },
-    [TokenType_Plus]               = { P_ExprUnary, P_ExprBinary, Prec_Unary, Prec_Term },
-    [TokenType_Minus]              = { P_ExprUnary, P_ExprBinary, Prec_Unary, Prec_Term },
-    [TokenType_Star]               = { nullptr,     P_ExprBinary, Prec_Factor, Prec_None },
-    [TokenType_Slash]              = { nullptr,     P_ExprBinary, Prec_Factor, Prec_None },
-    [TokenType_Percent]            = { nullptr,     P_ExprBinary, Prec_Factor, Prec_None },
+    [TokenType_Plus]               = { P_ExprUnary, P_ExprBinary, Prec_Unary, Prec_Term   },
+    [TokenType_Minus]              = { P_ExprUnary, P_ExprBinary, Prec_Unary, Prec_Term   },
+    [TokenType_Star]               = { P_ExprDeref, P_ExprBinary, Prec_Unary, Prec_Factor },
+    [TokenType_Slash]              = { nullptr,     P_ExprBinary, Prec_None,  Prec_Factor },
+    [TokenType_Percent]            = { nullptr,     P_ExprBinary, Prec_None,  Prec_Factor },
     [TokenType_PlusPlus]           = { nullptr, nullptr, Prec_None, Prec_None },
     [TokenType_MinusMinus]         = { nullptr, nullptr, Prec_None, Prec_None },
     [TokenType_Backslash]          = { nullptr, nullptr, Prec_None, Prec_None },
@@ -1055,7 +1131,7 @@ P_ParseRule parse_rules[] = {
     [TokenType_Struct]             = { nullptr, nullptr, Prec_None, Prec_None },
     [TokenType_Enum]               = { nullptr, nullptr, Prec_None, Prec_None },
     [TokenType_Null]               = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_Nullptr]            = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_Nullptr]            = { P_ExprNullptr, nullptr, Prec_None, Prec_None },
     [TokenType_If]                 = { nullptr, nullptr, Prec_None, Prec_None },
     [TokenType_Else]               = { nullptr, nullptr, Prec_None, Prec_None },
     [TokenType_Do]                 = { nullptr, nullptr, Prec_None, Prec_None },
@@ -1068,6 +1144,7 @@ P_ParseRule parse_rules[] = {
     [TokenType_Bool]               = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
     [TokenType_Double]             = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
     [TokenType_Char]               = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
+    [TokenType_String]             = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
     [TokenType_Long]               = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
     [TokenType_Void]               = { nullptr, nullptr, Prec_None, Prec_None },
     [TokenType_TokenTypeCount]     = { nullptr, nullptr, Prec_None, Prec_None },
@@ -1616,6 +1693,7 @@ void P_Parse(P_Parser* parser) {
 
 void P_Initialize(P_Parser* parser, string source) {
     arena_init(&parser->arena);
+    types_init(&parser->arena);
     parser->source = source;
     parser->root = nullptr;
     parser->current = (L_Token) {0};
@@ -1692,6 +1770,10 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
             P_PrintExprAST_Indent(arena, expr->op.unary.operand, indent + 1);
         } break;
         
+        case ExprType_Nullptr: {
+            printf("nullptr\n");
+        } break;
+        
         case ExprType_Binary: {
             printf("%.*s\n", str_expand(L__get_string_from_type__(expr->op.binary.operator)));
             P_PrintExprAST_Indent(arena, expr->op.binary.left, indent + 1);
@@ -1713,6 +1795,11 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
         case ExprType_Addr: {
             printf("[Get Address]\n");
             P_PrintExprAST_Indent(arena, expr->op.addr, indent + 1);
+        } break;
+        
+        case ExprType_Deref: {
+            printf("[Deref]\n");
+            P_PrintExprAST_Indent(arena, expr->op.deref, indent + 1);
         } break;
         
         case ExprType_Dot: {

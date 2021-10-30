@@ -36,7 +36,6 @@ void* arena_alloc(M_Arena* arena, u64 size) {
     if (arena->alloc_position + size > arena->commit_position) {
         u64 commit_size = size;
         
-        // Confused Confusing Confusion
         commit_size += M_ARENA_COMMIT_SIZE - 1;
         commit_size -= commit_size % M_ARENA_COMMIT_SIZE;
         

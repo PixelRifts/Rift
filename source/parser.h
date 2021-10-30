@@ -29,6 +29,7 @@ enum {
 typedef u32 P_ValueTypeCollection;
 enum {
     ValueTypeCollection_Number,
+    ValueTypeCollection_Pointer,
     ValueTypeCollection_WholeNumber,
     ValueTypeCollection_DecimalNumber,
     ValueTypeCollection_String,
@@ -42,7 +43,7 @@ enum {
     ExprType_StringLit, ExprType_CharLit, ExprType_BoolLit, ExprType_Typename,
     ExprType_Unary, ExprType_Binary, ExprType_Assignment, ExprType_Variable,
     ExprType_FuncCall, ExprType_Dot, ExprType_EnumDot, ExprType_Cast, ExprType_Index,
-    ExprType_Addr
+    ExprType_Addr, ExprType_Deref, ExprType_Nullptr
 };
 
 typedef struct P_Expr P_Expr;
@@ -61,6 +62,7 @@ struct P_Expr {
         P_ValueType typename;
         P_Expr* cast;
         P_Expr* addr;
+        P_Expr* deref;
         struct { L_TokenType operator; P_Expr* left; P_Expr* right; } binary;
         struct { L_TokenType operator; P_Expr* operand; } unary;
         struct { P_Expr* left; string right; } dot;
@@ -76,7 +78,8 @@ typedef u32 P_StmtType;
 enum {
     StmtType_Expression, StmtType_Block, StmtType_Return, StmtType_If,
     StmtType_IfElse, StmtType_While, StmtType_DoWhile, StmtType_VarDecl,
-    StmtType_VarDeclAssign, StmtType_FuncDecl, StmtType_NativeFuncDecl, StmtType_StructDecl, StmtType_EnumDecl,
+    StmtType_VarDeclAssign, StmtType_FuncDecl, StmtType_NativeFuncDecl, StmtType_StructDecl,
+    StmtType_EnumDecl,
 };
 
 typedef struct P_Stmt P_Stmt;

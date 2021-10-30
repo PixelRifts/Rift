@@ -5,12 +5,17 @@
 typedef const char* string;
 
 int main(void);
-void test_1intptr(int* i);
 
+typedef struct test {
+	int x;
+	int y;
+} test;
 int main(void) {
 	int x;
-	test_1intptr(&x);
+	int* ptr = &x;
+	void* p = ptr;
+	test* again = (test*)p;
+	test* foo = (test*)((void*)0);
+	int back_to_int = *(ptr+5);
 	return 10;
-}
-void test_1intptr(int* i) {
 }

@@ -29,4 +29,7 @@ void arena_init(M_Arena* arena);
 void arena_clear(M_Arena* arena);
 void arena_free(M_Arena* arena);
 
+// TODO(voxel): Bump / Stack Allocator
+// TODO(voxel): Pool Allocator
+
 #endif //MEM_H

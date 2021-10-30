@@ -20,12 +20,18 @@ P_ValueTypeCollection list_operator_logical[] = {
     ValueTypeCollection_Bool
 };
 
-P_BinaryOpPair pairs_operator_arithmetic[] = {
-    { .left = ValueTypeCollection_Number, .right = ValueTypeCollection_Number }
+P_BinaryOpPair pairs_operator_arithmetic_term[] = {
+    { .left = ValueTypeCollection_Number, .right = ValueTypeCollection_Number },
+    { .left = ValueTypeCollection_Pointer, .right = ValueTypeCollection_Number },
+    { .left = ValueTypeCollection_Number, .right = ValueTypeCollection_Pointer },
+};
+
+P_BinaryOpPair pairs_operator_arithmetic_factor[] = {
+    { .left = ValueTypeCollection_Number, .right = ValueTypeCollection_Number },
 };
 
 P_BinaryOpPair pairs_operator_bin[] = {
-    { .left = ValueTypeCollection_WholeNumber, .right = ValueTypeCollection_WholeNumber }
+    { .left = ValueTypeCollection_WholeNumber, .right = ValueTypeCollection_WholeNumber },
 };
 
 P_BinaryOpPair pairs_operator_equality[] = {

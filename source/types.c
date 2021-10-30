@@ -1,5 +1,32 @@
 #include "types.h"
 
+const P_ValueType ValueType_Invalid = { .base_type = str_lit("INVALID"), .mods = nullptr };
+
+const P_ValueType ValueType_Integer = value_type_abs("int");
+const P_ValueType ValueType_Long = value_type_abs("long");
+const P_ValueType ValueType_Float = value_type_abs("float");
+const P_ValueType ValueType_Double = value_type_abs("double");
+
+const P_ValueType ValueType_String = value_type_abs("string");
+const P_ValueType ValueType_Char = value_type_abs("char");
+const P_ValueType ValueType_Bool = value_type_abs("bool");
+const P_ValueType ValueType_Void = value_type_abs("void");
+const P_ValueType ValueType_Tombstone = value_type_abs("tombstone");
+
+// Mods get filled in in the init routine
+P_ValueType ValueType_VoidPointer = (P_ValueType) {
+    .base_type = str_lit("void"),
+    .full_type = str_lit("void*"),
+    .mod_ct = 1,
+};
+
+void types_init(M_Arena* arena) {
+    P_ValueTypeMod* void_ptr_mods = arena_alloc(arena, sizeof(P_ValueTypeMod));
+    *void_ptr_mods = (P_ValueTypeMod) { .type = ValueTypeModType_Pointer };
+    ValueType_VoidPointer.mods = void_ptr_mods;
+    ValueType_VoidPointer.mod_ct = 1;
+}
+
 void value_type_list_push_node(value_type_list* list, value_type_list_node* node) {
     if (!list->first && !list->last) {
         list->first = node;
@@ -29,5 +56,11 @@ b8 value_type_list_equals(value_type_list* a, value_type_list* b) {
         curr_a = curr_a->next;
         curr_b = curr_b->next;
     }
+    return true;
+}
+
+b8 is_ptr(P_ValueType a) {
+    if (a.mod_ct == 0) return false;
+    if (a.mods[a.mod_ct - 1].type != ValueTypeModType_Pointer) return false;
     return true;
 }
