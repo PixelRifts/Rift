@@ -57,6 +57,55 @@ b8 str_node_eq(string_const_list_node* a, string_const_list_node* b) {
     return memcmp(a->str, b->str, b->size) == 0;
 }
 
+string_const str_replace_all(M_Arena* arena, string_const to_fix, string_const needle, string_const replacement) {
+    if (needle.size == 0) return to_fix;
+    u64 replaceable = str_substr_count(to_fix, needle);
+    if (replaceable == 0) return to_fix;
+    
+    u64 new_size = (to_fix.size - replaceable) + (replaceable * replacement.size);
+    string_const ret = str_alloc(arena, new_size);
+    
+    b8 replaced;
+    u64 o = 0;
+    for (u64 i = 0; i < to_fix.size;) {
+        replaced = false;
+        if (to_fix.str[i] == needle.str[0]) {
+            if ((to_fix.size - i) >= needle.size) {
+                string_const sub = { .str = to_fix.str + i, .size = needle.size };
+                if (str_eq(sub, needle)) {
+                    // replace this one
+                    memmove(ret.str + o, replacement.str, replacement.size);
+                    replaced = true;
+                }
+            }
+        }
+        
+        if (replaced) {
+            o += replacement.size;
+            i += needle.size;
+            continue;
+        }
+        
+        ret.str[o] = to_fix.str[i];
+        o++; i++;
+    }
+    
+    return ret;
+}
+
+u64 str_substr_count(string_const str, string_const needle) {
+    u32 ct = 0;
+    u64 idx = 0;
+    while (true) {
+        idx = str_find_first(str, needle, idx);
+        if (idx == str.size)
+            break;
+        ct++;
+        idx++;
+    }
+    return ct;
+}
+
 u64 str_find_first(string_const str, string_const needle, u32 offset) {
     u64 i = 0;
     if (needle.size > 0) {

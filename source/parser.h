@@ -57,7 +57,7 @@ struct P_Expr {
         b8     bool_lit;
         string char_lit; // Is a string for transpiling reasons. :(
         string string_lit;
-        string typename;
+        P_ValueType typename;
         P_Expr* cast;
         struct { L_TokenType operator; P_Expr* left; P_Expr* right; } binary;
         struct { L_TokenType operator; P_Expr* operand; } unary;
@@ -88,8 +88,8 @@ struct P_Stmt {
         
         struct { P_ValueType type; string name; } var_decl;
         struct { P_ValueType type; string name; P_Expr* val; } var_decl_assign;
-        struct { string name; u32 arity; string_list param_types; string_list param_names; P_ValueType type; P_Stmt* block; b8 varargs; } func_decl;
-        struct { string name; u32 member_count; string_list member_types; string_list member_names; } struct_decl;
+        struct { string name; u32 arity; value_type_list param_types; string_list param_names; P_ValueType type; P_Stmt* block; b8 varargs; } func_decl;
+        struct { string name; u32 member_count; value_type_list member_types; string_list member_names; } struct_decl;
         struct { string name; u32 member_count; string_list member_names; } enum_decl;
         
         struct { P_Expr* condition; P_Stmt* then; } if_s;
@@ -109,7 +109,7 @@ struct P_PreStmt {
     P_PreStmtType type;
     P_PreStmt* next;
     union {
-        struct { string name; u32 arity; string_list param_types; string_list param_names; P_ValueType type; } forward_decl;
+        struct { string name; u32 arity; value_type_list param_types; string_list param_names; P_ValueType type; } forward_decl;
     } op;
 };
 

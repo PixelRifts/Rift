@@ -1,6 +1,12 @@
 #include "data_structures.h"
 
-static const func_entry_val tombstone = { .value = str_lit("tombstone"), .is_native = false };
+static const func_entry_val tombstone = {
+    .value = (P_ValueType) {
+        .base_type = str_lit("tombstone"),
+        .mods = nullptr
+    },
+    .is_native = false
+};
 
 //~ Variable Hashtable
 static u32 hash_var_key(var_entry_key k) {
@@ -20,7 +26,7 @@ static var_table_entry* find_var_entry(var_table_entry* entries, i32 cap, var_en
     while (true) {
         var_table_entry* entry = &entries[idx];
         if (entry->key.name.size == 0) {
-            if (entry->value.size == 0)
+            if (entry->value.base_type.size == 0)
                 return tombstone_e != nullptr ? tombstone_e : entry;
             else
                 if (tombstone_e == nullptr) tombstone_e = entry;
@@ -81,7 +87,7 @@ b8 var_hash_table_set(var_hash_table* table, var_entry_key key, P_ValueType valu
     
     var_table_entry* entry = find_var_entry(table->entries, table->capacity, key);
     b8 is_new_key = entry->key.name.size == 0;
-    if (is_new_key && entry->value.size == 0)
+    if (is_new_key && entry->value.base_type.size == 0)
         table->count++;
     
     entry->key = key;
@@ -167,7 +173,7 @@ void func_hash_table_free(func_hash_table* table) {
     table->entries = nullptr;
 }
 
-b8 func_hash_table_get(func_hash_table* table, func_entry_key key, string_list param_types, func_entry_val** value, u32* subset_match) {
+b8 func_hash_table_get(func_hash_table* table, func_entry_key key, value_type_list param_types, func_entry_val** value, u32* subset_match, b8 absolute_check) {
     if (table->count == 0) return false;
     func_table_entry* entry = find_func_entry(table->entries, table->capacity, key);
     if (entry->key.name.size == 0) return false;
@@ -184,12 +190,15 @@ b8 func_hash_table_get(func_hash_table* table, func_entry_key key, string_list p
         
         ctr = 0;
         // Check string_list equals. (can be a subset, so not using string_list_equals)
-        string_list_node* curr_test = c->param_types.first;
-        string_list_node* curr = param_types.first;
+        value_type_list_node* curr_test = c->param_types.first;
+        value_type_list_node* curr = param_types.first;
         while (!(curr_test == nullptr || curr == nullptr)) {
             
-            if (!str_str_node_eq(str_lit("..."), curr_test)) {
-                if (!node_type_check(curr, curr_test)) break;
+            if (!str_eq(str_lit("..."), curr_test->type.full_type)) {
+                if (absolute_check) {
+                    if (!str_eq(curr->type.full_type, curr_test->type.full_type)) break;
+                } else
+                    if (!node_type_check(curr, curr_test)) break;
                 ctr++;
                 curr_test = curr_test->next;
                 curr = curr->next;
@@ -229,7 +238,7 @@ b8 func_hash_table_set(func_hash_table* table, func_entry_key key, func_entry_va
         func_entry_val* c = entry->value;
         b8 found = false;
         while (true) {
-            if (string_list_equals(&c->param_types, &value->param_types)) {
+            if (value_type_list_equals(&c->param_types, &value->param_types)) {
                 found = true;
                 break;
             }
@@ -279,10 +288,23 @@ void type_array_add(type_array* array, P_Container structure) {
     if (array->count + 1 > array->capacity) {
         void* prev = array->elements;
         array->capacity = GROW_CAPACITY(array->capacity);
-        array->elements = malloc(array->capacity * sizeof(P_Container));
+        array->elements = calloc(array->capacity, sizeof(P_Container));
         memmove(array->elements, prev, array->count * sizeof(P_Container));
         free(prev);
     }
     *(array->elements + array->count) = structure;
+    array->count++;
+}
+
+//~ Type Modifiers
+
+void type_mod_array_add(M_Arena* arena, type_mod_array* array, P_ValueTypeMod mod) {
+    if (array->count + 1 > array->capacity) {
+        void* prev = array->elements;
+        array->capacity = GROW_CAPACITY(array->capacity);
+        array->elements = arena_alloc(arena, array->capacity * sizeof(P_ValueTypeMod));
+        memmove(array->elements, prev, array->count * sizeof(P_ValueTypeMod));
+    }
+    *(array->elements + array->count) = mod;
     array->count++;
 }

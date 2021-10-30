@@ -43,7 +43,7 @@ typedef struct func_entry_key {
 typedef struct func_entry_val {
     P_ValueType value;
     string mangled_name;
-    string_list param_types;
+    value_type_list param_types;
     b8 is_native;
     b8 is_varargs;
     
@@ -63,8 +63,7 @@ typedef struct func_hash_table {
 
 void func_hash_table_init(func_hash_table* table);
 void func_hash_table_free(func_hash_table* table);
-// Part decides how many params at the end don't get checked for varargs
-b8   func_hash_table_get(func_hash_table* table, func_entry_key key, string_list param_types, func_entry_val** value, u32* subset_match);
+b8   func_hash_table_get(func_hash_table* table, func_entry_key key, value_type_list param_types, func_entry_val** value, u32* subset_match, b8 absolute_check);
 b8   func_hash_table_set(func_hash_table* table, func_entry_key key, func_entry_val* value);
 b8   func_hash_table_del(func_hash_table* table, func_entry_key key);
 void func_hash_table_add_all(func_hash_table* from, func_hash_table* to);
@@ -80,7 +79,7 @@ typedef struct P_Container {
     string name;
     u32 depth;
     u32 member_count;
-    string_list member_types;
+    value_type_list member_types;
     string_list member_names;
 } P_Container;
 
@@ -93,5 +92,14 @@ typedef struct type_array {
 void type_array_init(type_array* array);
 void type_array_free(type_array* array);
 void type_array_add(type_array* array, P_Container structure);
+
+
+typedef struct type_mod_array {
+    u32 capacity;
+    u32 count;
+    P_ValueTypeMod* elements;
+} type_mod_array;
+
+void type_mod_array_add(M_Arena* arena, type_mod_array* array, P_ValueTypeMod mod);
 
 #endif //DATA_STRUCTURES_H

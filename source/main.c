@@ -49,6 +49,7 @@ int main(int argc, char **argv) {
         E_Emit(&emitter);
         E_Free(&emitter);
 #endif
+        
         free(source);
     }
 }

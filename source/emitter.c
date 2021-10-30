@@ -2,9 +2,8 @@
 #include <stdarg.h>
 
 // All types will go through this map
-static P_ValueType type_map(P_ValueType type) {
-    if (str_eq(type, str_lit("long")))
-        return str_lit("long long");
+static P_ValueType type_map(E_Emitter* emitter, P_ValueType type) {
+    type.full_type = str_replace_all(&emitter->parser.arena, type.full_type, str_lit("long"), str_lit("long long"));
     return type;
 }
 
@@ -81,7 +80,7 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
         } break;
         
         case ExprType_Cast: {
-            E_WriteF(emitter, "(%.*s)", str_expand(expr->ret_type));
+            E_WriteF(emitter, "(%.*s)", str_expand(expr->ret_type.full_type));
             E_EmitExpression(emitter, expr->op.cast);
         } break;
         
@@ -146,37 +145,38 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
         } break;
         
         case StmtType_VarDecl: {
-            P_ValueType type = type_map(stmt->op.var_decl.type);
-            E_WriteF(emitter, "%.*s %.*s", str_expand(type), str_expand(stmt->op.var_decl.name));
+            P_ValueType type = type_map(emitter, stmt->op.var_decl.type);
+            E_WriteF(emitter, "%.*s %.*s", str_expand(type.full_type), str_expand(stmt->op.var_decl.name));
             E_WriteLine(emitter, ";");
         } break;
         
         case StmtType_VarDeclAssign: {
-            P_ValueType type = type_map(stmt->op.var_decl_assign.type);
-            E_WriteF(emitter, "%.*s %.*s = ", str_expand(type), str_expand(stmt->op.var_decl_assign.name));
+            P_ValueType type = type_map(emitter, stmt->op.var_decl_assign.type);
+            E_WriteF(emitter, "%.*s %.*s = ", str_expand(type.full_type), str_expand(stmt->op.var_decl_assign.name));
             E_EmitExpression(emitter, stmt->op.var_decl_assign.val);
             E_WriteLine(emitter, ";");
         } break;
         
         case StmtType_FuncDecl: {
-            P_ValueType type = type_map(stmt->op.func_decl.type);
-            E_WriteF(emitter, "%.*s %.*s(", str_expand(type), str_expand(stmt->op.func_decl.name));
+            P_ValueType type = type_map(emitter, stmt->op.func_decl.type);
+            E_WriteF(emitter, "%.*s %.*s(", str_expand(type.full_type), str_expand(stmt->op.func_decl.name));
             string_list_node* curr_name = stmt->op.func_decl.param_names.first;
-            string_list_node* curr_type = stmt->op.func_decl.param_types.first;
+            value_type_list_node* curr_type = stmt->op.func_decl.param_types.first;
             
             string arg_before_varargs;
             string varargs;
             
             if (stmt->op.func_decl.arity != 0) {
                 for (u32 i = 0; i < stmt->op.func_decl.arity; i++) {
-                    P_ValueType c_type = type_map((P_ValueType){ .str = curr_type->str, .size = curr_type->size });
-                    if (str_eq(c_type, str_lit("..."))) {
-                        E_WriteF(emitter, "%.*s", str_node_expand(curr_type));
+                    // FIXME(voxel)
+                    P_ValueType c_type = type_map(emitter, curr_type->type);
+                    if (str_eq(c_type.full_type, str_lit("..."))) {
+                        E_WriteF(emitter, "%.*s", str_expand(c_type.full_type));
                         varargs = (string) { .str = curr_name->str, .size = curr_name->size };
                         break;
                     }
                     
-                    E_WriteF(emitter, "%.*s %.*s", str_expand(c_type), str_node_expand(curr_name));
+                    E_WriteF(emitter, "%.*s %.*s", str_expand(c_type.full_type), str_node_expand(curr_name));
                     if (i != stmt->op.func_decl.arity - 1)
                         E_Write(emitter, ", ");
                     
@@ -209,13 +209,13 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
         case StmtType_StructDecl: {
             E_WriteLineF(emitter, "typedef struct %.*s {", str_expand(stmt->op.struct_decl.name));
             string_list_node* curr_name = stmt->op.struct_decl.member_names.first;
-            string_list_node* curr_type = stmt->op.struct_decl.member_types.first;
+            value_type_list_node* curr_type = stmt->op.struct_decl.member_types.first;
             for (u32 i = 0; i < stmt->op.struct_decl.member_count; i++) {
-                P_ValueType c_type = type_map((P_ValueType) { .str = curr_type->str, .size = curr_type->size });
+                P_ValueType c_type = type_map(emitter, curr_type->type);
                 
                 for (u32 idt = 0; idt < indent + 1; idt++)
                     E_Write(emitter, "\t");
-                E_WriteLineF(emitter, "%.*s %.*s;", str_expand(c_type), str_node_expand(curr_name));
+                E_WriteLineF(emitter, "%.*s %.*s;", str_expand(c_type.full_type), str_node_expand(curr_name));
                 
                 curr_name = curr_name->next;
                 curr_type = curr_type->next;
@@ -280,18 +280,18 @@ static void E_EmitPreStatement(E_Emitter* emitter, P_PreStmt* stmt, u32 indent) 
     
     switch (stmt->type) {
         case PreStmtType_ForwardDecl: {
-            P_ValueType type = type_map(stmt->op.forward_decl.type);
-            E_WriteF(emitter, "%.*s %.*s(", str_expand(type), str_expand(stmt->op.forward_decl.name));
+            P_ValueType type = type_map(emitter, stmt->op.forward_decl.type);
+            E_WriteF(emitter, "%.*s %.*s(", str_expand(type.full_type), str_expand(stmt->op.forward_decl.name));
             string_list_node* curr_name = stmt->op.forward_decl.param_names.first;
-            string_list_node* curr_type = stmt->op.forward_decl.param_types.first;
+            value_type_list_node* curr_type = stmt->op.forward_decl.param_types.first;
             if (stmt->op.forward_decl.arity != 0) {
                 for (u32 i = 0; i < stmt->op.forward_decl.arity; i++) {
-                    P_ValueType c_type = type_map((P_ValueType) { .str = curr_type->str, .size = curr_type->size });
-                    if (str_eq(c_type, str_lit("..."))) {
-                        E_WriteF(emitter, "%.*s", str_expand(c_type));
+                    P_ValueType c_type = type_map(emitter, curr_type->type);
+                    if (str_eq(c_type.full_type, str_lit("..."))) {
+                        E_WriteF(emitter, "%.*s", c_type.full_type);
                         break;
                     }
-                    E_WriteF(emitter, "%.*s %.*s", str_expand(c_type), str_node_expand(curr_name));
+                    E_WriteF(emitter, "%.*s %.*s", str_expand(c_type.full_type), str_node_expand(curr_name));
                     if (i != stmt->op.forward_decl.arity - 1)
                         E_Write(emitter, ", ");
                     curr_name = curr_name->next;

@@ -47,11 +47,17 @@ static b8 container_type_exists(P_Parser* parser, string struct_name, u32 depth)
 
 static P_ValueType member_type_get(P_Container* structure, string reqd) {
     string_list_node* curr = structure->member_names.first;
-    string_list_node* type = structure->member_types.first;
+    value_type_list_node* type = structure->member_types.first;
     for (u32 i = 0; i < structure->member_count; i++) {
+        
         if (curr->size == reqd.size) {
-            if (memcmp(curr->str, reqd.str, curr->size) == 0)
-                return (P_ValueType) { .str = type->str, .size = type->size };
+            if (memcmp(curr->str, reqd.str, curr->size) == 0) {
+                return (P_ValueType) {
+                    .base_type = type->type.base_type,
+                    .full_type = type->type.full_type,
+                    .mods = nullptr
+                };
+            }
         }
         curr = curr->next;
         type = type->next;
@@ -121,19 +127,28 @@ static b8 P_IsTypeToken(P_Parser* parser) {
     return false;
 }
 
-static b8 P_AppendTypeMods(string_list* comp, P_Parser* parser) {
+// Just for mod consumption
+static P_Expr* P_Expression(P_Parser* parser);
+
+static b8 P_ConsumeTypeMods(P_Parser* parser, type_mod_array* mods) {
     if (parser->current.type == TokenType_Star) {
         P_Advance(parser);
-        string_list_push(&parser->arena, comp, str_lit("*"));
-        P_AppendTypeMods(comp, parser);
-        return true;
-    } else if (parser->current.type == TokenType_OpenBracket) {
-        P_Advance(parser);
-        P_Consume(parser, TokenType_CloseBracket, str_lit("Required ] after [ in type declaration\n"));
-        string_list_push(&parser->arena, comp, str_lit("[]"));
-        P_AppendTypeMods(comp, parser);
+        type_mod_array_add(&parser->arena, mods, (P_ValueTypeMod) { .type = ValueTypeModType_Pointer });
+        P_ConsumeTypeMods(parser, mods);
         return true;
     }
+    // TODO(voxel): ARRAYS
+    
+    /*else if (parser->current.type == TokenType_OpenBracket) {
+        P_Advance(parser);
+        P_Expr* e = P_Expression(parser);
+        
+        P_Consume(parser, TokenType_CloseBracket, str_lit("Required ] after expression in type declaration\n"));
+        type_mod_array_add(&parser->arena, mods, (P_ValueTypeMod) { .type = ValueTypeModType_Array, .op.array_expr = e });
+        P_ConsumeTypeMods(parser, mods);
+        return true;
+    }*/
+    
     return false;
 }
 
@@ -142,19 +157,36 @@ static P_ValueType P_ConsumeType(P_Parser* parser, string message) {
         parser->current.type == TokenType_Float || parser->current.type == TokenType_Double || parser->current.type == TokenType_Bool || parser->current.type == TokenType_Char ||
         parser->current.type == TokenType_Void || parser->current.type == TokenType_String) {
         P_Advance(parser);
+        string base_type = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
         
-        string_list l = {0};
-        string_list_push(&parser->arena, &l, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
-        P_AppendTypeMods(&l, parser);
-        return string_list_flatten(&parser->arena, &l);
+        type_mod_array mods = {0};
+        P_ConsumeTypeMods(parser, &mods);
+        
+        u64 complete_length = ((u64)parser->previous.start + (u64)parser->previous.length) - (u64)base_type.str;
+        
+        return (P_ValueType) {
+            .base_type = base_type,
+            .full_type = (string) { .str = base_type.str, .size = complete_length },
+            .mods = mods.elements,
+            .mod_ct = mods.count
+        };
     }
     if (parser->current.type == TokenType_Identifier) {
         if (container_type_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
             P_Advance(parser);
-            string_list l = {0};
-            string_list_push(&parser->arena, &l, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
-            P_AppendTypeMods(&l, parser);
-            return string_list_flatten(&parser->arena, &l);
+            string base_type = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+            
+            type_mod_array mods = {0};
+            P_ConsumeTypeMods(parser, &mods);
+            
+            u64 complete_length = ((u64)parser->previous.start + (u64)parser->previous.length) - (u64)base_type.str;
+            
+            return (P_ValueType) {
+                .base_type = base_type,
+                .full_type = (string) { .str = base_type.str, .size = complete_length },
+                .mods = mods.elements,
+                .mod_ct = mods.count
+            };
         }
     }
     
@@ -163,21 +195,21 @@ static P_ValueType P_ConsumeType(P_Parser* parser, string message) {
 }
 
 static P_ValueType type_heirarchy[] = {
-    str_lit("double"),
-    str_lit("float"),
-    str_lit("long"),
-    str_lit("int"),
-    str_lit("char"),
+    { .base_type = str_lit("double"), .full_type = str_lit("double") },
+    { .base_type = str_lit("float"), .full_type = str_lit("float") },
+    { .base_type = str_lit("long"), .full_type = str_lit("long") },
+    { .base_type = str_lit("int"), .full_type = str_lit("int") },
+    { .base_type = str_lit("char"), .full_type = str_lit("char") },
 };
 u32 type_heirarchy_length = 5;
 
 b8 type_check(P_ValueType a, P_ValueType expected) {
-    if (str_eq(a, expected)) return true;
+    if (str_eq(a.full_type, expected.full_type)) return true;
     
     // Implicit cast thingy
     i32 perm = -1;
     for (u32 i = 0; i < type_heirarchy_length; i++) {
-        if (str_eq(type_heirarchy[i], expected)) {
+        if (str_eq(type_heirarchy[i].base_type, expected.full_type)) {
             perm = i;
             break;
         }
@@ -185,7 +217,7 @@ b8 type_check(P_ValueType a, P_ValueType expected) {
     if (perm != -1) {
         i32 other = -1;
         for (u32 i = 0; i < type_heirarchy_length; i++) {
-            if (str_eq(type_heirarchy[i], a)) {
+            if (str_eq(type_heirarchy[i].base_type, a.full_type)) {
                 other = i;
                 break;
             }
@@ -196,13 +228,13 @@ b8 type_check(P_ValueType a, P_ValueType expected) {
     return false;
 }
 
-b8 node_type_check(string_list_node* a, string_list_node* expected) {
-    if (str_node_eq(a, expected)) return true;
+b8 node_type_check(value_type_list_node* a, value_type_list_node* expected) {
+    if (str_eq(a->type.full_type, expected->type.full_type)) return true;
     
     // Implicit cast thingy
     i32 perm = -1;
     for (u32 i = 0; i < type_heirarchy_length; i++) {
-        if (str_str_node_eq(type_heirarchy[i], expected)) {
+        if (str_eq(type_heirarchy[i].base_type, expected->type.full_type)) {
             perm = i;
             break;
         }
@@ -210,7 +242,7 @@ b8 node_type_check(string_list_node* a, string_list_node* expected) {
     if (perm != -1) {
         i32 other = -1;
         for (u32 i = 0; i < type_heirarchy_length; i++) {
-            if (str_str_node_eq(type_heirarchy[i], a)) {
+            if (str_eq(type_heirarchy[i].base_type, a->type.full_type)) {
                 other = i;
                 break;
             }
@@ -221,12 +253,18 @@ b8 node_type_check(string_list_node* a, string_list_node* expected) {
     return false;
 }
 
-static string P_FuncNameMangle(P_Parser* parser, string name, u32 arity, string_list params, string additional_info) {
+static string P_FuncNameMangle(P_Parser* parser, string name, u32 arity, value_type_list params, string additional_info) {
+    
     string_list sl = {0};
     string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "%.*s_%u", str_expand(name), arity));
-    string_list_node* curr = params.first;
+    
+    value_type_list_node* curr = params.first;
     for (u32 i = 0; i < arity; i++) {
-        string_list_push(&parser->arena, &sl, str_from_format(&parser->arena, "%.*s", str_node_expand(curr)));
+        string fixed = str_replace_all(&parser->arena,
+                                       str_from_format(&parser->arena, "%.*s", str_expand(curr->type.full_type)),
+                                       str_lit("*"), str_lit("ptr"));
+        
+        string_list_push(&parser->arena, &sl, fixed);
         curr = curr->next;
     }
     
@@ -260,7 +298,7 @@ static void P_Bind(P_Parser* parser, P_Expr* expr, P_ValueTypeCollection* expect
             return;
         }
     }
-    report_error(parser, error_msg, expr->ret_type.str);
+    report_error(parser, error_msg, expr->ret_type.full_type);
 }
 
 static void P_BindDouble(P_Parser* parser, P_Expr* left, P_Expr* right, P_BinaryOpPair* expected, u32 flagct, string error_msg) {
@@ -269,18 +307,17 @@ static void P_BindDouble(P_Parser* parser, P_Expr* left, P_Expr* right, P_Binary
             return;
         }
     }
-    report_error(parser, error_msg, left->ret_type.str, right->ret_type.str);
+    report_error(parser, error_msg, left->ret_type.full_type, right->ret_type.full_type);
 }
 
-// Basic Max function
 static P_ValueType P_GetNumberBinaryValType(P_Expr* a, P_Expr* b) {
-    if (str_eq(a->ret_type, ValueType_Double) || str_eq(b->ret_type, ValueType_Double))
+    if (str_eq(a->ret_type.full_type, ValueType_Double.full_type) || str_eq(b->ret_type.full_type, ValueType_Double.full_type))
         return ValueType_Double;
-    if (str_eq(a->ret_type, ValueType_Float) || str_eq(b->ret_type, ValueType_Float))
+    if (str_eq(a->ret_type.full_type, ValueType_Float.full_type) || str_eq(b->ret_type.full_type, ValueType_Float.full_type))
         return ValueType_Float;
-    if (str_eq(a->ret_type, ValueType_Long) || str_eq(b->ret_type, ValueType_Long))
+    if (str_eq(a->ret_type.full_type, ValueType_Long.full_type) || str_eq(b->ret_type.full_type, ValueType_Long.full_type))
         return ValueType_Long;
-    if (str_eq(a->ret_type, ValueType_Integer) || str_eq(b->ret_type, ValueType_Integer))
+    if (str_eq(a->ret_type.full_type, ValueType_Integer.full_type) || str_eq(b->ret_type.full_type, ValueType_Integer.full_type))
         return ValueType_Integer;
     return ValueType_Invalid;
 }
@@ -433,7 +470,7 @@ static P_Expr* P_MakeVariableNode(P_Parser* parser, string name, P_ValueType typ
     return expr;
 }
 
-static P_Expr* P_MakeTypenameNode(P_Parser* parser, string name) {
+static P_Expr* P_MakeTypenameNode(P_Parser* parser, P_ValueType name) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_Typename;
     expr->ret_type = ValueType_Invalid;
@@ -543,7 +580,7 @@ static P_Stmt* P_MakeEnumDeclStmtNode(P_Parser* parser, string name, u32 count, 
     return stmt;
 }
 
-static P_Stmt* P_MakeStructDeclStmtNode(P_Parser* parser, string name, u32 count, string_list types, string_list names) {
+static P_Stmt* P_MakeStructDeclStmtNode(P_Parser* parser, string name, u32 count, value_type_list types, string_list names) {
     P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
     stmt->type = StmtType_StructDecl;
     stmt->next = nullptr;
@@ -554,7 +591,7 @@ static P_Stmt* P_MakeStructDeclStmtNode(P_Parser* parser, string name, u32 count
     return stmt;
 }
 
-static P_Stmt* P_MakeFuncStmtNode(P_Parser* parser, P_ValueType type, string name, u32 arity, string_list param_types, string_list param_names, b8 varargs) {
+static P_Stmt* P_MakeFuncStmtNode(P_Parser* parser, P_ValueType type, string name, u32 arity, value_type_list param_types, string_list param_names, b8 varargs) {
     P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
     stmt->type = StmtType_FuncDecl;
     stmt->next = nullptr;
@@ -568,7 +605,7 @@ static P_Stmt* P_MakeFuncStmtNode(P_Parser* parser, P_ValueType type, string nam
     return stmt;
 }
 
-static P_Stmt* P_MakeNativeFuncStmtNode(P_Parser* parser, P_ValueType type, string name, u32 arity, string_list param_types, string_list param_names) {
+static P_Stmt* P_MakeNativeFuncStmtNode(P_Parser* parser, P_ValueType type, string name, u32 arity, value_type_list param_types, string_list param_names) {
     P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
     stmt->type = StmtType_NativeFuncDecl;
     stmt->next = nullptr;
@@ -576,7 +613,7 @@ static P_Stmt* P_MakeNativeFuncStmtNode(P_Parser* parser, P_ValueType type, stri
     return stmt;
 }
 
-static P_PreStmt* P_MakePreFuncStmtNode(P_Parser* parser, P_ValueType type, string name, u32 arity, string_list param_types, string_list param_names) {
+static P_PreStmt* P_MakePreFuncStmtNode(P_Parser* parser, P_ValueType type, string name, u32 arity, value_type_list param_types, string_list param_names) {
     P_PreStmt* stmt = arena_alloc(&parser->arena, sizeof(P_PreStmt));
     stmt->type = PreStmtType_ForwardDecl;
     stmt->next = nullptr;
@@ -634,7 +671,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
     // If I find a (, its a function call
     if (P_Match(parser, TokenType_OpenParenthesis)) {
         P_Expr* params[256] = {0};
-        string_list param_types = {0};
+        value_type_list param_types = {0};
         u32 call_arity = 0;
         while (!P_Match(parser, TokenType_CloseParenthesis)) {
             if (call_arity != 0) {
@@ -646,7 +683,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             
             params[call_arity] = P_Expression(parser);
             if (params[call_arity] == nullptr) return nullptr;
-            string_list_push(&parser->arena, &param_types, params[call_arity]->ret_type);
+            value_type_list_push(&parser->arena, &param_types, params[call_arity]->ret_type);
             call_arity++;
         }
         
@@ -659,26 +696,19 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         
         u32 subset_match = 1024; // Invalid cuz max param count is 256
         while (key.depth != -1) {
-            if (func_hash_table_get(&parser->functions, key, param_types, &value, &subset_match)) {
+            if (func_hash_table_get(&parser->functions, key, param_types, &value, &subset_match, true)) {
                 return P_MakeFuncCallNode(parser, value->is_native ? name : value->mangled_name, value->value, param_buffer, call_arity);
             }
             key.depth--;
         }
-        
-        // NOTE(voxel): If there are varargs, it can be any subset of the current args
-        /*key.name = name;
-        u32 i = call_arity;
-        while (i != 0) {
-            key.depth = parser->scope_depth;
-            while (key.depth != -1) {
-                if (func_hash_table_get(&parser->functions, key, param_types, call_arity - i, &value)) {
-                    return P_MakeFuncCallNode(parser, value->mangled_name, value->value, param_buffer, call_arity);
-                }
-                key.depth--;
+        // Reset key depth for a fuzzy type search
+        key.depth = parser->scope_depth;
+        while (key.depth != -1) {
+            if (func_hash_table_get(&parser->functions, key, param_types, &value, &subset_match, false)) {
+                return P_MakeFuncCallNode(parser, value->is_native ? name : value->mangled_name, value->value, param_buffer, call_arity);
             }
-            
-            i--;
-        }*/
+            key.depth--;
+        }
         
         report_error(parser, str_lit("Undefined function %.*s with provided parameters\n"), str_expand(name));
         
@@ -695,7 +725,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         
         P_Container* type = type_array_get(parser, name, parser->scope_depth);
         if (type != nullptr) {
-            return P_MakeTypenameNode(parser, name);
+            return P_MakeTypenameNode(parser, value_type_from_str(name));
         }
         
         report_error(parser, str_lit("Undefined variable %.*s\n"), str_expand(name));
@@ -705,7 +735,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
 
 static P_Expr* P_ExprPrimitiveTypename(P_Parser* parser) {
     string type = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
-    return P_MakeTypenameNode(parser, type);
+    return P_MakeTypenameNode(parser, value_type_from_str(type));
 }
 
 static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
@@ -719,7 +749,7 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
         if (type_check(xpr->ret_type, left->ret_type))
             return P_MakeAssignmentNode(parser, name, xpr);
         
-        report_error(parser, str_lit("Cannot assign %.*s to variable\n"), str_expand(xpr->ret_type));
+        report_error(parser, str_lit("Cannot assign %.*s to variable\n"), str_expand(xpr->ret_type.full_type));
     }
     return nullptr;
 }
@@ -732,7 +762,7 @@ static P_Expr* P_ExprGroup(P_Parser* parser) {
         P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after typename\n"));
         P_Expr* to_be_casted = P_Expression(parser);
         if (!type_check(to_be_casted->ret_type, in->op.typename))
-            report_error(parser, str_lit("Cannot cast from %.*s to %.*s\n"), str_expand(to_be_casted->ret_type), str_expand(in->op.typename));
+            report_error(parser, str_lit("Cannot cast from %.*s to %.*s\n"), str_expand(to_be_casted->ret_type.full_type), str_expand(in->op.typename.full_type));
         return P_MakeCastNode(parser, in->op.typename, to_be_casted);
     }
     
@@ -857,36 +887,37 @@ static P_Expr* P_ExprBinary(P_Parser* parser, P_Expr* left) {
 static P_Expr* P_ExprDot(P_Parser* parser, P_Expr* left) {
     if (left != nullptr) {
         if (left->type == ExprType_Typename) {
-            if (!container_type_exists(parser, left->op.typename, parser->scope_depth)) {
+            if (!container_type_exists(parser, left->op.typename.full_type, parser->scope_depth)) {
                 report_error(parser, str_lit("%.*s Is not a namespace or enum.\n"));
                 return nullptr;
             }
             
             P_Consume(parser, TokenType_Identifier, str_lit("Expected Member name after .\n"));
             string reqd = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
-            P_Container* type = type_array_get(parser, left->op.typename, parser->scope_depth);
+            P_Container* type = type_array_get(parser, left->op.typename.full_type, parser->scope_depth);
+            
             if (!member_exists(type, reqd)) {
-                report_error(parser, str_lit("No member %.*s in enum %.*s\n"), str_expand(reqd), str_expand(left->op.typename));
+                report_error(parser, str_lit("No member %.*s in enum %.*s\n"), str_expand(reqd), str_expand(left->op.typename.full_type));
             }
             
             // NOTE(voxel): This is always ValueType_Integer for now.
             // NOTE(voxel): But if I wanna support enums of different types, this will be different
             P_ValueType member_type = member_type_get(type, reqd);
-            return P_MakeEnumDotNode(parser, member_type, left->op.typename, reqd);
+            return P_MakeEnumDotNode(parser, member_type, left->op.typename.full_type, reqd);
             
         } else {
             P_ValueType valtype = left->ret_type;
             
-            if (!container_type_exists(parser, valtype, parser->scope_depth)) {
+            if (!container_type_exists(parser, valtype.full_type, parser->scope_depth)) {
                 report_error(parser, str_lit("Cannot apply . operator\n"));
                 return nullptr;
             }
             
             P_Consume(parser, TokenType_Identifier, str_lit("Expected Member name after .\n"));
             string reqd = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
-            P_Container* type = type_array_get(parser, valtype, parser->scope_depth);
+            P_Container* type = type_array_get(parser, valtype.full_type, parser->scope_depth);
             if (!member_exists(type, reqd)) {
-                report_error(parser, str_lit("No member %.*s in struct %.*s\n"), str_expand(reqd), str_expand(valtype));
+                report_error(parser, str_lit("No member %.*s in struct %.*s\n"), str_expand(reqd), str_expand(valtype.full_type));
             }
             P_ValueType member_type = member_type_get(type, reqd);
             return P_MakeDotNode(parser, member_type, left, reqd);
@@ -1001,7 +1032,7 @@ static P_Stmt* P_Statement(P_Parser* parser);
 static P_Stmt* P_Declaration(P_Parser* parser);
 
 static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b8 native) {
-    string_list params = {0};
+    value_type_list params = {0};
     string_list param_names = {0};
     u32 arity = 0;
     b8 varargs = false;
@@ -1025,7 +1056,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
             if (arity == 0)
                 report_error(parser, str_lit("Only varargs function not allowed\n"));
             
-            string_list_push(&parser->arena, &params, str_lit("..."));
+            value_type_list_push(&parser->arena, &params, value_type_abs("..."));
             
             P_Consume(parser, TokenType_Identifier, str_lit("Expected param name\n"));
             varargs = true;
@@ -1038,7 +1069,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         }
         
         P_ValueType param_type = P_ConsumeType(parser, str_lit("Expected type\n"));
-        string_list_push(&parser->arena, &params, param_type);
+        value_type_list_push(&parser->arena, &params, param_type);
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected param name\n"));
         string param_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
@@ -1064,7 +1095,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         
         u32 subset_match = 1024;
         func_entry_val* test = nullptr;
-        if (!func_hash_table_get(&parser->functions, key, params, &test, &subset_match)) {
+        if (!func_hash_table_get(&parser->functions, key, params, &test, &subset_match, true)) {
             func_entry_val* val = arena_alloc(&parser->arena, sizeof(func_entry_val)); val->value = type;
             val->is_native = native;
             val->param_types = params;
@@ -1124,7 +1155,7 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name) {
     if (P_Match(parser, TokenType_Equal)) {
         P_Expr* value = P_Expression(parser);
         if (!type_check(value->ret_type, type))
-            report_error(parser, str_lit("Cannot Assign Value of Type %.*s to variable of type %.*s\n"), str_expand(value->ret_type), str_expand(type));
+            report_error(parser, str_lit("Cannot Assign Value of Type %.*s to variable of type %.*s\n"), str_expand(value->ret_type.full_type), str_expand(type.full_type));
         P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
         return P_MakeVarDeclAssignStmtNode(parser, type, name, value);
     }
@@ -1145,11 +1176,11 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser) {
     type_array_add(&parser->types, (P_Container) { .type = ContainerType_Struct, .name = name, .depth = parser->scope_depth });
     u32 tmp_member_count = 0;
     string_list member_names = {0};
-    string_list member_types = {0};
+    value_type_list member_types = {0};
     
     // Parse Members
     while (!P_Match(parser, TokenType_CloseBrace)) {
-        string_list_push(&parser->arena, &member_types, P_ConsumeType(parser, str_lit("Expected Type or }\n")));
+        value_type_list_push(&parser->arena, &member_types, P_ConsumeType(parser, str_lit("Expected Type or }\n")));
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
         string_list_push(&parser->arena, &member_names, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
@@ -1179,11 +1210,11 @@ static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser) {
     type_array_add(&parser->types, (P_Container) { .type = ContainerType_Enum, .name = name, .depth = parser->scope_depth });
     u32 member_count = 0;
     string_list member_names = {0};
-    string_list member_types = {0};
+    value_type_list member_types = {0};
     
     // Parse Members
     while (!P_Match(parser, TokenType_CloseBrace)) {
-        string_list_push(&parser->arena, &member_types, ValueType_Integer);
+        value_type_list_push(&parser->arena, &member_types, ValueType_Integer);
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
         string_list_push(&parser->arena, &member_names, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
@@ -1236,7 +1267,7 @@ static P_Stmt* P_StmtReturn(P_Parser* parser) {
     P_Expr* val = P_Expression(parser);
     if (val == nullptr) return nullptr;
     if (!type_check(val->ret_type, parser->function_body_ret))
-        report_error(parser, str_lit("Function return type mismatch. Expected %.*s\n"), str_expand(parser->function_body_ret));
+        report_error(parser, str_lit("Function return type mismatch. Expected %.*s\n"), str_expand(parser->function_body_ret.full_type));
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after return statement\n"));
     return P_MakeReturnStmtNode(parser, val);
 }
@@ -1376,7 +1407,7 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
 
 //~ Pre-Parsing
 static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name) {
-    string_list params = {0};
+    value_type_list params = {0};
     string_list param_names = {0};
     u32 arity = 0;
     b8 varargs = false;
@@ -1389,7 +1420,7 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
             if (arity == 0)
                 report_error(parser, str_lit("Only varargs function not allowed\n"));
             
-            string_list_push(&parser->arena, &params, str_lit("..."));
+            value_type_list_push(&parser->arena, &params, value_type_abs("..."));
             
             P_Consume(parser, TokenType_Identifier, str_lit("Expected param name\n"));
             varargs = true;
@@ -1402,7 +1433,7 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
         }
         
         P_ValueType param_type = P_ConsumeType(parser, str_lit("Expected type\n"));
-        string_list_push(&parser->arena, &params, param_type);
+        value_type_list_push(&parser->arena, &params, param_type);
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected param name\n"));
         string param_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
@@ -1423,7 +1454,7 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
     u32 subset_match = 1024;
     func_entry_key key = (func_entry_key) { .name = name, .depth = 0 };
     func_entry_val* test = nullptr;
-    if (!func_hash_table_get(&parser->functions, key, params, &test, &subset_match)) {
+    if (!func_hash_table_get(&parser->functions, key, params, &test, &subset_match, true)) {
         func_entry_val* val = arena_alloc(&parser->arena, sizeof(func_entry_val));
         val->value = type;
         val->is_native = false;
@@ -1493,7 +1524,7 @@ void P_PreParse(P_Parser* parser) {
     
     u32 subset_match = 1024;
     func_entry_val* v = nullptr;
-    if (!func_hash_table_get(&parser->functions, (func_entry_key) { .name = str_lit("main"), .depth = 0 }, (string_list){0}, &v, &subset_match)) {
+    if (!func_hash_table_get(&parser->functions, (func_entry_key) { .name = str_lit("main"), .depth = 0 }, (value_type_list){0}, &v, &subset_match, true)) {
         report_error(parser, str_lit("No main function definition found\n"));
     }
 }
@@ -1576,7 +1607,7 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
         } break;
         
         case ExprType_Cast: {
-            printf("(%.*s) Cast\n", str_expand(expr->ret_type));
+            printf("(%.*s) Cast\n", str_expand(expr->ret_type.full_type));
             P_PrintExprAST_Indent(arena, expr->op.cast, indent + 1);
         } break;
         
@@ -1666,19 +1697,19 @@ static void P_PrintAST_Indent(M_Arena* arena, P_Stmt* stmt, u8 indent) {
             printf("Variable Declaration:\n");
             for (u8 i = 0; i < indent; i++)
                 printf("  ");
-            printf("%.*s: %.*s\n", str_expand(stmt->op.var_decl.name), str_expand(stmt->op.var_decl.type));
+            printf("%.*s: %.*s\n", str_expand(stmt->op.var_decl.name), str_expand(stmt->op.var_decl.type.full_type));
         } break;
         
         case StmtType_VarDeclAssign: {
             printf("Variable Declaration:\n");
             for (u8 i = 0; i < indent; i++)
                 printf("  ");
-            printf("%.*s: %.*s = \n", str_expand(stmt->op.var_decl_assign.name), str_expand(stmt->op.var_decl_assign.type));
+            printf("%.*s: %.*s = \n", str_expand(stmt->op.var_decl_assign.name), str_expand(stmt->op.var_decl_assign.type.full_type));
             P_PrintExprAST_Indent(arena, stmt->op.var_decl_assign.val, indent + 1);
         } break;
         
         case StmtType_FuncDecl: {
-            printf("Function Declaration: %s: %s\n", stmt->op.func_decl.name.str, stmt->op.func_decl.type.str);
+            printf("Function Declaration: %.*s: %.*s\n", str_expand(stmt->op.func_decl.name), str_expand(stmt->op.func_decl.type.full_type));
             if (stmt->op.func_decl.block != nullptr)
                 P_PrintAST_Indent(arena, stmt->op.func_decl.block, indent + 1);
         } break;
@@ -1686,11 +1717,11 @@ static void P_PrintAST_Indent(M_Arena* arena, P_Stmt* stmt, u8 indent) {
         case StmtType_StructDecl: {
             printf("Struct Declaration: %s\n", stmt->op.struct_decl.name.str);
             string_list_node* curr = stmt->op.struct_decl.member_names.first;
-            string_list_node* type = stmt->op.struct_decl.member_types.first;
+            value_type_list_node* type = stmt->op.struct_decl.member_types.first;
             for (u32 i = 0; i < stmt->op.struct_decl.member_count; i++) {
                 for (u8 idt = 0; idt < indent + 1; idt++)
                     printf("  ");
-                printf("%.*s: %.*s\n", str_node_expand(curr), str_node_expand(type));
+                printf("%.*s: %.*s\n", str_node_expand(curr), str_expand(type->type.full_type));
                 
                 curr = curr->next;
                 type = type->next;
