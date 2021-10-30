@@ -121,6 +121,11 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
             E_Write(emitter, "]");
         } break;
         
+        case ExprType_Addr: {
+            E_Write(emitter, "&");
+            E_EmitExpression(emitter, expr->op.addr);
+        } break;
+        
         case ExprType_Dot: {
             E_EmitExpression(emitter, expr->op.dot.left);
             E_WriteF(emitter, ".%.*s", str_expand(expr->op.dot.right));

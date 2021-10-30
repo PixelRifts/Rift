@@ -147,6 +147,16 @@ static P_ValueType P_ReduceType(P_Parser* parser, P_ValueType in) {
     return in;
 }
 
+static P_ValueType P_PushPointerType(P_Parser* parser, P_ValueType in) {
+    P_ValueType out = in;
+    out.full_type = str_cat(&parser->arena, in.full_type, str_lit("*"));
+    P_ValueTypeMod* new_mods = arena_alloc(&parser->arena, sizeof(P_ValueTypeMod) * (in.mod_ct + 1));
+    memmove(new_mods, in.mods, sizeof(P_ValueTypeMod) * in.mod_ct);
+    out.mods = new_mods;
+    out.mod_ct = in.mod_ct + 1;
+    return out;
+}
+
 // Just for mod consumption
 static P_Expr* P_Expression(P_Parser* parser);
 
@@ -215,11 +225,11 @@ static P_ValueType P_ConsumeType(P_Parser* parser, string message) {
 }
 
 static P_ValueType type_heirarchy[] = {
-    { .base_type = str_lit("double"), .full_type = str_lit("double") },
-    { .base_type = str_lit("float"), .full_type = str_lit("float") },
-    { .base_type = str_lit("long"), .full_type = str_lit("long") },
-    { .base_type = str_lit("int"), .full_type = str_lit("int") },
-    { .base_type = str_lit("char"), .full_type = str_lit("char") },
+    value_type_abs("double"),
+    value_type_abs("float"),
+    value_type_abs("long"),
+    value_type_abs("int"),
+    value_type_abs("char"),
 };
 u32 type_heirarchy_length = 5;
 
@@ -354,7 +364,8 @@ typedef P_Expr* (*P_InfixParseFn)(P_Parser*, P_Expr*);
 typedef struct P_ParseRule {
     P_PrefixParseFn prefix;
     P_InfixParseFn infix;
-    P_Precedence precedence;
+    P_Precedence prefix_precedence;
+    P_Precedence infix_precedence;
 } P_ParseRule;
 
 //~ AST Nodes
@@ -471,6 +482,15 @@ static P_Expr* P_MakeIndexNode(P_Parser* parser, P_ValueType type, P_Expr* left,
     return expr;
 }
 
+static P_Expr* P_MakeAddrNode(P_Parser* parser, P_ValueType type, P_Expr* e) {
+    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+    expr->type = ExprType_Addr;
+    expr->ret_type = type;
+    expr->can_assign = false;
+    expr->op.addr = e;
+    return expr;
+}
+
 static P_Expr* P_MakeDotNode(P_Parser* parser, P_ValueType type, P_Expr* left, string right) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_Dot;
@@ -485,7 +505,7 @@ static P_Expr* P_MakeEnumDotNode(P_Parser* parser, P_ValueType type, string left
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_EnumDot;
     expr->ret_type = type;
-    expr->can_assign = true;
+    expr->can_assign = false;
     expr->op.enum_dot.left = left;
     expr->op.enum_dot.right = right;
     return expr;
@@ -815,6 +835,12 @@ static P_Expr* P_ExprIndex(P_Parser* parser, P_Expr* left) {
     return P_MakeIndexNode(parser, ret, left, e);
 }
 
+static P_Expr* P_ExprAddr(P_Parser* parser) {
+    P_Expr* e = P_Expression(parser);
+    P_ValueType ret = P_PushPointerType(parser, e->ret_type);
+    return P_MakeAddrNode(parser, ret, e);
+}
+
 static P_Expr* P_ExprUnary(P_Parser* parser) {
     L_TokenType op_type = parser->previous.type;
     P_Expr* operand = P_ExprPrecedence(parser, Prec_Unary);
@@ -843,7 +869,7 @@ static P_Expr* P_ExprUnary(P_Parser* parser) {
 static P_Expr* P_ExprBinary(P_Parser* parser, P_Expr* left) {
     L_TokenType op_type = parser->previous.type;
     P_ParseRule* rule = P_GetRule(op_type);
-    P_Expr* right = P_ExprPrecedence(parser, (P_Precedence)(rule->precedence + 1));
+    P_Expr* right = P_ExprPrecedence(parser, (P_Precedence)(rule->infix_precedence + 1));
     P_ValueType ret_type;
     switch (op_type) {
         case TokenType_Plus: {
@@ -974,77 +1000,77 @@ static P_Expr* P_ExprDot(P_Parser* parser, P_Expr* left) {
 }
 
 P_ParseRule parse_rules[] = {
-    [TokenType_Error]            = { nullptr, nullptr, Prec_None },
-    [TokenType_EOF]              = { nullptr, nullptr, Prec_None },
-    [TokenType_Whitespace]       = { nullptr, nullptr, Prec_None },
-    [TokenType_Identifier]       = { P_ExprVar    , nullptr, Prec_None },
-    [TokenType_IntLit]           = { P_ExprInteger, nullptr, Prec_None },
-    [TokenType_FloatLit]         = { P_ExprFloat  , nullptr, Prec_None },
-    [TokenType_DoubleLit]        = { P_ExprDouble , nullptr, Prec_None },
-    [TokenType_LongLit]          = { P_ExprLong   , nullptr, Prec_None },
-    [TokenType_StringLit]        = { P_ExprString , nullptr, Prec_None },
-    [TokenType_CharLit]          = { P_ExprChar   , nullptr, Prec_None },
-    [TokenType_Plus]             = { P_ExprUnary, P_ExprBinary, Prec_Term },
-    [TokenType_Minus]            = { P_ExprUnary, P_ExprBinary, Prec_Term },
-    [TokenType_Star]             = { nullptr, P_ExprBinary, Prec_Factor },
-    [TokenType_Slash]            = { nullptr, P_ExprBinary, Prec_Factor },
-    [TokenType_Percent]          = { nullptr, P_ExprBinary, Prec_Factor },
-    [TokenType_PlusPlus]         = { nullptr, nullptr, Prec_None },
-    [TokenType_MinusMinus]       = { nullptr, nullptr, Prec_None },
-    [TokenType_Backslash]        = { nullptr, nullptr, Prec_None },
-    [TokenType_Hat]              = { nullptr, P_ExprBinary, Prec_BitXor },
-    [TokenType_Ampersand]        = { nullptr, P_ExprBinary, Prec_BitAnd },
-    [TokenType_Pipe]             = { nullptr, P_ExprBinary, Prec_BitOr },
-    [TokenType_Tilde]            = { P_ExprUnary, nullptr,  Prec_None },
-    [TokenType_Bang]             = { P_ExprUnary, nullptr,  Prec_None },
-    [TokenType_Equal]            = { nullptr, P_ExprAssign, Prec_Assignment },
-    [TokenType_PlusEqual]        = { nullptr, nullptr, Prec_None },
-    [TokenType_MinusEqual]       = { nullptr, nullptr, Prec_None },
-    [TokenType_StarEqual]        = { nullptr, nullptr, Prec_None },
-    [TokenType_SlashEqual]       = { nullptr, nullptr, Prec_None },
-    [TokenType_PercentEqual]     = { nullptr, nullptr, Prec_None },
-    [TokenType_AmpersandEqual]   = { nullptr, nullptr, Prec_None },
-    [TokenType_PipeEqual]        = { nullptr, nullptr, Prec_None },
-    [TokenType_HatEqual]         = { nullptr, nullptr, Prec_None },
-    [TokenType_TildeEqual]       = { nullptr, nullptr, Prec_None },
-    [TokenType_EqualEqual]       = { nullptr, P_ExprBinary, Prec_Equality },
-    [TokenType_BangEqual]        = { nullptr, P_ExprBinary, Prec_Equality },
-    [TokenType_Less]             = { nullptr, P_ExprBinary, Prec_Comparison },
-    [TokenType_Greater]          = { nullptr, P_ExprBinary, Prec_Comparison },
-    [TokenType_LessEqual]        = { nullptr, P_ExprBinary, Prec_Comparison },
-    [TokenType_GreaterEqual]     = { nullptr, P_ExprBinary, Prec_Comparison },
-    [TokenType_AmpersandAmpersand] = { nullptr, P_ExprBinary, Prec_LogAnd },
-    [TokenType_PipePipe]         = { nullptr, P_ExprBinary, Prec_LogOr },
-    [TokenType_OpenBrace]        = { nullptr, nullptr, Prec_None },
-    [TokenType_OpenParenthesis]  = { P_ExprGroup, nullptr, Prec_None },
-    [TokenType_OpenBracket]      = { nullptr, P_ExprIndex, Prec_Call },
-    [TokenType_CloseBrace]       = { nullptr, nullptr, Prec_None },
-    [TokenType_CloseParenthesis] = { nullptr, nullptr, Prec_None },
-    [TokenType_CloseBracket]     = { nullptr, nullptr, Prec_None },
-    [TokenType_Dot]              = { nullptr, P_ExprDot, Prec_Call },
-    [TokenType_Semicolon]        = { nullptr, nullptr, Prec_None },
-    [TokenType_Colon]            = { nullptr, nullptr, Prec_None },
-    [TokenType_Question]         = { nullptr, nullptr, Prec_None },
-    [TokenType_Return]           = { nullptr, nullptr, Prec_None },
-    [TokenType_Struct]           = { nullptr, nullptr, Prec_None },
-    [TokenType_Enum]             = { nullptr, nullptr, Prec_None },
-    [TokenType_Null]             = { nullptr, nullptr, Prec_None },
-    [TokenType_Nullptr]          = { nullptr, nullptr, Prec_None },
-    [TokenType_If]               = { nullptr, nullptr, Prec_None },
-    [TokenType_Else]             = { nullptr, nullptr, Prec_None },
-    [TokenType_Do]               = { nullptr, nullptr, Prec_None },
-    [TokenType_For]              = { nullptr, nullptr, Prec_None },
-    [TokenType_While]            = { nullptr, nullptr, Prec_None },
-    [TokenType_True]             = { P_ExprBool, nullptr, Prec_None },
-    [TokenType_False]            = { P_ExprBool, nullptr, Prec_None },
-    [TokenType_Int]              = { P_ExprPrimitiveTypename, nullptr, Prec_None },
-    [TokenType_Float]            = { P_ExprPrimitiveTypename, nullptr, Prec_None },
-    [TokenType_Bool]             = { P_ExprPrimitiveTypename, nullptr, Prec_None },
-    [TokenType_Double]           = { P_ExprPrimitiveTypename, nullptr, Prec_None },
-    [TokenType_Char]             = { P_ExprPrimitiveTypename, nullptr, Prec_None },
-    [TokenType_Long]             = { P_ExprPrimitiveTypename, nullptr, Prec_None },
-    [TokenType_Void]             = { nullptr, nullptr, Prec_None },
-    [TokenType_TokenTypeCount]   = { nullptr, nullptr, Prec_None },
+    [TokenType_Error]              = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_EOF]                = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_Whitespace]         = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_Identifier]         = { P_ExprVar,     nullptr, Prec_None, Prec_None },
+    [TokenType_IntLit]             = { P_ExprInteger, nullptr, Prec_None, Prec_None },
+    [TokenType_FloatLit]           = { P_ExprFloat,   nullptr, Prec_None, Prec_None },
+    [TokenType_DoubleLit]          = { P_ExprDouble,  nullptr, Prec_None, Prec_None },
+    [TokenType_LongLit]            = { P_ExprLong,    nullptr, Prec_None, Prec_None },
+    [TokenType_StringLit]          = { P_ExprString,  nullptr, Prec_None, Prec_None },
+    [TokenType_CharLit]            = { P_ExprChar,    nullptr, Prec_None, Prec_None },
+    [TokenType_Plus]               = { P_ExprUnary, P_ExprBinary, Prec_Unary, Prec_Term },
+    [TokenType_Minus]              = { P_ExprUnary, P_ExprBinary, Prec_Unary, Prec_Term },
+    [TokenType_Star]               = { nullptr,     P_ExprBinary, Prec_Factor, Prec_None },
+    [TokenType_Slash]              = { nullptr,     P_ExprBinary, Prec_Factor, Prec_None },
+    [TokenType_Percent]            = { nullptr,     P_ExprBinary, Prec_Factor, Prec_None },
+    [TokenType_PlusPlus]           = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_MinusMinus]         = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_Backslash]          = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_Hat]                = { nullptr,    P_ExprBinary, Prec_None,  Prec_BitXor },
+    [TokenType_Ampersand]          = { P_ExprAddr, P_ExprBinary, Prec_Unary, Prec_BitAnd },
+    [TokenType_Pipe]               = { nullptr,    P_ExprBinary, Prec_None,  Prec_BitOr },
+    [TokenType_Tilde]              = { P_ExprUnary, nullptr,  Prec_Unary, Prec_None },
+    [TokenType_Bang]               = { P_ExprUnary, nullptr,  Prec_Unary, Prec_None },
+    [TokenType_Equal]              = { nullptr, P_ExprAssign, Prec_None, Prec_Assignment },
+    [TokenType_PlusEqual]          = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_MinusEqual]         = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_StarEqual]          = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_SlashEqual]         = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_PercentEqual]       = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_AmpersandEqual]     = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_PipeEqual]          = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_HatEqual]           = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_TildeEqual]         = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_EqualEqual]         = { nullptr, P_ExprBinary, Prec_None, Prec_Equality },
+    [TokenType_BangEqual]          = { nullptr, P_ExprBinary, Prec_None, Prec_Equality },
+    [TokenType_Less]               = { nullptr, P_ExprBinary, Prec_None, Prec_Comparison },
+    [TokenType_Greater]            = { nullptr, P_ExprBinary, Prec_None, Prec_Comparison },
+    [TokenType_LessEqual]          = { nullptr, P_ExprBinary, Prec_None, Prec_Comparison },
+    [TokenType_GreaterEqual]       = { nullptr, P_ExprBinary, Prec_None, Prec_Comparison },
+    [TokenType_AmpersandAmpersand] = { nullptr, P_ExprBinary, Prec_None, Prec_LogAnd },
+    [TokenType_PipePipe]           = { nullptr, P_ExprBinary, Prec_None, Prec_LogOr },
+    [TokenType_OpenBrace]          = { nullptr, nullptr,      Prec_None, Prec_None },
+    [TokenType_OpenParenthesis]    = { P_ExprGroup, nullptr,  Prec_None, Prec_None },
+    [TokenType_OpenBracket]        = { nullptr, P_ExprIndex,  Prec_None, Prec_Call },
+    [TokenType_CloseBrace]         = { nullptr, nullptr,   Prec_None, Prec_None },
+    [TokenType_CloseParenthesis]   = { nullptr, nullptr,   Prec_None, Prec_None },
+    [TokenType_CloseBracket]       = { nullptr, nullptr,   Prec_None, Prec_None },
+    [TokenType_Dot]                = { nullptr, P_ExprDot, Prec_None, Prec_Call },
+    [TokenType_Semicolon]          = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_Colon]              = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_Question]           = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_Return]             = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_Struct]             = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_Enum]               = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_Null]               = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_Nullptr]            = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_If]                 = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_Else]               = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_Do]                 = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_For]                = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_While]              = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_True]               = { P_ExprBool, nullptr, Prec_None, Prec_None },
+    [TokenType_False]              = { P_ExprBool, nullptr, Prec_None, Prec_None },
+    [TokenType_Int]                = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
+    [TokenType_Float]              = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
+    [TokenType_Bool]               = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
+    [TokenType_Double]             = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
+    [TokenType_Char]               = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
+    [TokenType_Long]               = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
+    [TokenType_Void]               = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_TokenTypeCount]     = { nullptr, nullptr, Prec_None, Prec_None },
 };
 
 static P_ParseRule* P_GetRule(L_TokenType type) {
@@ -1060,7 +1086,7 @@ static P_Expr* P_ExprPrecedence(P_Parser* parser, P_Precedence precedence) {
     }
     
     P_Expr* e = prefix_rule(parser);
-    while (precedence <= P_GetRule(parser->current.type)->precedence) {
+    while (precedence <= P_GetRule(parser->current.type)->prefix_precedence) {
         P_Advance(parser);
         P_InfixParseFn infix = P_GetRule(parser->previous.type)->infix;
         e = infix(parser, e);
@@ -1682,6 +1708,11 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
             printf("[Index]");
             P_PrintExprAST_Indent(arena, expr->op.index.operand, indent + 1);
             P_PrintExprAST_Indent(arena, expr->op.index.index, indent + 1);
+        } break;
+        
+        case ExprType_Addr: {
+            printf("[Get Address]\n");
+            P_PrintExprAST_Indent(arena, expr->op.addr, indent + 1);
         } break;
         
         case ExprType_Dot: {
