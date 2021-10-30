@@ -127,6 +127,26 @@ static b8 P_IsTypeToken(P_Parser* parser) {
     return false;
 }
 
+static P_ValueType P_ReduceType(P_Parser* parser, P_ValueType in) {
+    if (in.mod_ct == 0) return in;
+    in.mod_ct--;
+    switch (in.mods[in.mod_ct].type) {
+        case ValueTypeModType_Pointer: {
+            // Pointer can only have * so reduce full_type size by 1
+            in.full_type.size--;
+        }
+        
+        case ValueTypeModType_Array: {
+            // TODO(voxel): This is gonna be tuff
+        } break;
+        
+        default: {
+            report_error(parser, str_lit("Cannot reduce modifier"));
+        } break;
+    }
+    return in;
+}
+
 // Just for mod consumption
 static P_Expr* P_Expression(P_Parser* parser);
 
@@ -359,7 +379,7 @@ static P_Expr* P_MakeLongNode(P_Parser* parser, i64 value) {
 static P_Expr* P_MakeFloatNode(P_Parser* parser, f32 value) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_FloatLit;
-    expr->ret_type = ValueType_Long;
+    expr->ret_type = ValueType_Float;
     expr->can_assign = false;
     expr->op.float_lit = value;
     return expr;
@@ -438,6 +458,16 @@ static P_Expr* P_MakeCastNode(P_Parser* parser, P_ValueType type, P_Expr* to_be_
     expr->ret_type = type;
     expr->can_assign = false;
     expr->op.cast = to_be_casted;
+    return expr;
+}
+
+static P_Expr* P_MakeIndexNode(P_Parser* parser, P_ValueType type, P_Expr* left, P_Expr* e) {
+    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+    expr->type = ExprType_Index;
+    expr->ret_type = type;
+    expr->can_assign = true;
+    expr->op.index.operand = left;
+    expr->op.index.index = e;
     return expr;
 }
 
@@ -770,6 +800,21 @@ static P_Expr* P_ExprGroup(P_Parser* parser) {
     return in;
 }
 
+static P_Expr* P_ExprIndex(P_Parser* parser, P_Expr* left) {
+    if (left->ret_type.mod_ct == 0)
+        report_error(parser, str_lit("Cannot Apply [] operator to expression of type %.*s\n"), left->ret_type.full_type);
+    if (left->ret_type.mods[left->ret_type.mod_ct - 1].type != ValueTypeModType_Pointer)
+        report_error(parser, str_lit("Cannot Apply [] operator to expression of type %.*s\n"), left->ret_type.full_type);
+    
+    P_Expr* e = P_Expression(parser);
+    if (!type_check(e->ret_type, ValueType_Integer))
+        report_error(parser, str_lit("The [] Operator expects an Integer. Got %.*s\n"), str_expand(e->ret_type.full_type));
+    
+    P_Consume(parser, TokenType_CloseBracket, str_lit("Unclosed [\n"));
+    P_ValueType ret = P_ReduceType(parser, left->ret_type);
+    return P_MakeIndexNode(parser, ret, left, e);
+}
+
 static P_Expr* P_ExprUnary(P_Parser* parser) {
     L_TokenType op_type = parser->previous.type;
     P_Expr* operand = P_ExprPrecedence(parser, Prec_Unary);
@@ -972,7 +1017,7 @@ P_ParseRule parse_rules[] = {
     [TokenType_PipePipe]         = { nullptr, P_ExprBinary, Prec_LogOr },
     [TokenType_OpenBrace]        = { nullptr, nullptr, Prec_None },
     [TokenType_OpenParenthesis]  = { P_ExprGroup, nullptr, Prec_None },
-    [TokenType_OpenBracket]      = { nullptr, nullptr, Prec_None },
+    [TokenType_OpenBracket]      = { nullptr, P_ExprIndex, Prec_Call },
     [TokenType_CloseBrace]       = { nullptr, nullptr, Prec_None },
     [TokenType_CloseParenthesis] = { nullptr, nullptr, Prec_None },
     [TokenType_CloseBracket]     = { nullptr, nullptr, Prec_None },
@@ -1075,7 +1120,8 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         string param_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
         string_list_push(&parser->arena, &param_names, param_name);
         
-        var_hash_table_set(&parser->variables, (var_entry_key) { .name = param_name, .depth = parser->scope_depth }, param_type);
+        if (!native)
+            var_hash_table_set(&parser->variables, (var_entry_key) { .name = param_name, .depth = parser->scope_depth }, param_type);
         
         arity++;
         if (!P_Match(parser, TokenType_Comma)) {
@@ -1616,20 +1662,26 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
         } break;
         
         case ExprType_Unary: {
-            printf("%s\n", L__get_string_from_type__(expr->op.unary.operator).str);
+            printf("%.*s\n", str_expand(L__get_string_from_type__(expr->op.unary.operator)));
             P_PrintExprAST_Indent(arena, expr->op.unary.operand, indent + 1);
         } break;
         
         case ExprType_Binary: {
-            printf("%s\n", L__get_string_from_type__(expr->op.binary.operator).str);
+            printf("%.*s\n", str_expand(L__get_string_from_type__(expr->op.binary.operator)));
             P_PrintExprAST_Indent(arena, expr->op.binary.left, indent + 1);
             P_PrintExprAST_Indent(arena, expr->op.binary.right, indent + 1);
         } break;
         
         case ExprType_FuncCall: {
-            printf("%s()\n", expr->op.func_call.name.str);
+            printf("%.*s()\n", str_expand(expr->op.func_call.name));
             for (u32 i = 0; i < expr->op.func_call.call_arity; i++)
                 P_PrintExprAST_Indent(arena, expr->op.func_call.params[i], indent + 1);
+        } break;
+        
+        case ExprType_Index: {
+            printf("[Index]");
+            P_PrintExprAST_Indent(arena, expr->op.index.operand, indent + 1);
+            P_PrintExprAST_Indent(arena, expr->op.index.index, indent + 1);
         } break;
         
         case ExprType_Dot: {

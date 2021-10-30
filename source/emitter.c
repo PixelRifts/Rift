@@ -35,6 +35,7 @@ static void E_BeginEmitting(E_Emitter* emitter) {
     E_WriteLine(emitter, "#include <stdio.h>");
     E_WriteLine(emitter, "#include <stdbool.h>");
     E_WriteLine(emitter, "#include <stdarg.h>");
+    E_WriteLine(emitter, "#include <stdlib.h>");
     E_WriteLine(emitter, "typedef const char* string;");
     E_WriteLine(emitter, "");
 }
@@ -111,6 +112,13 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
                     E_Write(emitter, ", ");
             }
             E_Write(emitter, ")");
+        } break;
+        
+        case ExprType_Index: {
+            E_EmitExpression(emitter, expr->op.index.operand);
+            E_Write(emitter, "[");
+            E_EmitExpression(emitter, expr->op.index.index);
+            E_Write(emitter, "]");
         } break;
         
         case ExprType_Dot: {

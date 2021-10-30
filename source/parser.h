@@ -22,7 +22,7 @@ enum {
     Prec_Term,        // + -
     Prec_Factor,      // * /
     Prec_Unary,       // ! -
-    Prec_Call,        // . ()
+    Prec_Call,        // . () []
     Prec_Primary
 };
 
@@ -41,7 +41,7 @@ enum {
     ExprType_IntLit, ExprType_LongLit, ExprType_FloatLit, ExprType_DoubleLit,
     ExprType_StringLit, ExprType_CharLit, ExprType_BoolLit, ExprType_Typename,
     ExprType_Unary, ExprType_Binary, ExprType_Assignment, ExprType_Variable,
-    ExprType_FuncCall, ExprType_Dot, ExprType_EnumDot, ExprType_Cast
+    ExprType_FuncCall, ExprType_Dot, ExprType_EnumDot, ExprType_Cast, ExprType_Index
 };
 
 typedef struct P_Expr P_Expr;
@@ -62,6 +62,7 @@ struct P_Expr {
         struct { L_TokenType operator; P_Expr* left; P_Expr* right; } binary;
         struct { L_TokenType operator; P_Expr* operand; } unary;
         struct { P_Expr* left; string right; } dot;
+        struct { P_Expr* operand; P_Expr* index; } index;
         struct { string left; string right; } enum_dot;
         struct { P_Expr* name; P_Expr* value; } assignment;
         string variable;
