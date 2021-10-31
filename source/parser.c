@@ -930,6 +930,8 @@ static P_Expr* P_ExprIndex(P_Parser* parser, P_Expr* left) {
 
 static P_Expr* P_ExprAddr(P_Parser* parser) {
     P_Expr* e = P_Expression(parser);
+    if (!e->can_assign)
+        report_error(parser, str_lit("Cannot Get Address of Non assignable expression\n"));
     P_ValueType ret = P_PushPointerType(parser, e->ret_type);
     return P_MakeAddrNode(parser, ret, e);
 }
@@ -1106,13 +1108,13 @@ P_ParseRule parse_rules[] = {
     [TokenType_Error]              = { nullptr, nullptr, Prec_None, Prec_None },
     [TokenType_EOF]                = { nullptr, nullptr, Prec_None, Prec_None },
     [TokenType_Whitespace]         = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_Identifier]         = { P_ExprVar,     nullptr, Prec_None, Prec_None },
-    [TokenType_IntLit]             = { P_ExprInteger, nullptr, Prec_None, Prec_None },
-    [TokenType_FloatLit]           = { P_ExprFloat,   nullptr, Prec_None, Prec_None },
-    [TokenType_DoubleLit]          = { P_ExprDouble,  nullptr, Prec_None, Prec_None },
-    [TokenType_LongLit]            = { P_ExprLong,    nullptr, Prec_None, Prec_None },
-    [TokenType_StringLit]          = { P_ExprString,  nullptr, Prec_None, Prec_None },
-    [TokenType_CharLit]            = { P_ExprChar,    nullptr, Prec_None, Prec_None },
+    [TokenType_Identifier]         = { P_ExprVar,     nullptr, Prec_Primary, Prec_None },
+    [TokenType_IntLit]             = { P_ExprInteger, nullptr, Prec_Primary, Prec_None },
+    [TokenType_FloatLit]           = { P_ExprFloat,   nullptr, Prec_Primary, Prec_None },
+    [TokenType_DoubleLit]          = { P_ExprDouble,  nullptr, Prec_Primary, Prec_None },
+    [TokenType_LongLit]            = { P_ExprLong,    nullptr, Prec_Primary, Prec_None },
+    [TokenType_StringLit]          = { P_ExprString,  nullptr, Prec_Primary, Prec_None },
+    [TokenType_CharLit]            = { P_ExprChar,    nullptr, Prec_Primary, Prec_None },
     [TokenType_Plus]               = { P_ExprUnary, P_ExprBinary, Prec_Unary, Prec_Term   },
     [TokenType_Minus]              = { P_ExprUnary, P_ExprBinary, Prec_Unary, Prec_Term   },
     [TokenType_Star]               = { P_ExprDeref, P_ExprBinary, Prec_Unary, Prec_Factor },
@@ -1190,7 +1192,7 @@ static P_Expr* P_ExprPrecedence(P_Parser* parser, P_Precedence precedence) {
     }
     
     P_Expr* e = prefix_rule(parser);
-    while (precedence <= P_GetRule(parser->current.type)->prefix_precedence) {
+    while (precedence <= P_GetRule(parser->current.type)->infix_precedence) {
         P_Advance(parser);
         P_InfixParseFn infix = P_GetRule(parser->previous.type)->infix;
         e = infix(parser, e);

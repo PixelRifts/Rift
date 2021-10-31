@@ -1,14 +1,8 @@
 void native printf(string format, ... rest);
-int* native calloc(int count, int elem_size);
-void native free(int* buffer);
+void* native calloc(int count, int elem_size);
+void native free(void* buffer);
 
 int main() {
-	int*[4] x;
-	int** xp = x;
-	test(x);
+	int* x = &6;
 	return 0;
-}
-
-int** test(int** blah) {
-	return blah;
 }

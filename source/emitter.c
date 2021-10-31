@@ -65,6 +65,8 @@ static void E_EmitTypeAndName(E_Emitter* emitter, P_ValueType* type, string name
     E_WriteF(emitter, "%.*s ", str_expand(type->base_type));
     if (type->mod_ct != 0) {
         E_EmitTypeMods_Recursive(emitter, type, type->mod_ct - 1, name);
+    } else {
+        E_WriteF(emitter, "%.*s", str_expand(name));
     }
 }
 
