@@ -130,6 +130,19 @@ u64 str_find_first(string_const str, string_const needle, u32 offset) {
     return i;
 }
 
+u64 str_find_last(string_const str, string_const needle, u32 offset) {
+    u64 prev = 0;
+    u64 idx = offset;
+    while (true) {
+        prev = idx;
+        idx = str_find_first(str, needle, idx);
+        if (idx == str.size)
+            break;
+        idx++;
+    }
+    return prev;
+}
+
 void string_list_push_node(string_const_list* list, string_const_list_node* node) {
     if (!list->first && !list->last) {
         list->first = node;

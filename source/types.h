@@ -67,7 +67,8 @@ void value_type_list_push(M_Arena* arena, value_type_list* list, P_ValueType typ
 
 void types_init(M_Arena* arena);
 b8 type_check(P_ValueType a, P_ValueType expected);
-b8 is_ptr(P_ValueType a);
+b8 is_ptr(P_ValueType* a);
+b8 is_array(P_ValueType* a);
 b8 node_type_check(value_type_list_node* a, value_type_list_node* expected);
 b8 value_type_list_equals(value_type_list* a, value_type_list* b);
 

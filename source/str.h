@@ -41,6 +41,7 @@ string_const str_from_format(M_Arena* arena, const char* format, ...);
 string_const str_replace_all(M_Arena* arena, string_const to_fix, string_const needle, string_const replacement);
 u64 str_substr_count(string_const str, string_const needle);
 u64 str_find_first(string_const str, string_const needle, u32 offset);
+u64 str_find_last(string_const str, string_const needle, u32 offset);
 
 b8 str_eq(string_const a, string_const b); // NOTE(voxel): Absolute comparison (string, string)
 b8 str_str_node_eq(string_const a, string_const_list_node* b); // NOTE(voxel): Absolute comparison (string, node)

@@ -4,6 +4,7 @@
 // All types will go through this map
 static P_ValueType type_map(E_Emitter* emitter, P_ValueType type) {
     type.full_type = str_replace_all(&emitter->parser.arena, type.full_type, str_lit("long"), str_lit("long long"));
+    type.full_type = str_replace_all(&emitter->parser.arena, type.full_type, str_lit("string"), str_lit("const char *"));
     return type;
 }
 
@@ -31,12 +32,47 @@ static void E_WriteLineF(E_Emitter* emitter, const char* text, ...) {
     va_end(args);
 }
 
+// int[6][4]* blah;
+// int (*((blah[6])[4]))
+
+static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr);
+
+static void E_EmitTypeMods_Recursive(E_Emitter* emitter, P_ValueType* type, int mod_idx, string name_if_negone) {
+    if (mod_idx == -1) {
+        E_WriteF(emitter, "%.*s", str_expand(name_if_negone));
+        return;
+    }
+    
+    if (mod_idx != 0)
+        E_Write(emitter, "(");
+    switch (type->mods[mod_idx].type) {
+        case ValueTypeModType_Pointer: {
+            E_Write(emitter, "*");
+            E_EmitTypeMods_Recursive(emitter, type, mod_idx - 1, name_if_negone);
+        } break;
+        case ValueTypeModType_Array: {
+            E_EmitTypeMods_Recursive(emitter, type, mod_idx - 1, name_if_negone);
+            E_Write(emitter, "[");
+            E_EmitExpression(emitter, type->mods[mod_idx].op.array_expr);
+            E_Write(emitter, "]");
+        } break;
+    }
+    if (mod_idx != 0)
+        E_Write(emitter, ")");
+}
+
+static void E_EmitTypeAndName(E_Emitter* emitter, P_ValueType* type, string name) {
+    E_WriteF(emitter, "%.*s ", str_expand(type->base_type));
+    if (type->mod_ct != 0) {
+        E_EmitTypeMods_Recursive(emitter, type, type->mod_ct - 1, name);
+    }
+}
+
 static void E_BeginEmitting(E_Emitter* emitter) {
     E_WriteLine(emitter, "#include <stdio.h>");
     E_WriteLine(emitter, "#include <stdbool.h>");
     E_WriteLine(emitter, "#include <stdarg.h>");
     E_WriteLine(emitter, "#include <stdlib.h>");
-    E_WriteLine(emitter, "typedef const char* string;");
     E_WriteLine(emitter, "");
 }
 
@@ -80,11 +116,6 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
             E_EmitExpression(emitter, expr->op.assignment.value);
         } break;
         
-        case ExprType_Cast: {
-            E_WriteF(emitter, "(%.*s)", str_expand(expr->ret_type.full_type));
-            E_EmitExpression(emitter, expr->op.cast);
-        } break;
-        
         case ExprType_Binary: {
             E_Write(emitter, "(");
             E_EmitExpression(emitter, expr->op.binary.left);
@@ -112,6 +143,17 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
                     E_Write(emitter, ", ");
             }
             E_Write(emitter, ")");
+        } break;
+        
+        case ExprType_Typename: {
+            E_EmitTypeAndName(emitter, &expr->op.typename, (string) {0});
+        } break;
+        
+        case ExprType_Cast: {
+            E_Write(emitter, "(");
+            E_EmitTypeAndName(emitter, &expr->ret_type, (string) {0});
+            E_Write(emitter, ")");
+            E_EmitExpression(emitter, expr->op.cast);
         } break;
         
         case ExprType_Index: {
@@ -168,19 +210,23 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
         
         case StmtType_VarDecl: {
             P_ValueType type = type_map(emitter, stmt->op.var_decl.type);
-            E_WriteF(emitter, "%.*s %.*s", str_expand(type.full_type), str_expand(stmt->op.var_decl.name));
+            E_EmitTypeAndName(emitter, &type, stmt->op.var_decl.name);
             E_WriteLine(emitter, ";");
         } break;
         
         case StmtType_VarDeclAssign: {
             P_ValueType type = type_map(emitter, stmt->op.var_decl_assign.type);
-            E_WriteF(emitter, "%.*s %.*s = ", str_expand(type.full_type), str_expand(stmt->op.var_decl_assign.name));
+            E_EmitTypeAndName(emitter, &type, stmt->op.var_decl_assign.name);
+            E_Write(emitter, " = ");
             E_EmitExpression(emitter, stmt->op.var_decl_assign.val);
             E_WriteLine(emitter, ";");
         } break;
         
         case StmtType_FuncDecl: {
             P_ValueType type = type_map(emitter, stmt->op.func_decl.type);
+            
+            // FIXME(voxel): Cannot pass Arrays from/to functions
+            // NOTE(voxel): This also fixes the function name mangling issue
             E_WriteF(emitter, "%.*s %.*s(", str_expand(type.full_type), str_expand(stmt->op.func_decl.name));
             string_list_node* curr_name = stmt->op.func_decl.param_names.first;
             value_type_list_node* curr_type = stmt->op.func_decl.param_types.first;
@@ -190,7 +236,6 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             
             if (stmt->op.func_decl.arity != 0) {
                 for (u32 i = 0; i < stmt->op.func_decl.arity; i++) {
-                    // FIXME(voxel)
                     P_ValueType c_type = type_map(emitter, curr_type->type);
                     if (str_eq(c_type.full_type, str_lit("..."))) {
                         E_WriteF(emitter, "%.*s", str_expand(c_type.full_type));
@@ -198,7 +243,7 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
                         break;
                     }
                     
-                    E_WriteF(emitter, "%.*s %.*s", str_expand(c_type.full_type), str_node_expand(curr_name));
+                    E_EmitTypeAndName(emitter, &c_type, (string) { .str = curr_name->str, .size = curr_name->size });
                     if (i != stmt->op.func_decl.arity - 1)
                         E_Write(emitter, ", ");
                     
@@ -237,7 +282,8 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
                 
                 for (u32 idt = 0; idt < indent + 1; idt++)
                     E_Write(emitter, "\t");
-                E_WriteLineF(emitter, "%.*s %.*s;", str_expand(c_type.full_type), str_node_expand(curr_name));
+                E_EmitTypeAndName(emitter, &c_type, (string) { .str = curr_name->str, .size = curr_name->size });
+                E_Write(emitter, ";");
                 
                 curr_name = curr_name->next;
                 curr_type = curr_type->next;

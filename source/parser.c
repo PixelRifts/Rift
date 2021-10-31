@@ -132,16 +132,15 @@ static P_ValueType P_ReduceType(P_Parser* parser, P_ValueType in) {
     in.mod_ct--;
     switch (in.mods[in.mod_ct].type) {
         case ValueTypeModType_Pointer: {
-            // Pointer can only have * so reduce full_type size by 1
             in.full_type.size--;
         }
         
         case ValueTypeModType_Array: {
-            // TODO(voxel): This is gonna be tuff
+            in.full_type.size -= str_find_last(in.full_type, str_lit("["), 0);
         } break;
         
         default: {
-            report_error(parser, str_lit("Cannot reduce modifier"));
+            report_error(parser, str_lit("Cannot reduce modifier. Parser error\n"));
         } break;
     }
     return in;
@@ -166,10 +165,7 @@ static b8 P_ConsumeTypeMods(P_Parser* parser, type_mod_array* mods) {
         type_mod_array_add(&parser->arena, mods, (P_ValueTypeMod) { .type = ValueTypeModType_Pointer });
         P_ConsumeTypeMods(parser, mods);
         return true;
-    }
-    // TODO(voxel): ARRAYS
-    
-    /*else if (parser->current.type == TokenType_OpenBracket) {
+    } else if (parser->current.type == TokenType_OpenBracket) {
         P_Advance(parser);
         P_Expr* e = P_Expression(parser);
         
@@ -177,7 +173,7 @@ static b8 P_ConsumeTypeMods(P_Parser* parser, type_mod_array* mods) {
         type_mod_array_add(&parser->arena, mods, (P_ValueTypeMod) { .type = ValueTypeModType_Array, .op.array_expr = e });
         P_ConsumeTypeMods(parser, mods);
         return true;
-    }*/
+    }
     
     return false;
 }
@@ -236,18 +232,25 @@ u32 type_heirarchy_length = 5;
 b8 type_check(P_ValueType a, P_ValueType expected) {
     if (str_eq(a.full_type, expected.full_type)) return true;
     
+    // Array testing [ any[] -> any* ]
+    if (is_array(&a)) {
+        if (is_ptr(&expected)) {
+            return true;
+        }
+    }
+    
     // Pointer testing [ any* -> void* ]
     if (str_eq(expected.base_type, ValueType_Void.base_type)) {
-        if (is_ptr(expected)) {
-            if (is_ptr(a)) {
+        if (is_ptr(&expected)) {
+            if (is_ptr(&a)) {
                 return true;
             }
         }
     }
     // Pointer testing [ void* -> any* ]
     if (str_eq(a.base_type, ValueType_Void.base_type)) {
-        if (is_ptr(a)) {
-            if (is_ptr(expected)) {
+        if (is_ptr(&a)) {
+            if (is_ptr(&expected)) {
                 return true;
             }
         }
@@ -277,6 +280,30 @@ b8 type_check(P_ValueType a, P_ValueType expected) {
 
 b8 node_type_check(value_type_list_node* a, value_type_list_node* expected) {
     if (str_eq(a->type.full_type, expected->type.full_type)) return true;
+    
+    // Array testing [ any[] -> any* ]
+    if (is_array(&a->type)) {
+        if (is_ptr(&expected->type)) {
+            return true;
+        }
+    }
+    
+    // Pointer testing [ any* -> void* ]
+    if (str_eq(expected->type.base_type, ValueType_Void.base_type)) {
+        if (is_ptr(&expected->type)) {
+            if (is_ptr(&a->type)) {
+                return true;
+            }
+        }
+    }
+    // Pointer testing [ void* -> any* ]
+    if (str_eq(a->type.base_type, ValueType_Void.base_type)) {
+        if (is_ptr(&a->type)) {
+            if (is_ptr(&expected->type)) {
+                return true;
+            }
+        }
+    }
     
     // Implicit cast thingy
     i32 perm = -1;
@@ -324,7 +351,7 @@ static b8 P_CheckValueType(P_ValueTypeCollection expected, P_ValueType type) {
     if (expected == ValueTypeCollection_Number) {
         return (type_check(type, ValueType_Integer) || type_check(type, ValueType_Long) || type_check(type, ValueType_Float) || type_check(type, ValueType_Double));
     } else if (expected == ValueTypeCollection_Pointer) {
-        return is_ptr(type);
+        return is_ptr(&type);
     } else if (expected == ValueTypeCollection_WholeNumber) {
         return type_check(type, ValueType_Integer) || type_check(type, ValueType_Long);
     } else if (expected == ValueTypeCollection_DecimalNumber) {
@@ -361,9 +388,9 @@ static void P_BindDouble(P_Parser* parser, P_Expr* left, P_Expr* right, P_Binary
 static P_ValueType P_GetNumberBinaryValType(P_Expr* a, P_Expr* b) {
     
     // Pointer stuff
-    if (is_ptr(a->ret_type)) {
+    if (is_ptr(&a->ret_type)) {
         return a->ret_type;
-    } else if (is_ptr(b->ret_type)) {
+    } else if (is_ptr(&b->ret_type)) {
         return b->ret_type;
     } else {
         if (str_eq(a->ret_type.full_type, ValueType_Double.full_type) || str_eq(b->ret_type.full_type, ValueType_Double.full_type))
@@ -871,8 +898,8 @@ static P_Expr* P_ExprGroup(P_Parser* parser) {
         b8 allowed_cast = false;
         if (!type_check(to_be_casted->ret_type, in->op.typename)) {
             
-            if (is_ptr(in->op.typename)) {
-                if (is_ptr(to_be_casted->ret_type))
+            if (is_ptr(&in->op.typename)) {
+                if (is_ptr(&to_be_casted->ret_type))
                     allowed_cast = true;
             }
         } else allowed_cast = true;
@@ -889,7 +916,7 @@ static P_Expr* P_ExprGroup(P_Parser* parser) {
 }
 
 static P_Expr* P_ExprIndex(P_Parser* parser, P_Expr* left) {
-    if (!is_ptr(left->ret_type))
+    if (!is_ptr(&left->ret_type))
         report_error(parser, str_lit("Cannot Apply [] operator to expression of type %.*s\n"), left->ret_type.full_type);
     
     P_Expr* e = P_Expression(parser);
@@ -910,7 +937,7 @@ static P_Expr* P_ExprAddr(P_Parser* parser) {
 static P_Expr* P_ExprDeref(P_Parser* parser) {
     P_Expr* e = P_Expression(parser);
     
-    if (!is_ptr(e->ret_type))
+    if (!is_ptr(&e->ret_type))
         report_error(parser, str_lit("Cannot Dereference expression of type %.*s\n"), str_expand(e->ret_type.full_type));
     
     P_ValueType ret = P_ReduceType(parser, e->ret_type);
@@ -1185,6 +1212,9 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     u32 arity = 0;
     b8 varargs = false;
     
+    if (is_array(&type))
+        report_error(parser, str_lit("Cannot Return Array type from function\n"));
+    
     P_ValueType prev_function_body_ret = parser->function_body_ret;
     b8 prev_directly_in_func_body = parser->is_directly_in_func_body;
     
@@ -1218,6 +1248,8 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         
         P_ValueType param_type = P_ConsumeType(parser, str_lit("Expected type\n"));
         value_type_list_push(&parser->arena, &params, param_type);
+        if (is_array(&param_type))
+            report_error(parser, str_lit("Cannot Pass Array type as parameter\n"));
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected param name\n"));
         string param_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
@@ -1561,6 +1593,9 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
     u32 arity = 0;
     b8 varargs = false;
     
+    if (is_array(&type))
+        report_error(parser, str_lit("Cannot Return Array type from function\n"));
+    
     while (!P_Match(parser, TokenType_CloseParenthesis)) {
         if (P_Match(parser, TokenType_Dot)) {
             P_Consume(parser, TokenType_Dot, str_lit("Expected .. after .\n"));
@@ -1582,6 +1617,8 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
         }
         
         P_ValueType param_type = P_ConsumeType(parser, str_lit("Expected type\n"));
+        if (is_array(&param_type))
+            report_error(parser, str_lit("Cannot Pass Array type as parameter\n"));
         value_type_list_push(&parser->arena, &params, param_type);
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected param name\n"));

@@ -2,20 +2,16 @@
 #include <stdbool.h>
 #include <stdarg.h>
 #include <stdlib.h>
-typedef const char* string;
 
 int main(void);
+int** test_1intptrptr(int** blah);
 
-typedef struct test {
-	int x;
-	int y;
-} test;
 int main(void) {
-	int x;
-	int* ptr = &x;
-	void* p = ptr;
-	test* again = (test*)p;
-	test* foo = (test*)((void*)0);
-	int back_to_int = *(ptr+5);
-	return 10;
+	int (*x[4]);
+	int (**xp) = x;
+	test_1intptrptr(x);
+	return 0;
+}
+int** test_1intptrptr(int (**blah)) {
+	return blah;
 }
