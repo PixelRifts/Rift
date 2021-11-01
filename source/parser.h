@@ -7,6 +7,7 @@
 #include "defines.h"
 #include "str.h"
 #include "types.h"
+#include "data_structures.h"
 
 typedef u32 P_Precedence;
 enum {
@@ -43,7 +44,7 @@ enum {
     ExprType_StringLit, ExprType_CharLit, ExprType_BoolLit, ExprType_Typename,
     ExprType_Unary, ExprType_Binary, ExprType_Assignment, ExprType_Variable,
     ExprType_FuncCall, ExprType_Dot, ExprType_EnumDot, ExprType_Cast, ExprType_Index,
-    ExprType_Addr, ExprType_Deref, ExprType_Nullptr
+    ExprType_Addr, ExprType_Deref, ExprType_Nullptr, ExprType_ArrayLit,
 };
 
 typedef struct P_Expr P_Expr;
@@ -63,6 +64,7 @@ struct P_Expr {
         P_Expr* cast;
         P_Expr* addr;
         P_Expr* deref;
+        expr_array array;
         struct { L_TokenType operator; P_Expr* left; P_Expr* right; } binary;
         struct { L_TokenType operator; P_Expr* operand; } unary;
         struct { P_Expr* left; string right; } dot;

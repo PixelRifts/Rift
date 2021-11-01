@@ -133,10 +133,10 @@ static P_ValueType P_ReduceType(P_Parser* parser, P_ValueType in) {
     switch (in.mods[in.mod_ct].type) {
         case ValueTypeModType_Pointer: {
             in.full_type.size--;
-        }
+        } break;
         
         case ValueTypeModType_Array: {
-            in.full_type.size -= str_find_last(in.full_type, str_lit("["), 0);
+            in.full_type.size -= str_find_last(in.full_type, str_lit("["), 0)-1;
         } break;
         
         default: {
@@ -152,6 +152,22 @@ static P_ValueType P_PushPointerType(P_Parser* parser, P_ValueType in) {
     P_ValueTypeMod* new_mods = arena_alloc(&parser->arena, sizeof(P_ValueTypeMod) * (in.mod_ct + 1));
     memmove(new_mods, in.mods, sizeof(P_ValueTypeMod) * in.mod_ct);
     out.mods = new_mods;
+    out.mods[in.mod_ct] = (P_ValueTypeMod) { .type = ValueTypeModType_Pointer };
+    out.mod_ct = in.mod_ct + 1;
+    return out;
+}
+
+static P_Expr* P_MakeIntNode(P_Parser* parser, i32 value);
+
+static P_ValueType P_PushArrayType(P_Parser* parser, P_ValueType in, u32 count) {
+    P_ValueType out = in;
+    out.full_type = str_cat(&parser->arena, in.full_type, str_from_format(&parser->arena, "[%u]", count));
+    P_ValueTypeMod* new_mods = arena_alloc(&parser->arena, sizeof(P_ValueTypeMod) * (in.mod_ct + 1));
+    memmove(new_mods, in.mods, sizeof(P_ValueTypeMod) * in.mod_ct);
+    
+    out.mods = new_mods;
+    out.mods[in.mod_ct] = (P_ValueTypeMod) { .type = ValueTypeModType_Array };
+    out.mods[in.mod_ct].op.array_expr = P_MakeIntNode(parser, (i32)count);
     out.mod_ct = in.mod_ct + 1;
     return out;
 }
@@ -231,6 +247,12 @@ u32 type_heirarchy_length = 5;
 
 b8 type_check(P_ValueType a, P_ValueType expected) {
     if (str_eq(a.full_type, expected.full_type)) return true;
+    
+    // Test for 'any' type
+    if (str_eq(a.full_type, ValueType_Any.full_type) ||
+        str_eq(expected.full_type, ValueType_Any.full_type)) {
+        return true;
+    }
     
     // Array testing [ any[] -> any* ]
     if (is_array(&a)) {
@@ -490,6 +512,15 @@ static P_Expr* P_MakeNullptrNode(P_Parser* parser) {
     expr->type = ExprType_Nullptr;
     expr->ret_type = ValueType_VoidPointer;
     expr->can_assign = false;
+    return expr;
+}
+
+static P_Expr* P_MakeArrayLiteralNode(P_Parser* parser, P_ValueType type, expr_array array) {
+    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+    expr->type = ExprType_ArrayLit;
+    expr->ret_type = type;
+    expr->can_assign = false;
+    expr->op.array = array;
     return expr;
 }
 
@@ -789,6 +820,25 @@ static P_Expr* P_ExprNullptr(P_Parser* parser) {
     return P_MakeNullptrNode(parser);
 }
 
+static P_Expr* P_ExprArray(P_Parser* parser) {
+    if (P_Match(parser, TokenType_CloseBrace))
+        return P_MakeArrayLiteralNode(parser, ValueType_Any, (expr_array) {0});
+    
+    expr_array arr = {0};
+    P_Expr* curr = P_Expression(parser);
+    P_ValueType array_type = curr->ret_type;
+    while (curr != nullptr) {
+        expr_array_add(&parser->arena, &arr, curr);
+        if (P_Match(parser, TokenType_CloseBrace)) break;
+        P_Consume(parser, TokenType_Comma, str_lit("Expected , or }\n"));
+        curr = P_Expression(parser);
+        if (!type_check(curr->ret_type, array_type))
+            report_error(parser, str_lit("Arrays cannot contain expressions of multiple types.\n"));
+    }
+    array_type = P_PushArrayType(parser, array_type, arr.count);
+    return P_MakeArrayLiteralNode(parser, array_type, arr);
+}
+
 static P_Expr* P_ExprVar(P_Parser* parser) {
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     
@@ -916,7 +966,7 @@ static P_Expr* P_ExprGroup(P_Parser* parser) {
 }
 
 static P_Expr* P_ExprIndex(P_Parser* parser, P_Expr* left) {
-    if (!is_ptr(&left->ret_type))
+    if (!(is_ptr(&left->ret_type) || is_array(&left->ret_type)))
         report_error(parser, str_lit("Cannot Apply [] operator to expression of type %.*s\n"), left->ret_type.full_type);
     
     P_Expr* e = P_Expression(parser);
@@ -1146,7 +1196,7 @@ P_ParseRule parse_rules[] = {
     [TokenType_GreaterEqual]       = { nullptr, P_ExprBinary, Prec_None, Prec_Comparison },
     [TokenType_AmpersandAmpersand] = { nullptr, P_ExprBinary, Prec_None, Prec_LogAnd },
     [TokenType_PipePipe]           = { nullptr, P_ExprBinary, Prec_None, Prec_LogOr },
-    [TokenType_OpenBrace]          = { nullptr, nullptr,      Prec_None, Prec_None },
+    [TokenType_OpenBrace]          = { P_ExprArray, nullptr,  Prec_Primary, Prec_None },
     [TokenType_OpenParenthesis]    = { P_ExprGroup, nullptr,  Prec_None, Prec_None },
     [TokenType_OpenBracket]        = { nullptr, P_ExprIndex,  Prec_None, Prec_Call },
     [TokenType_CloseBrace]         = { nullptr, nullptr,   Prec_None, Prec_None },
@@ -1811,6 +1861,13 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
         
         case ExprType_Nullptr: {
             printf("nullptr\n");
+        } break;
+        
+        case ExprType_ArrayLit: {
+            printf("Array: \n");
+            for (u32 i = 0; i < expr->op.array.count; i++) {
+                P_PrintExprAST_Indent(arena, expr->op.array.elements[i], indent + 1);
+            }
         } break;
         
         case ExprType_Binary: {

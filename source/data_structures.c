@@ -297,13 +297,24 @@ void type_array_add(type_array* array, P_Container structure) {
 }
 
 //~ Type Modifiers
-
 void type_mod_array_add(M_Arena* arena, type_mod_array* array, P_ValueTypeMod mod) {
     if (array->count + 1 > array->capacity) {
         void* prev = array->elements;
         array->capacity = GROW_CAPACITY(array->capacity);
         array->elements = arena_alloc(arena, array->capacity * sizeof(P_ValueTypeMod));
         memmove(array->elements, prev, array->count * sizeof(P_ValueTypeMod));
+    }
+    *(array->elements + array->count) = mod;
+    array->count++;
+}
+
+//~ Expressions
+void expr_array_add(M_Arena* arena, expr_array* array, struct P_Expr* mod) {
+    if (array->count + 1 > array->capacity) {
+        void* prev = array->elements;
+        array->capacity = GROW_CAPACITY(array->capacity);
+        array->elements = arena_alloc(arena, array->capacity * sizeof(struct P_Expr*));
+        memmove(array->elements, prev, array->count * sizeof(struct P_Expr*));
     }
     *(array->elements + array->count) = mod;
     array->count++;

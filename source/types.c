@@ -2,6 +2,7 @@
 
 const P_ValueType ValueType_Invalid = { .base_type = str_lit("INVALID"), .mods = nullptr };
 
+const P_ValueType ValueType_Any = value_type_abs("any");
 const P_ValueType ValueType_Integer = value_type_abs("int");
 const P_ValueType ValueType_Long = value_type_abs("long");
 const P_ValueType ValueType_Float = value_type_abs("float");

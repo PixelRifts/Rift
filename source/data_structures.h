@@ -102,4 +102,12 @@ typedef struct type_mod_array {
 
 void type_mod_array_add(M_Arena* arena, type_mod_array* array, P_ValueTypeMod mod);
 
+typedef struct expr_array {
+    u32 capacity;
+    u32 count;
+    struct P_Expr** elements;
+} expr_array;
+
+void expr_array_add(M_Arena* arena, expr_array* array, struct P_Expr* mod);
+
 #endif //DATA_STRUCTURES_H

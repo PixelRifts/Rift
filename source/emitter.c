@@ -75,6 +75,7 @@ static void E_BeginEmitting(E_Emitter* emitter) {
     E_WriteLine(emitter, "#include <stdbool.h>");
     E_WriteLine(emitter, "#include <stdarg.h>");
     E_WriteLine(emitter, "#include <stdlib.h>");
+    E_WriteLine(emitter, "#include <string.h>");
     E_WriteLine(emitter, "");
 }
 
@@ -110,6 +111,15 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
         
         case ExprType_StringLit: {
             E_WriteF(emitter, "%.*s", str_expand(expr->op.string_lit));
+        } break;
+        
+        case ExprType_ArrayLit: {
+            E_Write(emitter, "{ ");
+            for (u32 i = 0; i < expr->op.array.count; i++) {
+                E_EmitExpression(emitter, expr->op.array.elements[i]);
+                E_Write(emitter, ", ");
+            }
+            E_Write(emitter, " }");
         } break;
         
         case ExprType_Assignment: {

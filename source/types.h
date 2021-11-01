@@ -47,6 +47,7 @@ typedef struct value_type_list {
 
 extern const P_ValueType ValueType_Invalid;
 
+extern const P_ValueType ValueType_Any;
 extern const P_ValueType ValueType_Integer;
 extern const P_ValueType ValueType_Long;
 extern const P_ValueType ValueType_Float;
