@@ -127,7 +127,7 @@ static b8 P_IsTypeToken(P_Parser* parser) {
     return false;
 }
 
-static P_ValueType P_ReduceType(P_Parser* parser, P_ValueType in) {
+static P_ValueType P_ReduceType(P_ValueType in) {
     if (in.mod_ct == 0) return in;
     in.mod_ct--;
     switch (in.mods[in.mod_ct].type) {
@@ -139,8 +139,12 @@ static P_ValueType P_ReduceType(P_Parser* parser, P_ValueType in) {
             in.full_type.size -= str_find_last(in.full_type, str_lit("["), 0)-1;
         } break;
         
+        case ValueTypeModType_Reference: {
+            in.full_type.size--;
+        } break;
+        
         default: {
-            report_error(parser, str_lit("Cannot reduce modifier. Parser error\n"));
+            exit(REDUCTION_ERROR);
         } break;
     }
     return in;
@@ -176,17 +180,19 @@ static P_ValueType P_PushArrayType(P_Parser* parser, P_ValueType in, u32 count) 
 static P_Expr* P_Expression(P_Parser* parser);
 
 static b8 P_ConsumeTypeMods(P_Parser* parser, type_mod_array* mods) {
-    if (parser->current.type == TokenType_Star) {
-        P_Advance(parser);
+    if (P_Match(parser, TokenType_Star)) {
         type_mod_array_add(&parser->arena, mods, (P_ValueTypeMod) { .type = ValueTypeModType_Pointer });
         P_ConsumeTypeMods(parser, mods);
         return true;
-    } else if (parser->current.type == TokenType_OpenBracket) {
-        P_Advance(parser);
+    } else if (P_Match(parser, TokenType_OpenBracket)) {
         P_Expr* e = P_Expression(parser);
         
         P_Consume(parser, TokenType_CloseBracket, str_lit("Required ] after expression in type declaration\n"));
         type_mod_array_add(&parser->arena, mods, (P_ValueTypeMod) { .type = ValueTypeModType_Array, .op.array_expr = e });
+        P_ConsumeTypeMods(parser, mods);
+        return true;
+    } else if (P_Match(parser, TokenType_Ampersand)) {
+        type_mod_array_add(&parser->arena, mods, (P_ValueTypeMod) { .type = ValueTypeModType_Reference });
         P_ConsumeTypeMods(parser, mods);
         return true;
     }
@@ -254,6 +260,12 @@ b8 type_check(P_ValueType a, P_ValueType expected) {
         return true;
     }
     
+    // Ref checking
+    if (is_ref(&expected)) {
+        P_ValueType o = P_ReduceType(expected);
+        return type_check(a, o);
+    }
+    
     // Array testing [ any[] -> any* ]
     if (is_array(&a)) {
         if (is_ptr(&expected)) {
@@ -300,55 +312,6 @@ b8 type_check(P_ValueType a, P_ValueType expected) {
     return false;
 }
 
-b8 node_type_check(value_type_list_node* a, value_type_list_node* expected) {
-    if (str_eq(a->type.full_type, expected->type.full_type)) return true;
-    
-    // Array testing [ any[] -> any* ]
-    if (is_array(&a->type)) {
-        if (is_ptr(&expected->type)) {
-            return true;
-        }
-    }
-    
-    // Pointer testing [ any* -> void* ]
-    if (str_eq(expected->type.base_type, ValueType_Void.base_type)) {
-        if (is_ptr(&expected->type)) {
-            if (is_ptr(&a->type)) {
-                return true;
-            }
-        }
-    }
-    // Pointer testing [ void* -> any* ]
-    if (str_eq(a->type.base_type, ValueType_Void.base_type)) {
-        if (is_ptr(&a->type)) {
-            if (is_ptr(&expected->type)) {
-                return true;
-            }
-        }
-    }
-    
-    // Implicit cast thingy
-    i32 perm = -1;
-    for (u32 i = 0; i < type_heirarchy_length; i++) {
-        if (str_eq(type_heirarchy[i].base_type, expected->type.full_type)) {
-            perm = i;
-            break;
-        }
-    }
-    if (perm != -1) {
-        i32 other = -1;
-        for (u32 i = 0; i < type_heirarchy_length; i++) {
-            if (str_eq(type_heirarchy[i].base_type, a->type.full_type)) {
-                other = i;
-                break;
-            }
-        }
-        return perm < other;
-    }
-    
-    return false;
-}
-
 static string P_FuncNameMangle(P_Parser* parser, string name, u32 arity, value_type_list params, string additional_info) {
     
     string_list sl = {0};
@@ -359,6 +322,7 @@ static string P_FuncNameMangle(P_Parser* parser, string name, u32 arity, value_t
         string fixed = str_replace_all(&parser->arena,
                                        str_from_format(&parser->arena, "%.*s", str_expand(curr->type.full_type)),
                                        str_lit("*"), str_lit("ptr"));
+        fixed = str_replace_all(&parser->arena, fixed, str_lit("&"), str_lit("ref"));
         
         string_list_push(&parser->arena, &sl, fixed);
         curr = curr->next;
@@ -871,6 +835,19 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         u32 subset_match = 1024; // Invalid cuz max param count is 256
         while (key.depth != -1) {
             if (func_hash_table_get(&parser->functions, key, param_types, &value, &subset_match, true)) {
+                // Convert any ref takers to a &(Addr) node
+                value_type_list_node* curr = value->param_types.first;
+                u32 i = 0;
+                while (curr != nullptr) {
+                    if (is_ref(&curr->type)) {
+                        P_Expr* e = param_buffer[i];
+                        P_Expr* a = P_MakeAddrNode(parser, curr->type, e);
+                        param_buffer[i] = a;
+                    }
+                    curr = curr->next;
+                    i++;
+                }
+                
                 return P_MakeFuncCallNode(parser, value->is_native ? name : value->mangled_name, value->value, param_buffer, call_arity);
             }
             key.depth--;
@@ -879,6 +856,19 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         key.depth = parser->scope_depth;
         while (key.depth != -1) {
             if (func_hash_table_get(&parser->functions, key, param_types, &value, &subset_match, false)) {
+                // Convert any ref takers to a &(Addr) node
+                value_type_list_node* curr = value->param_types.first;
+                u32 i = 0;
+                while (curr != nullptr) {
+                    if (is_ref(&curr->type)) {
+                        P_Expr* e = param_buffer[i];
+                        P_Expr* a = P_MakeAddrNode(parser, curr->type, e);
+                        param_buffer[i] = a;
+                    }
+                    curr = curr->next;
+                    i++;
+                }
+                
                 return P_MakeFuncCallNode(parser, value->is_native ? name : value->mangled_name, value->value, param_buffer, call_arity);
             }
             key.depth--;
@@ -892,6 +882,10 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         P_ValueType value = ValueType_Invalid;
         while (key.depth != -1) {
             if (var_hash_table_get(&parser->variables, key, &value)) {
+                if (is_ref(&value)) {
+                    P_ValueType ret = P_ReduceType(value);
+                    return P_MakeDerefNode(parser, ret, P_MakeVariableNode(parser, name, value));
+                }
                 return P_MakeVariableNode(parser, name, value);
             }
             key.depth--;
@@ -925,12 +919,17 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
     if (left != nullptr) {
         if (!left->can_assign)
             report_error(parser, str_lit("Required variable name before = sign\n"));
-        P_Expr* name = left;
-        
         P_Expr* xpr = P_Expression(parser);
         if (xpr == nullptr) return nullptr;
+        
+        if (is_ref(&left->ret_type)) {
+            P_ValueType m = P_ReduceType(left->ret_type);
+            if (type_check(xpr->ret_type, m))
+                return P_MakeAssignmentNode(parser, left, P_MakeAddrNode(parser, m, xpr));
+        }
+        
         if (type_check(xpr->ret_type, left->ret_type))
-            return P_MakeAssignmentNode(parser, name, xpr);
+            return P_MakeAssignmentNode(parser, left, xpr);
         
         report_error(parser, str_lit("Cannot assign %.*s to variable\n"), str_expand(xpr->ret_type.full_type));
     }
@@ -974,7 +973,7 @@ static P_Expr* P_ExprIndex(P_Parser* parser, P_Expr* left) {
         report_error(parser, str_lit("The [] Operator expects an Integer. Got %.*s\n"), str_expand(e->ret_type.full_type));
     
     P_Consume(parser, TokenType_CloseBracket, str_lit("Unclosed [\n"));
-    P_ValueType ret = P_ReduceType(parser, left->ret_type);
+    P_ValueType ret = P_ReduceType(left->ret_type);
     return P_MakeIndexNode(parser, ret, left, e);
 }
 
@@ -992,7 +991,7 @@ static P_Expr* P_ExprDeref(P_Parser* parser) {
     if (!is_ptr(&e->ret_type))
         report_error(parser, str_lit("Cannot Dereference expression of type %.*s\n"), str_expand(e->ret_type.full_type));
     
-    P_ValueType ret = P_ReduceType(parser, e->ret_type);
+    P_ValueType ret = P_ReduceType(e->ret_type);
     return P_MakeDerefNode(parser, ret, e);
 }
 
@@ -1387,10 +1386,26 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name) {
     
     if (P_Match(parser, TokenType_Equal)) {
         P_Expr* value = P_Expression(parser);
+        
+        if (is_ref(&type)) {
+            if (!value->can_assign)
+                report_error(parser, str_lit("Cannot pass a reference to a non assignable field\n"));
+            P_ValueType m = P_ReduceType(type);
+            
+            if (type_check(value->ret_type, m)) {
+                P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
+                return P_MakeVarDeclAssignStmtNode(parser, type, name, P_MakeAddrNode(parser, m, value));
+            }
+        }
+        
         if (!type_check(value->ret_type, type))
             report_error(parser, str_lit("Cannot Assign Value of Type %.*s to variable of type %.*s\n"), str_expand(value->ret_type.full_type), str_expand(type.full_type));
         P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
         return P_MakeVarDeclAssignStmtNode(parser, type, name, value);
+    }
+    
+    if (is_ref(&type)) {
+        report_error(parser, str_lit("Uninitialized Reference Type\n"));
     }
     
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));

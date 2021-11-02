@@ -11,7 +11,8 @@ struct P_Expr;
 typedef u32 P_ValueTypeModType;
 enum P_ValueTypeModType {
     ValueTypeModType_Pointer,
-    ValueTypeModType_Array
+    ValueTypeModType_Array,
+    ValueTypeModType_Reference
 };
 
 typedef struct P_ValueTypeMod {
@@ -70,7 +71,7 @@ void types_init(M_Arena* arena);
 b8 type_check(P_ValueType a, P_ValueType expected);
 b8 is_ptr(P_ValueType* a);
 b8 is_array(P_ValueType* a);
-b8 node_type_check(value_type_list_node* a, value_type_list_node* expected);
+b8 is_ref(P_ValueType* a);
 b8 value_type_list_equals(value_type_list* a, value_type_list* b);
 
 #endif //TYPES_H

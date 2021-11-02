@@ -46,7 +46,8 @@ static void E_EmitTypeMods_Recursive(E_Emitter* emitter, P_ValueType* type, int 
     if (mod_idx != 0)
         E_Write(emitter, "(");
     switch (type->mods[mod_idx].type) {
-        case ValueTypeModType_Pointer: {
+        case ValueTypeModType_Pointer:
+        case ValueTypeModType_Reference: {
             E_Write(emitter, "*");
             E_EmitTypeMods_Recursive(emitter, type, mod_idx - 1, name_if_negone);
         } break;
@@ -361,7 +362,8 @@ static void E_EmitPreStatement(E_Emitter* emitter, P_PreStmt* stmt, u32 indent) 
     switch (stmt->type) {
         case PreStmtType_ForwardDecl: {
             P_ValueType type = type_map(emitter, stmt->op.forward_decl.type);
-            E_WriteF(emitter, "%.*s %.*s(", str_expand(type.full_type), str_expand(stmt->op.forward_decl.name));
+            E_EmitTypeAndName(emitter, &type, stmt->op.forward_decl.name);
+            E_Write(emitter, "(");
             string_list_node* curr_name = stmt->op.forward_decl.param_names.first;
             value_type_list_node* curr_type = stmt->op.forward_decl.param_types.first;
             if (stmt->op.forward_decl.arity != 0) {
@@ -371,7 +373,7 @@ static void E_EmitPreStatement(E_Emitter* emitter, P_PreStmt* stmt, u32 indent) 
                         E_WriteF(emitter, "%.*s", c_type.full_type);
                         break;
                     }
-                    E_WriteF(emitter, "%.*s %.*s", str_expand(c_type.full_type), str_node_expand(curr_name));
+                    E_EmitTypeAndName(emitter, &c_type, (string) { .str = curr_name->str, .size = curr_name->size });
                     if (i != stmt->op.forward_decl.arity - 1)
                         E_Write(emitter, ", ");
                     curr_name = curr_name->next;

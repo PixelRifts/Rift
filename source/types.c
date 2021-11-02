@@ -71,3 +71,9 @@ b8 is_array(P_ValueType* a) {
     if (a->mods[a->mod_ct - 1].type != ValueTypeModType_Array) return false;
     return true;
 }
+
+b8 is_ref(P_ValueType* a) {
+    if (a->mod_ct == 0) return false;
+    if (a->mods[a->mod_ct - 1].type != ValueTypeModType_Reference) return false;
+    return true;
+}

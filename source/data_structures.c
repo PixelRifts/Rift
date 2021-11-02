@@ -198,7 +198,7 @@ b8 func_hash_table_get(func_hash_table* table, func_entry_key key, value_type_li
                 if (absolute_check) {
                     if (!str_eq(curr->type.full_type, curr_test->type.full_type)) break;
                 } else
-                    if (!node_type_check(curr, curr_test)) break;
+                    if (!type_check(curr->type, curr_test->type)) break;
                 ctr++;
                 curr_test = curr_test->next;
                 curr = curr->next;

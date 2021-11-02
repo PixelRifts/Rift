@@ -29,6 +29,8 @@ typedef char b8;
 #define nullptr (void*)0
 #define trace printf("Trace\n")
 
+#define REDUCTION_ERROR -1
+
 #define FATAL(s)            \
 do {                    \
 fprintf(stderr, s); \
