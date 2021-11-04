@@ -204,11 +204,44 @@ static P_ValueType P_ConsumeType(P_Parser* parser, string message) {
     if (parser->current.type == TokenType_Int || parser->current.type == TokenType_Long ||
         parser->current.type == TokenType_Float || parser->current.type == TokenType_Double || parser->current.type == TokenType_Bool || parser->current.type == TokenType_Char ||
         parser->current.type == TokenType_Void || parser->current.type == TokenType_String) {
-        P_Advance(parser);
+        if (parser->current.type == TokenType_Identifier) {
+            if (container_type_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
+                P_Advance(parser);
+            } else {
+                report_error_at_current(parser, message);
+                return ValueType_Invalid;
+            }
+        } else {
+            P_Advance(parser);
+        }
+        
+        b8 is_func_ptr = false;
+        
         string base_type = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
         
         type_mod_array mods = {0};
         P_ConsumeTypeMods(parser, &mods);
+        
+        type_mod_array func_mods = {0};
+        value_type_list* list = nullptr;
+        if (P_Match(parser, TokenType_OpenParenthesis)) {
+            list = arena_alloc(&parser->arena, sizeof(value_type_list));
+            while (!P_Match(parser, TokenType_CloseParenthesis)) {
+                if (P_Match(parser, TokenType_EOF))
+                    report_error(parser, str_lit("Unclosed Function Pointer Parenthesis\n"));
+                P_ValueType type = P_ConsumeType(parser, str_lit("Expected Type in Function Pointer declaration\n"));
+                value_type_list_push(&parser->arena, list, type);
+                
+                if (!P_Match(parser, TokenType_Comma)) {
+                    P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected , or )\n"));
+                    break;
+                }
+            }
+            
+            P_Consume(parser, TokenType_Star, str_lit("Expected *\n"));
+            is_func_ptr = true;
+            P_ConsumeTypeMods(parser, &func_mods);
+        }
         
         u64 complete_length = ((u64)parser->previous.start + (u64)parser->previous.length) - (u64)base_type.str;
         
@@ -216,28 +249,13 @@ static P_ValueType P_ConsumeType(P_Parser* parser, string message) {
             .base_type = base_type,
             .full_type = (string) { .str = base_type.str, .size = complete_length },
             .mods = mods.elements,
-            .mod_ct = mods.count
+            .mod_ct = mods.count,
+            .is_func_ptr = is_func_ptr,
+            .func_mods = func_mods.elements,
+            .func_mod_ct = func_mods.count,
+            .func_param_types = list,
         };
     }
-    if (parser->current.type == TokenType_Identifier) {
-        if (container_type_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
-            P_Advance(parser);
-            string base_type = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
-            
-            type_mod_array mods = {0};
-            P_ConsumeTypeMods(parser, &mods);
-            
-            u64 complete_length = ((u64)parser->previous.start + (u64)parser->previous.length) - (u64)base_type.str;
-            
-            return (P_ValueType) {
-                .base_type = base_type,
-                .full_type = (string) { .str = base_type.str, .size = complete_length },
-                .mods = mods.elements,
-                .mod_ct = mods.count
-            };
-        }
-    }
-    
     report_error_at_current(parser, message);
     return ValueType_Invalid;
 }
@@ -594,6 +612,15 @@ static P_Expr* P_MakeTypenameNode(P_Parser* parser, P_ValueType name) {
     return expr;
 }
 
+static P_Expr* P_MakeFuncnameNode(P_Parser* parser, P_ValueType type, string name) {
+    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+    expr->type = ExprType_Funcname;
+    expr->ret_type = type;
+    expr->can_assign = false;
+    expr->op.funcname = name;
+    return expr;
+}
+
 static P_Expr* P_MakeFuncCallNode(P_Parser* parser, string name, P_ValueType type, P_Expr** exprs, u32 call_arity) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_FuncCall;
@@ -862,6 +889,8 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
                 while (curr != nullptr) {
                     if (is_ref(&curr->type)) {
                         P_Expr* e = param_buffer[i];
+                        if (!e->can_assign)
+                            report_error(parser, str_lit("Cannot pass non assignable value to reference parameter\n"));
                         P_Expr* a = P_MakeAddrNode(parser, curr->type, e);
                         param_buffer[i] = a;
                     }
@@ -874,21 +903,53 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             key.depth--;
         }
         
+        var_entry_key varkey = { .name = name, .depth = parser->scope_depth };
+        P_ValueType ret;
+        while (varkey.depth != -1) {
+            if (var_hash_table_get(&parser->variables, varkey, &ret)) {
+                // TODO(voxel): Check Arguments
+                
+                if (ret.is_func_ptr) {
+                    // Convert any ref takers to a &(Addr) node
+                    value_type_list_node* curr = ret.func_param_types->first;
+                    u32 i = 0;
+                    while (curr != nullptr) {
+                        if (is_ref(&curr->type)) {
+                            P_Expr* e = param_buffer[i];
+                            if (!e->can_assign)
+                                report_error(parser, str_lit("Cannot pass non assignable value to reference parameter\n"));
+                            P_Expr* a = P_MakeAddrNode(parser, curr->type, e);
+                            param_buffer[i] = a;
+                        }
+                        curr = curr->next;
+                        i++;
+                    }
+                    
+                    // FIXME(voxel): THIS HAS TO BE FIXED. Function Pointers are insane
+                    ret.is_func_ptr = false;
+                    return P_MakeFuncCallNode(parser, name, ret, param_buffer, call_arity);
+                } else {
+                    report_error(parser, str_lit("Cannot call variable that isn't a function pointer\n"));
+                }
+            }
+            varkey.depth--;
+        }
+        
         report_error(parser, str_lit("Undefined function %.*s with provided parameters\n"), str_expand(name));
         
     } else {
         
-        var_entry_key key = { .name = name, .depth = parser->scope_depth };
+        var_entry_key varkey = { .name = name, .depth = parser->scope_depth };
         P_ValueType value = ValueType_Invalid;
-        while (key.depth != -1) {
-            if (var_hash_table_get(&parser->variables, key, &value)) {
+        while (varkey.depth != -1) {
+            if (var_hash_table_get(&parser->variables, varkey, &value)) {
                 if (is_ref(&value)) {
                     P_ValueType ret = P_ReduceType(value);
                     return P_MakeDerefNode(parser, ret, P_MakeVariableNode(parser, name, value));
                 }
                 return P_MakeVariableNode(parser, name, value);
             }
-            key.depth--;
+            varkey.depth--;
         }
         
         P_Container* type = type_array_get(parser, name, parser->scope_depth);
@@ -897,6 +958,15 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             P_ConsumeTypeMods(parser, &mods);
             u64 complete_length = ((u64)parser->previous.start + (u64)parser->previous.length) - (u64)name.str;
             return P_MakeTypenameNode(parser, (P_ValueType) { .base_type = name, .full_type = (string) { .str = name.str, .size = complete_length }, .mods = mods.elements, .mod_ct = mods.count });
+        }
+        
+        func_entry_key fnkey = { .name = name, .depth = parser->scope_depth };
+        while (fnkey.depth != -1) {
+            if (func_hash_table_has_name(&parser->functions, fnkey)) {
+                // Any value type so that I can check for specific func pointer sig based on the parameters reqd
+                return P_MakeFuncnameNode(parser, ValueType_Any, name);
+            }
+            fnkey.depth--;
         }
         
         report_error(parser, str_lit("Undefined variable %.*s\n"), str_expand(name));
@@ -928,8 +998,27 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
                 return P_MakeAssignmentNode(parser, left, P_MakeAddrNode(parser, m, xpr));
         }
         
-        if (type_check(xpr->ret_type, left->ret_type))
-            return P_MakeAssignmentNode(parser, left, xpr);
+        if (left->ret_type.is_func_ptr) {
+            if (xpr->type == ExprType_Funcname) {
+                func_entry_key key = { .name = xpr->op.funcname, .depth = parser->scope_depth };
+                func_entry_val* val = nullptr;
+                u32 subset_match = 1024;
+                while (key.depth != -1) {
+                    if (func_hash_table_get_absp(&parser->functions, key, *left->ret_type.func_param_types, &val, &subset_match, true, true)) {
+                        // Fix xpr with mangled name
+                        xpr->op.funcname = val->mangled_name;
+                        return P_MakeAssignmentNode(parser, left, xpr);
+                    }
+                    key.depth--;
+                }
+                report_error(parser, str_lit("Given Function does not have an overload with matching parameters\n"));
+            } else {
+                report_error(parser, str_lit("Expected function name\n"));
+            }
+        } else {
+            if (type_check(xpr->ret_type, left->ret_type))
+                return P_MakeAssignmentNode(parser, left, xpr);
+        }
         
         report_error(parser, str_lit("Cannot assign %.*s to variable\n"), str_expand(xpr->ret_type.full_type));
     }
@@ -1398,10 +1487,30 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name) {
             }
         }
         
-        if (!type_check(value->ret_type, type))
-            report_error(parser, str_lit("Cannot Assign Value of Type %.*s to variable of type %.*s\n"), str_expand(value->ret_type.full_type), str_expand(type.full_type));
-        P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
-        return P_MakeVarDeclAssignStmtNode(parser, type, name, value);
+        if (type.is_func_ptr) {
+            if (value->type == ExprType_Funcname) {
+                func_entry_key key = { .name = value->op.funcname, .depth = parser->scope_depth };
+                func_entry_val* val = nullptr;
+                u32 subset_match = 1024;
+                while (key.depth != -1) {
+                    if (func_hash_table_get_absp(&parser->functions, key, *type.func_param_types, &val, &subset_match, true, true)) {
+                        // Fix value with mangled name
+                        value->op.funcname = val->mangled_name;
+                        P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
+                        return P_MakeVarDeclAssignStmtNode(parser, type, name, value);
+                    }
+                    key.depth--;
+                }
+                report_error(parser, str_lit("Given Function does not have an overload with matching parameters\n"));
+            } else {
+                report_error(parser, str_lit("Expected function name\n"));
+            }
+        } else {
+            if (!type_check(value->ret_type, type))
+                report_error(parser, str_lit("Cannot Assign Value of Type %.*s to variable of type %.*s\n"), str_expand(value->ret_type.full_type), str_expand(type.full_type));
+            P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
+            return P_MakeVarDeclAssignStmtNode(parser, type, name, value);
+        }
     }
     
     if (is_ref(&type)) {
@@ -1867,6 +1976,14 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
         
         case ExprType_Variable: {
             printf("%.*s\n", str_expand(expr->op.variable));
+        } break;
+        
+        case ExprType_Typename: {
+            printf("%.*s [Typename]\n", str_expand(expr->op.typename.full_type));
+        } break;
+        
+        case ExprType_Funcname: {
+            printf("%.*s [Funcname]\n", str_expand(expr->op.funcname));
         } break;
         
         case ExprType_Unary: {

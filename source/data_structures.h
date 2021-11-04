@@ -63,7 +63,9 @@ typedef struct func_hash_table {
 
 void func_hash_table_init(func_hash_table* table);
 void func_hash_table_free(func_hash_table* table);
+b8   func_hash_table_get_absp(func_hash_table* table, func_entry_key key, value_type_list param_types, func_entry_val** value, u32* subset_match, b8 absolute_check, b8 no_varargs);
 b8   func_hash_table_get(func_hash_table* table, func_entry_key key, value_type_list param_types, func_entry_val** value, u32* subset_match, b8 absolute_check);
+b8   func_hash_table_has_name(func_hash_table* table, func_entry_key key);
 b8   func_hash_table_set(func_hash_table* table, func_entry_key key, func_entry_val* value);
 b8   func_hash_table_del(func_hash_table* table, func_entry_key key);
 void func_hash_table_add_all(func_hash_table* from, func_hash_table* to);

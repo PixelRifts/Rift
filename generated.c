@@ -4,6 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
+void fooxyz_1int(int x);
 int main(void);
-void change_1intref(int *r);
 

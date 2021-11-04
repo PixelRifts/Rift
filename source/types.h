@@ -7,17 +7,18 @@
 #include "str.h"
 
 struct P_Expr;
+struct P_ValueType;
+struct value_type_list;
 
 typedef u32 P_ValueTypeModType;
 enum P_ValueTypeModType {
     ValueTypeModType_Pointer,
     ValueTypeModType_Array,
-    ValueTypeModType_Reference
+    ValueTypeModType_Reference,
 };
 
 typedef struct P_ValueTypeMod {
     P_ValueTypeModType type;
-    // Union bcoz maybe ill need some other thingy here. highly unlikely but ya never know
     union {
         struct P_Expr* array_expr;
     } op;
@@ -28,6 +29,11 @@ typedef struct P_ValueType {
     string full_type;
     P_ValueTypeMod* mods;
     u32 mod_ct;
+    
+    b8 is_func_ptr;
+    P_ValueTypeMod* func_mods;
+    u32 func_mod_ct;
+    struct value_type_list* func_param_types;
 } P_ValueType;
 
 typedef struct value_type_list_node {

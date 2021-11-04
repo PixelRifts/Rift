@@ -42,9 +42,10 @@ typedef u32 P_ExprType;
 enum {
     ExprType_IntLit, ExprType_LongLit, ExprType_FloatLit, ExprType_DoubleLit,
     ExprType_StringLit, ExprType_CharLit, ExprType_BoolLit, ExprType_Typename,
-    ExprType_Unary, ExprType_Binary, ExprType_Assignment, ExprType_Variable,
-    ExprType_FuncCall, ExprType_Dot, ExprType_EnumDot, ExprType_Cast, ExprType_Index,
-    ExprType_Addr, ExprType_Deref, ExprType_Nullptr, ExprType_ArrayLit,
+    ExprType_Funcname, ExprType_Unary, ExprType_Binary, ExprType_Assignment,
+    ExprType_Variable, ExprType_FuncCall, ExprType_Dot, ExprType_EnumDot,
+    ExprType_Cast, ExprType_Index, ExprType_Addr, ExprType_Deref,
+    ExprType_Nullptr, ExprType_ArrayLit,
 };
 
 typedef struct P_Expr P_Expr;
@@ -61,6 +62,7 @@ struct P_Expr {
         string char_lit; // Is a string for transpiling reasons. :(
         string string_lit;
         P_ValueType typename;
+        string funcname;
         P_Expr* cast;
         P_Expr* addr;
         P_Expr* deref;

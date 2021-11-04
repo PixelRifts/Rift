@@ -1,6 +1,10 @@
 #include "emitter.h"
 #include <stdarg.h>
 
+#if 0
+#define OUT_TO_CONSOLE
+#endif
+
 // All types will go through this map
 static P_ValueType type_map(E_Emitter* emitter, P_ValueType type) {
     type.full_type = str_replace_all(&emitter->parser.arena, type.full_type, str_lit("long"), str_lit("long long"));
@@ -9,26 +13,44 @@ static P_ValueType type_map(E_Emitter* emitter, P_ValueType type) {
 }
 
 static void E_Write(E_Emitter* emitter, const char* text) {
+#ifdef OUT_TO_CONSOLE
+    printf(text);
+#else
     fprintf(emitter->output_file, text);
+#endif
 }
 
 static void E_WriteLine(E_Emitter* emitter, const char* text) {
+#ifdef OUT_TO_CONSOLE
+    printf(text);
+    printf("\n");
+#else
     fprintf(emitter->output_file, text);
     fprintf(emitter->output_file, "\n");
+#endif
 }
 
 static void E_WriteF(E_Emitter* emitter, const char* text, ...) {
     va_list args;
     va_start(args, text);
+#ifdef OUT_TO_CONSOLE
+    vprintf(text, args);
+#else
     vfprintf(emitter->output_file, text, args);
+#endif
     va_end(args);
 }
 
 static void E_WriteLineF(E_Emitter* emitter, const char* text, ...) {
     va_list args;
     va_start(args, text);
+#ifdef OUT_TO_CONSOLE
+    vprintf(text, args);
+    printf("\n");
+#else
     vfprintf(emitter->output_file, text, args);
     fprintf(emitter->output_file, "\n");
+#endif
     va_end(args);
 }
 
@@ -36,38 +58,54 @@ static void E_WriteLineF(E_Emitter* emitter, const char* text, ...) {
 // int (*((blah[6])[4]))
 
 static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr);
+static void E_EmitTypeAndName(E_Emitter* emitter, P_ValueType* type, string name);
 
-static void E_EmitTypeMods_Recursive(E_Emitter* emitter, P_ValueType* type, int mod_idx, string name_if_negone) {
+static void E_EmitTypeMods_Recursive(E_Emitter* emitter, P_ValueTypeMod* mods, i32 mod_idx, string name_if_negone, b8 is_only_one) {
     if (mod_idx == -1) {
         E_WriteF(emitter, "%.*s", str_expand(name_if_negone));
         return;
     }
     
-    if (mod_idx != 0)
+    if (!is_only_one)
         E_Write(emitter, "(");
-    switch (type->mods[mod_idx].type) {
+    switch (mods[mod_idx].type) {
         case ValueTypeModType_Pointer:
         case ValueTypeModType_Reference: {
             E_Write(emitter, "*");
-            E_EmitTypeMods_Recursive(emitter, type, mod_idx - 1, name_if_negone);
+            E_EmitTypeMods_Recursive(emitter, mods, mod_idx - 1, name_if_negone, false);
         } break;
         case ValueTypeModType_Array: {
-            E_EmitTypeMods_Recursive(emitter, type, mod_idx - 1, name_if_negone);
+            E_EmitTypeMods_Recursive(emitter, mods, mod_idx - 1, name_if_negone, false);
             E_Write(emitter, "[");
-            E_EmitExpression(emitter, type->mods[mod_idx].op.array_expr);
+            E_EmitExpression(emitter, mods[mod_idx].op.array_expr);
             E_Write(emitter, "]");
         } break;
     }
-    if (mod_idx != 0)
+    if (!is_only_one)
         E_Write(emitter, ")");
 }
 
 static void E_EmitTypeAndName(E_Emitter* emitter, P_ValueType* type, string name) {
     E_WriteF(emitter, "%.*s ", str_expand(type->base_type));
-    if (type->mod_ct != 0) {
-        E_EmitTypeMods_Recursive(emitter, type, type->mod_ct - 1, name);
+    if (type->is_func_ptr) {
+        E_EmitTypeMods_Recursive(emitter, type->mods, type->mod_ct - 1, (string){0}, type->mod_ct == 1);
+        E_WriteF(emitter, "(*", str_expand(name));
+        E_EmitTypeMods_Recursive(emitter, type->func_mods, type->func_mod_ct - 1, name, false);
+        E_Write(emitter, ")(");
+        value_type_list_node* curr = type->func_param_types->first;
+        while (curr != nullptr) {
+            E_EmitTypeAndName(emitter, &curr->type, (string){0});
+            if (curr->next != nullptr)
+                E_Write(emitter, ", ");
+            curr = curr->next;
+        }
+        E_Write(emitter, ")");
     } else {
-        E_WriteF(emitter, "%.*s", str_expand(name));
+        if (type->mod_ct != 0) {
+            E_EmitTypeMods_Recursive(emitter, type->mods, type->mod_ct - 1, name, type->mod_ct == 1);
+        } else {
+            E_WriteF(emitter, "%.*s", str_expand(name));
+        }
     }
 }
 
@@ -162,6 +200,10 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
             E_EmitTypeAndName(emitter, &expr->op.typename, (string) {0});
         } break;
         
+        case ExprType_Funcname: {
+            E_WriteF(emitter, "%.*s", str_expand(expr->op.funcname));
+        } break;
+        
         case ExprType_Cast: {
             E_Write(emitter, "(");
             E_EmitTypeAndName(emitter, &expr->ret_type, (string) {0});
@@ -238,9 +280,8 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
         case StmtType_FuncDecl: {
             P_ValueType type = type_map(emitter, stmt->op.func_decl.type);
             
-            // FIXME(voxel): Cannot pass Arrays from/to functions
-            // NOTE(voxel): This also fixes the function name mangling issue
-            E_WriteF(emitter, "%.*s %.*s(", str_expand(type.full_type), str_expand(stmt->op.func_decl.name));
+            E_EmitTypeAndName(emitter, &type, stmt->op.func_decl.name);
+            E_Write(emitter, "(");
             string_list_node* curr_name = stmt->op.func_decl.param_names.first;
             value_type_list_node* curr_type = stmt->op.func_decl.param_types.first;
             
