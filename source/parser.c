@@ -118,7 +118,8 @@ static b8 P_IsTypeToken(P_Parser* parser) {
         parser->current.type == TokenType_Char   ||
         parser->current.type == TokenType_Bool   ||
         parser->current.type == TokenType_Void   ||
-        parser->current.type == TokenType_String) return true;
+        parser->current.type == TokenType_String ||
+        parser->current.type == TokenType_Hat) return true;
     if (parser->current.type == TokenType_Identifier) {
         if (container_type_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
             return true;
@@ -215,45 +216,51 @@ static P_ValueType P_ConsumeType(P_Parser* parser, string message) {
             P_Advance(parser);
         }
         
-        b8 is_func_ptr = false;
-        
         string base_type = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
-        
         type_mod_array mods = {0};
         P_ConsumeTypeMods(parser, &mods);
-        
-        type_mod_array func_mods = {0};
-        value_type_list* list = nullptr;
-        if (P_Match(parser, TokenType_OpenParenthesis)) {
-            list = arena_alloc(&parser->arena, sizeof(value_type_list));
-            while (!P_Match(parser, TokenType_CloseParenthesis)) {
-                if (P_Match(parser, TokenType_EOF))
-                    report_error(parser, str_lit("Unclosed Function Pointer Parenthesis\n"));
-                P_ValueType type = P_ConsumeType(parser, str_lit("Expected Type in Function Pointer declaration\n"));
-                value_type_list_push(&parser->arena, list, type);
-                
-                if (!P_Match(parser, TokenType_Comma)) {
-                    P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected , or )\n"));
-                    break;
-                }
-            }
-            
-            P_Consume(parser, TokenType_Star, str_lit("Expected *\n"));
-            is_func_ptr = true;
-            P_ConsumeTypeMods(parser, &func_mods);
-        }
-        
         u64 complete_length = ((u64)parser->previous.start + (u64)parser->previous.length) - (u64)base_type.str;
         
         return (P_ValueType) {
+            .type = ValueTypeType_Basic,
             .base_type = base_type,
             .full_type = (string) { .str = base_type.str, .size = complete_length },
             .mods = mods.elements,
             .mod_ct = mods.count,
-            .is_func_ptr = is_func_ptr,
-            .func_mods = func_mods.elements,
-            .func_mod_ct = func_mods.count,
-            .func_param_types = list,
+        };
+    } else if (P_Match(parser, TokenType_Hat)) {
+        P_ValueType* ret_type = arena_alloc(&parser->arena, sizeof(P_ValueType));
+        string base_type = (string) { .str = (u8*)parser->current.start, .size = parser->current.length };
+        *ret_type = P_ConsumeType(parser, str_lit("Expected Type as return type for Function Pointer\n"));
+        P_Consume(parser, TokenType_OpenParenthesis, str_lit("Expected (\n"));
+        
+        type_mod_array func_mods = {0};
+        value_type_list* list = nullptr;
+        
+        list = arena_alloc(&parser->arena, sizeof(value_type_list));
+        while (!P_Match(parser, TokenType_CloseParenthesis)) {
+            if (P_Match(parser, TokenType_EOF))
+                report_error(parser, str_lit("Unclosed Function Pointer Parenthesis\n"));
+            P_ValueType type = P_ConsumeType(parser, str_lit("Expected Type in Function Pointer declaration\n"));
+            value_type_list_push(&parser->arena, list, type);
+            
+            if (!P_Match(parser, TokenType_Comma)) {
+                P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected , or )\n"));
+                break;
+            }
+        }
+        P_ConsumeTypeMods(parser, &func_mods);
+        u64 complete_length = ((u64)parser->previous.start + (u64)parser->previous.length) - (u64)base_type.str;
+        
+        return (P_ValueType) {
+            .type = ValueTypeType_FuncPointer,
+            .base_type = base_type,
+            .full_type = (string) { .str = base_type.str, .size = complete_length },
+            .mods = func_mods.elements,
+            .mod_ct = func_mods.count,
+            
+            .op.func_ptr.ret_type = ret_type,
+            .op.func_ptr.func_param_types = list,
         };
     }
     report_error_at_current(parser, message);
@@ -271,6 +278,37 @@ u32 type_heirarchy_length = 5;
 
 b8 type_check(P_ValueType a, P_ValueType expected) {
     if (str_eq(a.full_type, expected.full_type)) return true;
+    
+    if ((a.type == ValueTypeType_FuncPointer) && (expected.type == ValueTypeType_FuncPointer)) {
+        if (!type_check(*a.op.func_ptr.ret_type, *expected.op.func_ptr.ret_type))
+            return false;
+        
+        value_type_list_node* curr_test = expected.op.func_ptr.func_param_types->first;
+        value_type_list_node* curr = a.op.func_ptr.func_param_types->first;
+        while (!(curr_test == nullptr || curr == nullptr)) {
+            
+            if (!str_eq(str_lit("..."), curr_test->type.full_type)) {
+                // Only looks for absolute matches. No fuzz
+                if (!str_eq(curr->type.full_type, curr_test->type.full_type))
+                    break;
+                curr_test = curr_test->next;
+                curr = curr->next;
+            } else {
+                if (curr == a.op.func_ptr.func_param_types->last) {
+                    curr = curr->next;
+                    curr_test = curr_test->next;
+                } else curr = curr->next;
+            }
+            
+        }
+        
+        if (curr_test == nullptr && curr == nullptr) {
+            return true;
+        }
+        
+    } else if (a.type == ValueTypeType_FuncPointer || expected.type == ValueTypeType_FuncPointer) {
+        return false;
+    }
     
     // Test for 'any' type
     if (str_eq(a.full_type, ValueType_Any.full_type) ||
@@ -861,7 +899,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         
         u32 subset_match = 1024; // Invalid cuz max param count is 256
         while (key.depth != -1) {
-            if (func_hash_table_get(&parser->functions, key, param_types, &value, &subset_match, true)) {
+            if (func_hash_table_get(&parser->functions, key, &param_types, &value, &subset_match, true)) {
                 // Convert any ref takers to a &(Addr) node
                 value_type_list_node* curr = value->param_types.first;
                 u32 i = 0;
@@ -882,7 +920,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         // Reset key depth for a fuzzy type search
         key.depth = parser->scope_depth;
         while (key.depth != -1) {
-            if (func_hash_table_get(&parser->functions, key, param_types, &value, &subset_match, false)) {
+            if (func_hash_table_get(&parser->functions, key, &param_types, &value, &subset_match, false)) {
                 // Convert any ref takers to a &(Addr) node
                 value_type_list_node* curr = value->param_types.first;
                 u32 i = 0;
@@ -907,27 +945,42 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         P_ValueType ret;
         while (varkey.depth != -1) {
             if (var_hash_table_get(&parser->variables, varkey, &ret)) {
-                // TODO(voxel): Check Arguments
-                
-                if (ret.is_func_ptr) {
-                    // Convert any ref takers to a &(Addr) node
-                    value_type_list_node* curr = ret.func_param_types->first;
+                if (ret.type == ValueTypeType_FuncPointer) {
+                    // Type chack arguments
+                    value_type_list_node* curr_test = ret.op.func_ptr.func_param_types->first;
+                    value_type_list_node* curr = param_types.first;
                     u32 i = 0;
-                    while (curr != nullptr) {
-                        if (is_ref(&curr->type)) {
-                            P_Expr* e = param_buffer[i];
-                            if (!e->can_assign)
-                                report_error(parser, str_lit("Cannot pass non assignable value to reference parameter\n"));
-                            P_Expr* a = P_MakeAddrNode(parser, curr->type, e);
-                            param_buffer[i] = a;
+                    while (!(curr_test == nullptr || curr == nullptr)) {
+                        
+                        if (!str_eq(str_lit("..."), curr_test->type.full_type)) {
+                            if (!type_check(curr->type, curr_test->type))
+                                report_error(parser, str_lit("Invalid arguments to function call\n"));
+                            
+                            // Convert any ref takers to a &(Addr) node
+                            if (is_ref(&curr_test->type)) {
+                                P_Expr* e = param_buffer[i];
+                                if (!e->can_assign)
+                                    report_error(parser, str_lit("Cannot pass non assignable value to reference parameter\n"));
+                                P_Expr* a = P_MakeAddrNode(parser, curr->type, e);
+                                param_buffer[i] = a;
+                            }
+                            
+                            curr_test = curr_test->next;
+                            curr = curr->next;
+                        } else {
+                            if (curr == param_types.last) {
+                                curr = curr->next;
+                                curr_test = curr_test->next;
+                            } else curr = curr->next;
                         }
-                        curr = curr->next;
+                        
                         i++;
                     }
                     
-                    // FIXME(voxel): THIS HAS TO BE FIXED. Function Pointers are insane
-                    ret.is_func_ptr = false;
-                    return P_MakeFuncCallNode(parser, name, ret, param_buffer, call_arity);
+                    if (curr_test == nullptr && curr == nullptr) {
+                        return P_MakeFuncCallNode(parser, name, *ret.op.func_ptr.ret_type, param_buffer, call_arity);
+                    }
+                    report_error(parser, str_lit("Invalid arguments to function call\n"));
                 } else {
                     report_error(parser, str_lit("Cannot call variable that isn't a function pointer\n"));
                 }
@@ -998,13 +1051,13 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
                 return P_MakeAssignmentNode(parser, left, P_MakeAddrNode(parser, m, xpr));
         }
         
-        if (left->ret_type.is_func_ptr) {
+        if (left->ret_type.type == ValueTypeType_FuncPointer) {
             if (xpr->type == ExprType_Funcname) {
                 func_entry_key key = { .name = xpr->op.funcname, .depth = parser->scope_depth };
                 func_entry_val* val = nullptr;
                 u32 subset_match = 1024;
                 while (key.depth != -1) {
-                    if (func_hash_table_get_absp(&parser->functions, key, *left->ret_type.func_param_types, &val, &subset_match, true, true)) {
+                    if (func_hash_table_get_absp(&parser->functions, key, left->ret_type.op.func_ptr.func_param_types, &val, &subset_match, true, true)) {
                         // Fix xpr with mangled name
                         xpr->op.funcname = val->mangled_name;
                         return P_MakeAssignmentNode(parser, left, xpr);
@@ -1012,6 +1065,13 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
                     key.depth--;
                 }
                 report_error(parser, str_lit("Given Function does not have an overload with matching parameters\n"));
+            } else if (xpr->ret_type.type == ValueTypeType_FuncPointer) {
+                
+                if (!type_check(xpr->ret_type, left->ret_type)) {
+                    report_error(parser, str_lit("Incompatible function pointer types\n"));
+                } else {
+                    return P_MakeAssignmentNode(parser, left, xpr);
+                }
             } else {
                 report_error(parser, str_lit("Expected function name\n"));
             }
@@ -1416,7 +1476,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         
         u32 subset_match = 1024;
         func_entry_val* test = nullptr;
-        if (!func_hash_table_get(&parser->functions, key, params, &test, &subset_match, true)) {
+        if (!func_hash_table_get(&parser->functions, key, &params, &test, &subset_match, true)) {
             func_entry_val* val = arena_alloc(&parser->arena, sizeof(func_entry_val)); val->value = type;
             val->is_native = native;
             val->param_types = params;
@@ -1487,13 +1547,13 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name) {
             }
         }
         
-        if (type.is_func_ptr) {
+        if (type.type == ValueTypeType_FuncPointer) {
             if (value->type == ExprType_Funcname) {
                 func_entry_key key = { .name = value->op.funcname, .depth = parser->scope_depth };
                 func_entry_val* val = nullptr;
                 u32 subset_match = 1024;
                 while (key.depth != -1) {
-                    if (func_hash_table_get_absp(&parser->functions, key, *type.func_param_types, &val, &subset_match, true, true)) {
+                    if (func_hash_table_get_absp(&parser->functions, key, type.op.func_ptr.func_param_types, &val, &subset_match, true, true)) {
                         // Fix value with mangled name
                         value->op.funcname = val->mangled_name;
                         P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
@@ -1502,6 +1562,14 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name) {
                     key.depth--;
                 }
                 report_error(parser, str_lit("Given Function does not have an overload with matching parameters\n"));
+            } else if (value->ret_type.type == ValueTypeType_FuncPointer) {
+                
+                if (!type_check(value->ret_type, type)) {
+                    report_error(parser, str_lit("Incompatible function pointer types\n"));
+                } else {
+                    P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
+                    return P_MakeVarDeclAssignStmtNode(parser, type, name, value);
+                }
             } else {
                 report_error(parser, str_lit("Expected function name\n"));
             }
@@ -1622,6 +1690,34 @@ static P_Stmt* P_StmtReturn(P_Parser* parser) {
         parser->all_code_paths_return = true;
     
     P_Expr* val = P_Expression(parser);
+    if (parser->function_body_ret.type == ValueTypeType_FuncPointer) {
+        if (val->type == ExprType_Funcname) {
+            
+            func_entry_key key = { .name = val->op.funcname, .depth = parser->scope_depth };
+            func_entry_val* v = nullptr;
+            u32 subset_match = 1024;
+            while (key.depth != -1) {
+                if (func_hash_table_get_absp(&parser->functions, key, parser->function_body_ret.op.func_ptr.func_param_types, &v, &subset_match, true, true)) {
+                    // Fix value with mangled name
+                    val->op.funcname = v->mangled_name;
+                    P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
+                    return P_MakeReturnStmtNode(parser, val);
+                }
+                key.depth--;
+            }
+            report_error(parser, str_lit("Cannot Find function with required parameters and/or return types\n"));
+        } else if (val->ret_type.type == ValueTypeType_FuncPointer) {
+            
+            if (!type_check(val->ret_type, parser->function_body_ret)) {
+                report_error(parser, str_lit("Incompatible function pointer types\n"));
+            } else {
+                P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
+                return P_MakeReturnStmtNode(parser, val);
+            }
+        } else {
+            report_error(parser, str_lit("Expected Function name\n"));
+        }
+    }
     if (val == nullptr) return nullptr;
     if (!type_check(val->ret_type, parser->function_body_ret))
         report_error(parser, str_lit("Function return type mismatch. Expected %.*s\n"), str_expand(parser->function_body_ret.full_type));
@@ -1816,7 +1912,7 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
     u32 subset_match = 1024;
     func_entry_key key = (func_entry_key) { .name = name, .depth = 0 };
     func_entry_val* test = nullptr;
-    if (!func_hash_table_get(&parser->functions, key, params, &test, &subset_match, true)) {
+    if (!func_hash_table_get(&parser->functions, key, &params, &test, &subset_match, true)) {
         func_entry_val* val = arena_alloc(&parser->arena, sizeof(func_entry_val));
         val->value = type;
         val->is_native = false;
@@ -1886,7 +1982,8 @@ void P_PreParse(P_Parser* parser) {
     
     u32 subset_match = 1024;
     func_entry_val* v = nullptr;
-    if (!func_hash_table_get(&parser->functions, (func_entry_key) { .name = str_lit("main"), .depth = 0 }, (value_type_list){0}, &v, &subset_match, true)) {
+    value_type_list noargs = (value_type_list){0};
+    if (!func_hash_table_get(&parser->functions, (func_entry_key) { .name = str_lit("main"), .depth = 0 }, &noargs, &v, &subset_match, true)) {
         report_error(parser, str_lit("No main function definition found\n"));
     }
 }

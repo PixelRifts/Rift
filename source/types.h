@@ -24,16 +24,26 @@ typedef struct P_ValueTypeMod {
     } op;
 } P_ValueTypeMod;
 
+typedef u32 P_ValueTypeType;
+enum {
+    ValueTypeType_Basic,
+    ValueTypeType_FuncPointer
+};
+
+// TODO(voxel): Fix this with a nice recursive definition
 typedef struct P_ValueType {
+    P_ValueTypeType type;
+    
     string base_type;
     string full_type;
     P_ValueTypeMod* mods;
     u32 mod_ct;
-    
-    b8 is_func_ptr;
-    P_ValueTypeMod* func_mods;
-    u32 func_mod_ct;
-    struct value_type_list* func_param_types;
+    union {
+        struct {
+            struct P_ValueType* ret_type;
+            struct value_type_list* func_param_types;
+        } func_ptr;
+    } op;
 } P_ValueType;
 
 typedef struct value_type_list_node {
