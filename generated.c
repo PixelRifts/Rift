@@ -6,3 +6,12 @@
 
 int main(void);
 
+int lambda0_2intint(int x, int y)	{
+		return (x+y);
+}
+int main(void) {
+	int (*add)(int , int ) = lambda0_2intint;
+	int c = add(20, 30);
+	printf("%d", c);
+	return 0;
+}
