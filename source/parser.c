@@ -1160,7 +1160,7 @@ static P_Expr* P_ExprLambda(P_Parser* parser) {
     
     string additional = {0};
     if (varargs) additional = str_cat(&parser->arena, additional, str_lit("varargs"));
-    string mangled = P_FuncNameMangle(parser, str_from_format(&parser->arena, "lambda%d", parser->lambda_number), varargs ? arity - 1 : arity, params, additional);
+    string mangled = P_FuncNameMangle(parser, str_from_format(&parser->arena, "lambda%d", parser->lambda_number++), varargs ? arity - 1 : arity, params, additional);
     
     P_Stmt* func = P_MakeFuncStmtNode(parser, *parser->expected_fnptr->op.func_ptr.ret_type, mangled, arity, params, param_names, varargs);
     
