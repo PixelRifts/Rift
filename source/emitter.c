@@ -319,6 +319,10 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
             E_WriteF(emitter, "%.*s", str_expand(expr->op.funcname));
         } break;
         
+        case ExprType_Lambda: {
+            E_WriteF(emitter, "%.*s", str_expand(expr->op.lambda));
+        } break;
+        
         case ExprType_Cast: {
             E_Write(emitter, "(");
             E_EmitTypeAndName(emitter, &expr->ret_type, (string) {0}, false);
@@ -397,7 +401,8 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             string varargs;
             string arg_before_varargs;
             E_EmitTypeAndName_Fndecl(emitter, &type, stmt->op.func_decl.name, false, stmt->op.func_decl.param_names, stmt->op.func_decl.param_types, stmt->op.func_decl.arity, stmt->op.func_decl.varargs, &varargs, &arg_before_varargs);
-            E_WriteLine(emitter, " {");
+            if (stmt->op.func_decl.block->type != StmtType_Block)
+                E_WriteLine(emitter, " {");
             
             if (stmt->op.func_decl.varargs) {
                 E_WriteLineF(emitter, "va_list %.*s;", str_expand(varargs));
@@ -409,7 +414,8 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             if (stmt->op.func_decl.varargs)
                 E_WriteLineF(emitter, "va_end(%.*s);", str_expand(varargs));
             
-            E_WriteLine(emitter, "}");
+            if (stmt->op.func_decl.block->type != StmtType_Block)
+                E_WriteLine(emitter, "}");
         } break;
         
         case StmtType_StructDecl: {
@@ -517,8 +523,10 @@ void E_Emit(E_Emitter* emitter) {
     E_WriteLine(emitter, "");
     
     P_Parse(&emitter->parser);
-    if (!emitter->parser.had_error)
+    if (!emitter->parser.had_error) {
+        E_EmitStatementChain(emitter, emitter->parser.lambda_functions_start, 0);
         E_EmitStatementChain(emitter, emitter->parser.root, 0);
+    }
     E_FinishEmitting(emitter);
 }
 

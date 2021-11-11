@@ -43,6 +43,7 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_Greater: return str_lit(">");
         case TokenType_LessEqual: return str_lit("<=");
         case TokenType_GreaterEqual: return str_lit(">=");
+        case TokenType_Arrow: return str_lit("=>");
         case TokenType_AmpersandAmpersand: return str_lit("&&");
         case TokenType_PipePipe: return str_lit("||");
         case TokenType_OpenBrace: return str_lit("{");
@@ -285,7 +286,7 @@ L_Token L_LexToken(L_Lexer* lexer) {
         case ':':  return L_MakeToken(lexer, TokenType_Colon);
         case '?':  return L_MakeToken(lexer, TokenType_Question);
         
-        case '=':  return L_DoubleHandle(lexer, '=', TokenType_EqualEqual, TokenType_Equal);
+        case '=':  return L_TripleHandle(lexer, '=', TokenType_EqualEqual, '>', TokenType_Arrow, TokenType_Equal);
         case '!':  return L_DoubleHandle(lexer, '=', TokenType_BangEqual, TokenType_Bang);
         case '|':  return L_TripleHandle(lexer, '=', TokenType_PipeEqual, '|', TokenType_PipePipe, TokenType_Pipe);
         case '~':  return L_DoubleHandle(lexer, '=', TokenType_TildeEqual, TokenType_Tilde);

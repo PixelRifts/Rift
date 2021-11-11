@@ -45,8 +45,10 @@ enum {
     ExprType_Funcname, ExprType_Unary, ExprType_Binary, ExprType_Assignment,
     ExprType_Variable, ExprType_FuncCall, ExprType_Dot, ExprType_EnumDot,
     ExprType_Cast, ExprType_Index, ExprType_Addr, ExprType_Deref,
-    ExprType_Nullptr, ExprType_ArrayLit,
+    ExprType_Nullptr, ExprType_ArrayLit, ExprType_Lambda,
 };
+
+struct P_Stmt;
 
 typedef struct P_Expr P_Expr;
 struct P_Expr {
@@ -63,6 +65,7 @@ struct P_Expr {
         string string_lit;
         P_ValueType typename;
         string funcname;
+        string lambda;
         P_Expr* cast;
         P_Expr* addr;
         P_Expr* deref;
@@ -133,6 +136,11 @@ typedef struct P_Parser {
     P_PreStmt* pre_root;
     P_Stmt* root;
     
+    P_Stmt* lambda_functions_start;
+    P_Stmt* lambda_functions_curr;
+    
+    L_Token next_two;
+    L_Token next;
     L_Token current;
     L_Token previous;
     L_Token previous_two;
@@ -142,6 +150,8 @@ typedef struct P_Parser {
     func_hash_table functions;
     type_array types;
     
+    P_ValueType* expected_fnptr;
+    
     b8 had_error;
     b8 panik_mode;
     
@@ -149,6 +159,7 @@ typedef struct P_Parser {
     b8 all_code_paths_return;
     P_ValueType function_body_ret;
     b8 encountered_return;
+    u32 lambda_number;
 } P_Parser;
 
 void P_Advance(P_Parser* parser);

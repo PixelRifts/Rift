@@ -30,7 +30,6 @@ enum {
     ValueTypeType_FuncPointer
 };
 
-// TODO(voxel): Fix this with a nice recursive definition
 typedef struct P_ValueType {
     P_ValueTypeType type;
     

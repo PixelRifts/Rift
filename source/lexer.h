@@ -31,7 +31,7 @@ enum {
     TokenType_OpenBrace, TokenType_OpenParenthesis, TokenType_OpenBracket,
     TokenType_CloseBrace, TokenType_CloseParenthesis, TokenType_CloseBracket,
     TokenType_Comma, TokenType_Dot, TokenType_Semicolon, TokenType_Colon,
-    TokenType_Question,
+    TokenType_Question, TokenType_Arrow,
     
     TokenType_Return, TokenType_Struct, TokenType_Enum,
     TokenType_Null, TokenType_Nullptr, TokenType_Native,
