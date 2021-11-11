@@ -1069,8 +1069,10 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
 }
 
 static P_Expr* P_ExprLambda(P_Parser* parser) {
-    if (str_eq(parser->expected_fnptr->full_type, ValueType_Invalid.full_type))
+    if (parser->expected_fnptr == nullptr) {
         report_error(parser, str_lit("Did not expect function pointer type here\n"));
+        return nullptr;
+    }
     
     P_Consume(parser, TokenType_OpenParenthesis, str_lit("Expected (\n"));
     value_type_list params = {0};
@@ -1696,6 +1698,8 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name) {
         if (type.type == ValueTypeType_FuncPointer) parser->expected_fnptr = &type;
         else parser->expected_fnptr = nullptr;
         P_Expr* value = P_Expression(parser);
+        if (value == nullptr)
+            return nullptr;
         
         if (is_ref(&type)) {
             if (!value->can_assign)
