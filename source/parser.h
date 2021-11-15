@@ -86,7 +86,7 @@ enum {
     StmtType_Expression, StmtType_Block, StmtType_Return, StmtType_If,
     StmtType_IfElse, StmtType_While, StmtType_DoWhile, StmtType_VarDecl,
     StmtType_VarDeclAssign, StmtType_FuncDecl, StmtType_NativeFuncDecl, StmtType_StructDecl,
-    StmtType_EnumDecl,
+    StmtType_EnumDecl, StmtType_For,
 };
 
 typedef struct P_Stmt P_Stmt;
@@ -109,6 +109,7 @@ struct P_Stmt {
         struct { P_Expr* condition; P_Stmt* then; P_Stmt* else_s; } if_else;
         struct { P_Expr* condition; P_Stmt* then; } while_s;
         struct { P_Expr* condition; P_Stmt* then; } do_while;
+        struct { P_Expr* condition; P_Stmt* then; P_Stmt* init; P_Expr* loopexec; } for_s;
     } op;
 };
 

@@ -465,6 +465,17 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             E_EmitStatement(emitter, stmt->op.if_else.else_s, indent + 1);
         } break;
         
+        case StmtType_For: {
+            E_Write(emitter, "for (");
+            if (stmt->op.for_s.init != nullptr)
+                E_EmitStatement(emitter, stmt->op.for_s.init, 0);
+            E_EmitExpression(emitter, stmt->op.for_s.condition);
+            E_Write(emitter, ";");
+            E_EmitExpression(emitter, stmt->op.for_s.loopexec);
+            E_WriteLine(emitter, ")");
+            E_EmitStatement(emitter, stmt->op.for_s.then, indent + 1);
+        } break;
+        
         case StmtType_While: {
             E_Write(emitter, "while (");
             E_EmitExpression(emitter, stmt->op.while_s.condition);

@@ -739,6 +739,17 @@ static P_Stmt* P_MakeIfStmtNode(P_Parser* parser, P_Expr* condition, P_Stmt* the
     return stmt;
 }
 
+static P_Stmt* P_MakeForStmtNode(P_Parser* parser, P_Stmt* init, P_Expr* condn, P_Expr* loopexec, P_Stmt* then) {
+    P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
+    stmt->type = StmtType_For;
+    stmt->next = nullptr;
+    stmt->op.for_s.init = init;
+    stmt->op.for_s.condition = condn;
+    stmt->op.for_s.loopexec = loopexec;
+    stmt->op.for_s.then = then;
+    return stmt;
+}
+
 static P_Stmt* P_MakeWhileStmtNode(P_Parser* parser, P_Expr* condition, P_Stmt* then) {
     P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
     stmt->type = StmtType_While;
@@ -1225,18 +1236,17 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
             if (xpr->type == ExprType_Funcname || xpr->type == ExprType_Lambda) {
                 parser->expected_fnptr = past_expectation;
                 return P_MakeAssignmentNode(parser, left, xpr);
-            }
-            report_error(parser, str_lit("Given Function does not have an overload with matching parameters\n"));
-        } else if (xpr->ret_type.type == ValueTypeType_FuncPointer) {
-            
-            if (!type_check(xpr->ret_type, left->ret_type)) {
-                report_error(parser, str_lit("Incompatible function pointer types\n"));
+            } else if (xpr->ret_type.type == ValueTypeType_FuncPointer) {
+                
+                if (!type_check(xpr->ret_type, left->ret_type)) {
+                    report_error(parser, str_lit("Incompatible function pointer types\n"));
+                } else {
+                    parser->expected_fnptr = past_expectation;
+                    return P_MakeAssignmentNode(parser, left, xpr);
+                }
             } else {
-                parser->expected_fnptr = past_expectation;
-                return P_MakeAssignmentNode(parser, left, xpr);
+                report_error(parser, str_lit("Expected function name\n"));
             }
-        } else {
-            report_error(parser, str_lit("Expected function name\n"));
         }
         
         if (type_check(xpr->ret_type, left->ret_type)) {
@@ -1914,6 +1924,42 @@ static P_Stmt* P_StmtIf(P_Parser* parser) {
     return P_MakeIfStmtNode(parser, condition, then);
 }
 
+static P_Stmt* P_StmtFor(P_Parser* parser) {
+    P_Consume(parser, TokenType_OpenParenthesis, str_lit("Expected ( after for\n"));
+    
+    P_Stmt* initializer = nullptr;
+    if (!P_Match(parser, TokenType_Semicolon)) {
+        initializer = P_Declaration(parser);
+    }
+    
+    P_Expr* condition = P_Expression(parser);
+    if (!type_check(condition->ret_type, ValueType_Bool))
+        report_error(parser, str_lit("Expected expression returning bool\n"));
+    P_Consume(parser, TokenType_Semicolon, str_lit("Expected ;\n"));
+    P_Expr* loopexec = nullptr;
+    if (!P_Match(parser, TokenType_CloseParenthesis)) {
+        loopexec = P_Expression(parser);
+        P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression\n"));
+    }
+    
+    b8 reset = false;
+    b8 prev_directly_in_func_body = parser->is_directly_in_func_body;
+    parser->is_directly_in_func_body = false;
+    if (parser->current.type != TokenType_OpenBrace) {
+        parser->scope_depth++;
+        reset = true;
+    }
+    
+    P_Stmt* then = P_Statement(parser);
+    
+    parser->is_directly_in_func_body = prev_directly_in_func_body;
+    if (reset) {
+        parser->scope_depth--;
+    }
+    
+    return P_MakeForStmtNode(parser, initializer, condition, loopexec, then);
+}
+
 static P_Stmt* P_StmtWhile(P_Parser* parser) {
     P_Consume(parser, TokenType_OpenParenthesis, str_lit("Expected ( after while\n"));
     P_Expr* condition = P_Expression(parser);
@@ -1984,6 +2030,8 @@ static P_Stmt* P_Statement(P_Parser* parser) {
             return P_StmtIf(parser);
         if (P_Match(parser, TokenType_While))
             return P_StmtWhile(parser);
+        if (P_Match(parser, TokenType_For))
+            return P_StmtFor(parser);
         if (P_Match(parser, TokenType_Do))
             return P_StmtDoWhile(parser);
         return P_StmtExpression(parser);
@@ -1994,6 +2042,9 @@ static P_Stmt* P_Statement(P_Parser* parser) {
 
 static P_Stmt* P_Declaration(P_Parser* parser) {
     P_Stmt* s;
+    
+    // Consume semicolons
+    while (P_Match(parser, TokenType_Semicolon));
     
     if (P_IsTypeToken(parser)) {
         P_ValueType type = P_ConsumeType(parser, str_lit("There's an error in the parser. (P_Declaration)\n"));
@@ -2406,6 +2457,16 @@ static void P_PrintAST_Indent(M_Arena* arena, P_Stmt* stmt, u8 indent) {
                 
                 curr = curr->next;
             }
+        } break;
+        
+        case StmtType_For: {
+            printf("For Loop:\n");
+            if (stmt->op.for_s.init != nullptr)
+                P_PrintAST_Indent(arena, stmt->op.for_s.init, indent + 1);
+            P_PrintExprAST_Indent(arena, stmt->op.for_s.condition, indent + 1);
+            if (stmt->op.for_s.loopexec != nullptr)
+                P_PrintExprAST_Indent(arena, stmt->op.for_s.loopexec, indent + 1);
+            P_PrintAST_Indent(arena, stmt->op.for_s.then, indent + 1);
         } break;
         
         case StmtType_While: {

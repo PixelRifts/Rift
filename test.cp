@@ -3,7 +3,9 @@ void* native calloc(int count, int elem_size);
 void native free(void* buffer);
 
 int main() {
-	int c = ^(int x, int y) => { return x + y; }(5, 6);
-	printf("%d", c);
+	for (int x = 0; x < 10; x = x + 1) {
+		printf("Loop%d\n", x);
+	}
+	printf("Exited successfully");
 	return 0;
 }
