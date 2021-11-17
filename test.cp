@@ -7,6 +7,15 @@ int main() {
 		printf("Loop%d\n", x);
 		continue;
 	}
+	int x;
+	void test() {
+		printf("Test\n");
+	}
+	^void() testLambda = ^() => {
+		test();
+		printf("Test Lambda\n");
+	};
+	testLambda();
 	printf("Exited successfully");
 	return 0;
 }

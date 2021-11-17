@@ -474,8 +474,32 @@ static P_ValueType P_GetNumberBinaryValType(P_Expr* a, P_Expr* b) {
     return ValueType_Invalid;
 }
 
-static P_ScopeContext BeginScope(P_Parser* parser, P_ScopeType scope_type) {
+static b8 P_GetVariable(P_Parser* parser, string name, P_ValueType* type) {
+    if (parser->is_in_private_scope) {
+        var_entry_key key = { .name = name, .depth = parser->scope_depth };
+        if (var_hash_table_get(&parser->variables, key, type)) {
+            return true;
+        }
+    } else {
+        var_entry_key key = { .name = name, .depth = parser->scope_depth };
+        while (key.depth != -1) {
+            if (var_hash_table_get(&parser->variables, key, type)) {
+                return true;
+            }
+            key.depth++;
+        }
+    }
+    return false;
+}
+
+static P_ScopeContext P_BeginScope(P_Parser* parser, P_ScopeType scope_type) {
     P_ScopeContext context;
+    
+    // Temporary until i figure out a way to handle closures
+    if (scope_type == ScopeType_Lambda) {
+        context.prev_was_in_private_scope = parser->is_in_private_scope;
+        parser->is_in_private_scope = true;
+    }
     
     // Push on the scope type stack
     parser->scopetype_stack[parser->scopetype_tos++] = scope_type;
@@ -487,9 +511,10 @@ static P_ScopeContext BeginScope(P_Parser* parser, P_ScopeType scope_type) {
     return context;
 }
 
-static void EndScope(P_Parser* parser, P_ScopeContext context) {
+static void P_EndScope(P_Parser* parser, P_ScopeContext context) {
     parser->function_body_ret = context.prev_function_body_ret;
     parser->is_directly_in_func_body = context.prev_directly_in_func_body;
+    parser->is_in_private_scope = context.prev_was_in_private_scope;
     
     // Pop from the scope type stack
     parser->scopetype_tos--;
@@ -739,6 +764,13 @@ static P_Expr* P_MakeFuncCallNode(P_Parser* parser, string name, P_ValueType typ
     expr->op.func_call.params = exprs;
     expr->op.func_call.call_arity = call_arity;
     return expr;
+}
+
+static P_Stmt* P_MakeNothingNode(P_Parser* parser) {
+    P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
+    stmt->type = StmtType_Nothing;
+    stmt->next = nullptr;
+    return stmt;
 }
 
 static P_Stmt* P_MakeBlockStmtNode(P_Parser* parser) {
@@ -1039,68 +1071,60 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             key.depth--;
         }
         
-        var_entry_key varkey = { .name = name, .depth = parser->scope_depth };
         P_ValueType ret;
-        while (varkey.depth != -1) {
-            if (var_hash_table_get(&parser->variables, varkey, &ret)) {
-                if (ret.type == ValueTypeType_FuncPointer) {
-                    // Type chack arguments
-                    value_type_list_node* curr_test = ret.op.func_ptr.func_param_types->first;
-                    value_type_list_node* curr = param_types.first;
-                    u32 i = 0;
-                    while (!(curr_test == nullptr || curr == nullptr)) {
+        if (P_GetVariable(parser, name, &ret)) {
+            if (ret.type == ValueTypeType_FuncPointer) {
+                // Type chack arguments
+                value_type_list_node* curr_test = ret.op.func_ptr.func_param_types->first;
+                value_type_list_node* curr = param_types.first;
+                u32 i = 0;
+                while (!(curr_test == nullptr || curr == nullptr)) {
+                    
+                    if (!str_eq(str_lit("..."), curr_test->type.full_type)) {
+                        if (!type_check(curr->type, curr_test->type))
+                            report_error(parser, str_lit("Invalid arguments to function call\n"));
                         
-                        if (!str_eq(str_lit("..."), curr_test->type.full_type)) {
-                            if (!type_check(curr->type, curr_test->type))
-                                report_error(parser, str_lit("Invalid arguments to function call\n"));
-                            
-                            // Convert any ref takers to a &(Addr) node
-                            if (is_ref(&curr_test->type)) {
-                                P_Expr* e = param_buffer[i];
-                                if (!e->can_assign)
-                                    report_error(parser, str_lit("Cannot pass non assignable value to reference parameter\n"));
-                                P_Expr* a = P_MakeAddrNode(parser, curr->type, e);
-                                param_buffer[i] = a;
-                            }
-                            
-                            curr_test = curr_test->next;
-                            curr = curr->next;
-                        } else {
-                            if (curr == param_types.last) {
-                                curr = curr->next;
-                                curr_test = curr_test->next;
-                            } else curr = curr->next;
+                        // Convert any ref takers to a &(Addr) node
+                        if (is_ref(&curr_test->type)) {
+                            P_Expr* e = param_buffer[i];
+                            if (!e->can_assign)
+                                report_error(parser, str_lit("Cannot pass non assignable value to reference parameter\n"));
+                            P_Expr* a = P_MakeAddrNode(parser, curr->type, e);
+                            param_buffer[i] = a;
                         }
                         
-                        i++;
+                        curr_test = curr_test->next;
+                        curr = curr->next;
+                    } else {
+                        if (curr == param_types.last) {
+                            curr = curr->next;
+                            curr_test = curr_test->next;
+                        } else curr = curr->next;
                     }
                     
-                    if (curr_test == nullptr && curr == nullptr) {
-                        return P_MakeFuncCallNode(parser, name, *ret.op.func_ptr.ret_type, param_buffer, call_arity);
-                    }
-                    report_error(parser, str_lit("Invalid arguments to function call\n"));
-                } else {
-                    report_error(parser, str_lit("Cannot call variable that isn't a function pointer\n"));
+                    i++;
                 }
+                
+                if (curr_test == nullptr && curr == nullptr) {
+                    return P_MakeFuncCallNode(parser, name, *ret.op.func_ptr.ret_type, param_buffer, call_arity);
+                }
+                report_error(parser, str_lit("Invalid arguments to function call\n"));
+            } else {
+                report_error(parser, str_lit("Cannot call variable that isn't a function pointer\n"));
             }
-            varkey.depth--;
         }
         
         report_error(parser, str_lit("Undefined function %.*s with provided parameters\n"), str_expand(name));
         
     } else {
         
-        var_entry_key varkey = { .name = name, .depth = parser->scope_depth };
         P_ValueType value = ValueType_Invalid;
-        while (varkey.depth != -1) {
-            if (var_hash_table_get(&parser->variables, varkey, &value)) {
-                if (is_ref(&value)) {
-                    P_ValueType ret = P_ReduceType(value);
-                    return P_MakeDerefNode(parser, ret, P_MakeVariableNode(parser, name, value));
-                }
-                return P_MakeVariableNode(parser, name, value);
+        if (P_GetVariable(parser, name, &value)) {
+            if (is_ref(&value)) {
+                P_ValueType ret = P_ReduceType(value);
+                return P_MakeDerefNode(parser, ret, P_MakeVariableNode(parser, name, value));
             }
-            varkey.depth--;
+            return P_MakeVariableNode(parser, name, value);
         }
         
         P_Container* type = type_array_get(parser, name, parser->scope_depth);
@@ -1140,7 +1164,7 @@ static P_Expr* P_ExprLambda(P_Parser* parser) {
     u32 arity = 0;
     b8 varargs = false;
     
-    P_ScopeContext scope_context = BeginScope(parser, ScopeType_None);
+    P_ScopeContext scope_context = P_BeginScope(parser, ScopeType_Lambda);
     
     // CHECK THIS
     parser->all_code_paths_return = type_check(*parser->expected_fnptr->op.func_ptr.ret_type, ValueType_Void);
@@ -1226,6 +1250,7 @@ static P_Expr* P_ExprLambda(P_Parser* parser) {
     P_Consume(parser, TokenType_Arrow, str_lit("Expected => after ) in lambda\n"));
     func->op.func_decl.block = P_Declaration(parser);
     
+    // Push onto lambda SLL
     if (parser->lambda_functions_curr != nullptr) {
         parser->lambda_functions_curr->next = func;
         parser->lambda_functions_curr = func;
@@ -1240,7 +1265,7 @@ static P_Expr* P_ExprLambda(P_Parser* parser) {
             var_hash_table_del(&parser->variables, parser->variables.entries[i].key);
     }
     
-    EndScope(parser, scope_context);
+    P_EndScope(parser, scope_context);
     
     return P_MakeLambdaNode(parser, *parser->expected_fnptr, mangled);
 }
@@ -1304,7 +1329,8 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
 
 static P_Expr* P_ExprGroup(P_Parser* parser) {
     P_Expr* in = P_Expression(parser);
-    
+    if (in == nullptr) return nullptr;
+
     if (in->type == ExprType_Typename) {
         // Explicit Cast syntax
         P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after typename\n"));
@@ -1630,9 +1656,9 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         report_error(parser, str_lit("Cannot Return Array type from function\n"));
     
     P_ScopeContext scope_context;
-    
     if (!native) {
-        scope_context = BeginScope(parser, ScopeType_None);
+        // Inner scope functions are basically lambdas
+        scope_context = P_BeginScope(parser, parser->scope_depth == 1 ? ScopeType_None : ScopeType_Lambda);
         parser->all_code_paths_return = type_check(type, ValueType_Void);
         parser->encountered_return = false;
         parser->function_body_ret = type;
@@ -1642,7 +1668,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     while (!P_Match(parser, TokenType_CloseParenthesis)) {
         if (P_Match(parser, TokenType_Dot)) {
             P_Consume(parser, TokenType_Dot, str_lit("Expected .. after .\n"));
-            P_Consume(parser, TokenType_Dot, str_lit("Expected .. after .\n"));
+            P_Consume(parser, TokenType_Dot, str_lit("Expected . after ..\n"));
             
             if (arity == 0)
                 report_error(parser, str_lit("Only varargs function not allowed\n"));
@@ -1680,7 +1706,17 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     
     string additional = {0};
     if (varargs) additional = str_cat(&parser->arena, additional, str_lit("varargs"));
-    string mangled = native || str_eq(str_lit("main"), name) ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, additional);
+    
+    string mangled = {0};
+    if (parser->scope_depth == 1) {
+        mangled = native || str_eq(str_lit("main"), name)
+            ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, additional);
+    } else {
+        // Function in a scope...
+        string main_part = str_cat(&parser->arena, parser->current_function, name);
+        mangled = native
+            ? name : P_FuncNameMangle(parser, main_part, varargs ? arity - 1 : arity, params, additional);
+    }
     
     // Don't try to add the outermost scope functions since they get added during preparsing
     if (parser->scope_depth != 1 || native) {
@@ -1707,6 +1743,9 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         
         func = P_MakeFuncStmtNode(parser, type, mangled, arity, params, param_names, varargs);
         
+        string outer_function = parser->current_function;
+        parser->current_function = mangled;
+        
         P_Stmt* curr = nullptr;
         while (!P_Match(parser, TokenType_CloseBrace)) {
             P_Stmt* stmt = P_Declaration(parser);
@@ -1718,13 +1757,23 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
             if (parser->current.type == TokenType_EOF)
                 report_error(parser, str_lit("Unterminated Function Block. Expected }\n"));
         }
-        // Pop all entries with the current & higher scope depth from variables here
-        for (u32 i = 0; i < parser->variables.capacity; i++) {
-            if (parser->variables.entries[i].key.depth >= parser->scope_depth)
-                var_hash_table_del(&parser->variables, parser->variables.entries[i].key);
+        
+        parser->current_function = outer_function;
+        
+        if (parser->scope_depth != 1) {
+            // If it's an inner scope function, Push it onto the lambda stack and return a "Nothing" Node Instead
+            if (parser->lambda_functions_curr != nullptr) {
+                parser->lambda_functions_curr->next = func;
+                parser->lambda_functions_curr = func;
+            } else {
+                parser->lambda_functions_start = func;
+                parser->lambda_functions_curr = func;
+            }
+            
+            func = P_MakeNothingNode(parser);
         }
         
-        EndScope(parser, scope_context);
+        P_EndScope(parser, scope_context);
         if (!parser->all_code_paths_return) report_error(parser, str_lit("Not all code paths return a value\n"));
     } else {
         P_Consume(parser, TokenType_Semicolon, str_lit("Can't have function body on a native function\n"));
@@ -1871,7 +1920,7 @@ static P_Stmt* P_StmtBlock(P_Parser* parser) {
     P_ScopeContext scope_context;
     b8 reset = false;
     if (parser->block_stmt_should_begin_scope) {
-        scope_context = BeginScope(parser, ScopeType_None);
+        scope_context = P_BeginScope(parser, ScopeType_None);
         reset = true;
     }
     
@@ -1889,7 +1938,7 @@ static P_Stmt* P_StmtBlock(P_Parser* parser) {
     }
     
     if (reset)
-        EndScope(parser, scope_context);
+        P_EndScope(parser, scope_context);
     return block;
 }
 
@@ -1942,16 +1991,16 @@ static P_Stmt* P_StmtIf(P_Parser* parser) {
     P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression"));
     
     parser->block_stmt_should_begin_scope = false;
-    P_ScopeContext scope_context = BeginScope(parser, ScopeType_If);
+    P_ScopeContext scope_context = P_BeginScope(parser, ScopeType_If);
     P_Stmt* then = P_Statement(parser);
-    EndScope(parser, scope_context);
+    P_EndScope(parser, scope_context);
     parser->block_stmt_should_begin_scope = true;
     
     if (P_Match(parser, TokenType_Else)) {
         parser->block_stmt_should_begin_scope = false;
-        P_ScopeContext scope_context = BeginScope(parser, ScopeType_Else);
+        P_ScopeContext scope_context = P_BeginScope(parser, ScopeType_Else);
         P_Stmt* else_s = P_Statement(parser);
-        EndScope(parser, scope_context);
+        P_EndScope(parser, scope_context);
         parser->block_stmt_should_begin_scope = true;
         
         return P_MakeIfElseStmtNode(parser, condition, then, else_s);
@@ -1964,7 +2013,7 @@ static P_Stmt* P_StmtFor(P_Parser* parser) {
     P_Consume(parser, TokenType_OpenParenthesis, str_lit("Expected ( after for\n"));
     
     parser->block_stmt_should_begin_scope = false;
-    P_ScopeContext scope_context = BeginScope(parser, ScopeType_For);
+    P_ScopeContext scope_context = P_BeginScope(parser, ScopeType_For);
     P_Stmt* initializer = nullptr;
     if (!P_Match(parser, TokenType_Semicolon)) {
         initializer = P_Declaration(parser);
@@ -1980,9 +2029,8 @@ static P_Stmt* P_StmtFor(P_Parser* parser) {
         P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression\n"));
     }
     
-    
     P_Stmt* then = P_Statement(parser);
-    EndScope(parser, scope_context);
+    P_EndScope(parser, scope_context);
     parser->block_stmt_should_begin_scope = true;
     
     return P_MakeForStmtNode(parser, initializer, condition, loopexec, then);
@@ -2015,11 +2063,11 @@ static P_Stmt* P_StmtWhile(P_Parser* parser) {
     P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression\n"));
     
     parser->block_stmt_should_begin_scope = false;
-    P_ScopeContext scope_context = BeginScope(parser, ScopeType_None);
+    P_ScopeContext scope_context = P_BeginScope(parser, ScopeType_None);
     
     P_Stmt* then = P_Statement(parser);
     
-    EndScope(parser, scope_context);
+    P_EndScope(parser, scope_context);
     parser->block_stmt_should_begin_scope = true;
     
     return P_MakeWhileStmtNode(parser, condition, then);
@@ -2027,7 +2075,7 @@ static P_Stmt* P_StmtWhile(P_Parser* parser) {
 
 static P_Stmt* P_StmtDoWhile(P_Parser* parser) {
     parser->block_stmt_should_begin_scope = false;
-    P_ScopeContext scope_context = BeginScope(parser, ScopeType_DoWhile);
+    P_ScopeContext scope_context = P_BeginScope(parser, ScopeType_DoWhile);
     
     P_Stmt* then = P_Statement(parser);
     P_Consume(parser, TokenType_While, str_lit("Expected 'while'"));
@@ -2038,7 +2086,7 @@ static P_Stmt* P_StmtDoWhile(P_Parser* parser) {
     P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression"));
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after )"));
     
-    EndScope(parser, scope_context);
+    P_EndScope(parser, scope_context);
     parser->block_stmt_should_begin_scope = true;
     
     return P_MakeDoWhileStmtNode(parser, condition, then);
@@ -2170,8 +2218,20 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
     P_PreStmt* func = P_MakePreFuncStmtNode(parser, type, mangled, arity, params, param_names);
     
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected {\n"));
+    parser->scope_depth++;
     
-    while (!P_Match(parser, TokenType_CloseBrace)) {
+    // Consume the function body :^)
+    while (true) {
+        
+        if (P_Match(parser, TokenType_OpenBrace)) {
+            parser->scope_depth++;
+        } else if (P_Match(parser, TokenType_CloseBrace)) {
+            parser->scope_depth--;
+        }
+        
+        if (parser->scope_depth == 0)
+            break;
+        
         P_Advance(parser);
         if (P_Match(parser, TokenType_EOF)) {
             report_error(parser, str_lit("Unterminated function block\n"));
@@ -2271,8 +2331,10 @@ void P_Initialize(P_Parser* parser, string source) {
     parser->lambda_number = 0;
     parser->scopetype_stack = arena_alloc(&parser->arena, 1024 * sizeof(P_ScopeType));
     parser->scopetype_tos = 0;
+    parser->current_function = (string) {0};
     parser->expected_fnptr = nullptr;
     parser->block_stmt_should_begin_scope = true;
+    parser->is_in_private_scope = false;
     var_hash_table_init(&parser->variables);
     func_hash_table_init(&parser->functions);
     type_array_init(&parser->types);

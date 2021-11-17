@@ -83,6 +83,7 @@ struct P_Expr {
 
 typedef u32 P_StmtType;
 enum {
+    StmtType_Nothing, // Used Successful parsing but no code emission e.g. Inner scope functions
     StmtType_Expression, StmtType_Block, StmtType_Return, StmtType_If,
     StmtType_IfElse, StmtType_While, StmtType_DoWhile, StmtType_VarDecl,
     StmtType_VarDeclAssign, StmtType_FuncDecl, StmtType_NativeFuncDecl, StmtType_StructDecl,
@@ -132,6 +133,7 @@ struct P_PreStmt {
 typedef u32 P_ScopeType;
 enum {
     ScopeType_None,
+    ScopeType_Lambda,
     ScopeType_For,
     ScopeType_While,
     ScopeType_DoWhile,
@@ -142,6 +144,7 @@ enum {
 typedef struct P_ScopeContext {
     P_ValueType prev_function_body_ret;
     b8 prev_directly_in_func_body;
+    b8 prev_was_in_private_scope;
 } P_ScopeContext;
 
 typedef struct P_Parser {
@@ -173,12 +176,14 @@ typedef struct P_Parser {
     
     P_ScopeType* scopetype_stack;
     u32 scopetype_tos;
+    string current_function;
     
-    // @refactor into bitfield maybe
+    // TODO(voxel): Refactor into bitfield maybe
     b8 block_stmt_should_begin_scope;
     b8 is_directly_in_func_body;
     b8 all_code_paths_return;
     P_ValueType function_body_ret;
+    b8 is_in_private_scope; // This is temporary until I come up with a solution for closures
     b8 encountered_return;
     u32 lambda_number;
 } P_Parser;
