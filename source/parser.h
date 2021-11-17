@@ -86,7 +86,7 @@ enum {
     StmtType_Expression, StmtType_Block, StmtType_Return, StmtType_If,
     StmtType_IfElse, StmtType_While, StmtType_DoWhile, StmtType_VarDecl,
     StmtType_VarDeclAssign, StmtType_FuncDecl, StmtType_NativeFuncDecl, StmtType_StructDecl,
-    StmtType_EnumDecl, StmtType_For,
+    StmtType_EnumDecl, StmtType_For, StmtType_Break,
 };
 
 typedef struct P_Stmt P_Stmt;
@@ -129,13 +129,28 @@ struct P_PreStmt {
 
 #include "data_structures.h"
 
+typedef u32 P_ScopeType;
+enum {
+    ScopeType_None,
+    ScopeType_For,
+    ScopeType_While,
+    ScopeType_DoWhile,
+    ScopeType_If,
+    ScopeType_Else,
+};
+
+typedef struct P_ScopeContext {
+    P_ValueType prev_function_body_ret;
+    b8 prev_directly_in_func_body;
+} P_ScopeContext;
+
 typedef struct P_Parser {
     M_Arena arena;
     L_Lexer lexer;
     string source;
     
     P_PreStmt* pre_root;
-    P_Stmt* root;
+    P_Stmt*    root;
     
     P_Stmt* lambda_functions_start;
     P_Stmt* lambda_functions_curr;
@@ -156,6 +171,11 @@ typedef struct P_Parser {
     b8 had_error;
     b8 panik_mode;
     
+    P_ScopeType* scopetype_stack;
+    u32 scopetype_tos;
+    
+    // @refactor into bitfield maybe
+    b8 block_stmt_should_begin_scope;
     b8 is_directly_in_func_body;
     b8 all_code_paths_return;
     P_ValueType function_body_ret;

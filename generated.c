@@ -11,6 +11,7 @@ int main(void) {
 (x<10);x = (x+1))
 		{
 			printf("Loop%d\n", x);
+			break;
 }
 	printf("Exited successfully");
 	return 0;

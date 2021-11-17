@@ -5,6 +5,7 @@ void native free(void* buffer);
 int main() {
 	for (int x = 0; x < 10; x = x + 1) {
 		printf("Loop%d\n", x);
+		break;
 	}
 	printf("Exited successfully");
 	return 0;

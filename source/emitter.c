@@ -483,6 +483,10 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             E_EmitStatement(emitter, stmt->op.while_s.then, indent + 1);
         } break;
         
+        case StmtType_Break: {
+            E_WriteLine(emitter, "break;");
+        } break;
+        
         case StmtType_DoWhile: {
             E_WriteLine(emitter, "do");
             E_EmitStatement(emitter, stmt->op.do_while.then, indent + 1);

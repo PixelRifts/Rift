@@ -61,6 +61,7 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_Enum: return str_lit("Enum");
         case TokenType_Null: return str_lit("Null");
         case TokenType_Nullptr: return str_lit("Nullptr");
+        case TokenType_Break: return str_lit("Break");
         case TokenType_If: return str_lit("If");
         case TokenType_Else: return str_lit("Else");
         case TokenType_Do: return str_lit("Do");
@@ -203,7 +204,12 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
     switch (lexer->start[0]) {
         case 'r': return L_MatchType(lexer, 1, str_lit("eturn"), TokenType_Return);
         case 'w': return L_MatchType(lexer, 1, str_lit("hile"), TokenType_While);
-        case 'b': return L_MatchType(lexer, 1, str_lit("ool"), TokenType_Bool);
+        case 'b': {
+            switch (lexer->start[1]) {
+                case 'o': return L_MatchType(lexer, 2, str_lit("ol"), TokenType_Bool);
+                case 'r': return L_MatchType(lexer, 2, str_lit("eak"), TokenType_Break);
+            }
+        }
         case 'c': return L_MatchType(lexer, 1, str_lit("har"), TokenType_Char);
         case 'l': return L_MatchType(lexer, 1, str_lit("ong"), TokenType_Long);
         case 'v': return L_MatchType(lexer, 1, str_lit("oid"), TokenType_Void);

@@ -455,8 +455,6 @@ static void P_BindDouble(P_Parser* parser, P_Expr* left, P_Expr* right, P_Binary
 }
 
 static P_ValueType P_GetNumberBinaryValType(P_Expr* a, P_Expr* b) {
-    
-    // Pointer stuff
     if (is_ptr(&a->ret_type)) {
         return a->ret_type;
     } else if (is_ptr(&b->ret_type)) {
@@ -470,8 +468,45 @@ static P_ValueType P_GetNumberBinaryValType(P_Expr* a, P_Expr* b) {
             return ValueType_Long;
         if (str_eq(a->ret_type.full_type, ValueType_Integer.full_type) || str_eq(b->ret_type.full_type, ValueType_Integer.full_type))
             return ValueType_Integer;
+        if (str_eq(a->ret_type.full_type, ValueType_Char.full_type) || str_eq(b->ret_type.full_type, ValueType_Char.full_type))
+            return ValueType_Char;
     }
     return ValueType_Invalid;
+}
+
+static P_ScopeContext BeginScope(P_Parser* parser, P_ScopeType scope_type) {
+    P_ScopeContext context;
+    
+    // Push on the scope type stack
+    parser->scopetype_stack[parser->scopetype_tos++] = scope_type;
+    
+    context.prev_function_body_ret = parser->function_body_ret;
+    context.prev_directly_in_func_body = parser->is_directly_in_func_body;
+    parser->scope_depth++;
+    
+    return context;
+}
+
+static void EndScope(P_Parser* parser, P_ScopeContext context) {
+    parser->function_body_ret = context.prev_function_body_ret;
+    parser->is_directly_in_func_body = context.prev_directly_in_func_body;
+    
+    // Pop from the scope type stack
+    parser->scopetype_tos--;
+    
+    // Remove all variables from the current scope
+    for (u32 i = 0; i < parser->variables.capacity; i++) {
+        if (parser->variables.entries[i].key.depth == parser->scope_depth)
+            var_hash_table_del(&parser->variables, parser->variables.entries[i].key);
+    }
+    
+    // Remove all functions from the current scope
+    for (u32 i = 0; i < parser->functions.capacity; i++) {
+        if (parser->functions.entries[i].key.depth == parser->scope_depth)
+            func_hash_table_del(&parser->functions, parser->functions.entries[i].key);
+    }
+    
+    parser->scope_depth--;
 }
 
 //~ Parse Rules
@@ -747,6 +782,20 @@ static P_Stmt* P_MakeForStmtNode(P_Parser* parser, P_Stmt* init, P_Expr* condn, 
     stmt->op.for_s.condition = condn;
     stmt->op.for_s.loopexec = loopexec;
     stmt->op.for_s.then = then;
+    return stmt;
+}
+
+static P_Stmt* P_MakeBreakStmtNode(P_Parser* parser) {
+    P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
+    stmt->type = StmtType_Break;
+    stmt->next = nullptr;
+    return stmt;
+}
+
+static P_Stmt* P_MakeContinueStmtNode(P_Parser* parser) {
+    P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
+    stmt->type = StmtType_Continue;
+    stmt->next = nullptr;
     return stmt;
 }
 
@@ -1091,16 +1140,13 @@ static P_Expr* P_ExprLambda(P_Parser* parser) {
     u32 arity = 0;
     b8 varargs = false;
     
-    P_ValueType prev_function_body_ret = parser->function_body_ret;
-    b8 prev_directly_in_func_body = parser->is_directly_in_func_body;
+    P_ScopeContext scope_context = BeginScope(parser, ScopeType_None);
     
     // CHECK THIS
     parser->all_code_paths_return = type_check(*parser->expected_fnptr->op.func_ptr.ret_type, ValueType_Void);
     parser->encountered_return = false;
     parser->function_body_ret = *parser->expected_fnptr->op.func_ptr.ret_type;
     parser->is_directly_in_func_body = true;
-    
-    parser->scope_depth++;
     
     while (!P_Match(parser, TokenType_CloseParenthesis)) {
         if (P_Match(parser, TokenType_Dot)) {
@@ -1180,7 +1226,6 @@ static P_Expr* P_ExprLambda(P_Parser* parser) {
     P_Consume(parser, TokenType_Arrow, str_lit("Expected => after ) in lambda\n"));
     func->op.func_decl.block = P_Declaration(parser);
     
-    // TODO(voxel): Add func to parser's lambda list
     if (parser->lambda_functions_curr != nullptr) {
         parser->lambda_functions_curr->next = func;
         parser->lambda_functions_curr = func;
@@ -1195,8 +1240,7 @@ static P_Expr* P_ExprLambda(P_Parser* parser) {
             var_hash_table_del(&parser->variables, parser->variables.entries[i].key);
     }
     
-    parser->function_body_ret = prev_function_body_ret;
-    parser->is_directly_in_func_body = prev_directly_in_func_body;
+    EndScope(parser, scope_context);
     
     return P_MakeLambdaNode(parser, *parser->expected_fnptr, mangled);
 }
@@ -1585,16 +1629,15 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     if (is_array(&type))
         report_error(parser, str_lit("Cannot Return Array type from function\n"));
     
-    P_ValueType prev_function_body_ret = parser->function_body_ret;
-    b8 prev_directly_in_func_body = parser->is_directly_in_func_body;
+    P_ScopeContext scope_context;
     
     if (!native) {
+        scope_context = BeginScope(parser, ScopeType_None);
         parser->all_code_paths_return = type_check(type, ValueType_Void);
         parser->encountered_return = false;
         parser->function_body_ret = type;
         parser->is_directly_in_func_body = true;
     }
-    parser->scope_depth++;
     
     while (!P_Match(parser, TokenType_CloseParenthesis)) {
         if (P_Match(parser, TokenType_Dot)) {
@@ -1639,10 +1682,10 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     if (varargs) additional = str_cat(&parser->arena, additional, str_lit("varargs"));
     string mangled = native || str_eq(str_lit("main"), name) ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, additional);
     
-    // Don't try to add the outer scope functions since the get added during preparsing
+    // Don't try to add the outermost scope functions since they get added during preparsing
     if (parser->scope_depth != 1 || native) {
-        func_entry_key key = (func_entry_key) { .name = name, .depth = parser->scope_depth - 1 };
-        // -1 Because the scope depth is changed by this point
+        func_entry_key key = (func_entry_key) { .name = name, .depth = native ? parser->scope_depth : parser->scope_depth - 1 };
+        // -1 When not native because the scope depth is changed by this point if the function has a body
         
         u32 subset_match = 1024;
         func_entry_val* test = nullptr;
@@ -1681,14 +1724,12 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
                 var_hash_table_del(&parser->variables, parser->variables.entries[i].key);
         }
         
-        parser->function_body_ret = prev_function_body_ret;
-        parser->is_directly_in_func_body = prev_directly_in_func_body;
+        EndScope(parser, scope_context);
         if (!parser->all_code_paths_return) report_error(parser, str_lit("Not all code paths return a value\n"));
     } else {
         P_Consume(parser, TokenType_Semicolon, str_lit("Can't have function body on a native function\n"));
         func = P_MakeNativeFuncStmtNode(parser, type, name, arity, params, param_names);
     }
-    parser->scope_depth--;
     
     return func;
 }
@@ -1827,8 +1868,13 @@ static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser) {
 }
 
 static P_Stmt* P_StmtBlock(P_Parser* parser) {
-    b8 prev_directly_in_func_body = parser->is_directly_in_func_body;
-    parser->scope_depth++;
+    P_ScopeContext scope_context;
+    b8 reset = false;
+    if (parser->block_stmt_should_begin_scope) {
+        scope_context = BeginScope(parser, ScopeType_None);
+        reset = true;
+    }
+    
     P_Stmt* block = P_MakeBlockStmtNode(parser);
     P_Stmt* curr = nullptr;
     while (!P_Match(parser, TokenType_CloseBrace)) {
@@ -1841,13 +1887,9 @@ static P_Stmt* P_StmtBlock(P_Parser* parser) {
         if (parser->current.type == TokenType_EOF)
             report_error(parser, str_lit("Unterminated Block statement. Expected }\n"));
     }
-    // Pop all entries with the current scope depth from variables here
-    for (u32 i = 0; i < parser->variables.capacity; i++) {
-        if (parser->variables.entries[i].key.depth == parser->scope_depth)
-            var_hash_table_del(&parser->variables, parser->variables.entries[i].key);
-    }
-    parser->scope_depth--;
-    parser->is_directly_in_func_body = prev_directly_in_func_body;
+    
+    if (reset)
+        EndScope(parser, scope_context);
     return block;
 }
 
@@ -1899,26 +1941,20 @@ static P_Stmt* P_StmtIf(P_Parser* parser) {
     }
     P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression"));
     
-    b8 reset = false;
-    b8 prev_directly_in_func_body = parser->is_directly_in_func_body;
-    
-    parser->is_directly_in_func_body = false;
-    
-    if (parser->current.type != TokenType_OpenBrace) {
-        parser->scope_depth++;
-        reset = true;
-    }
-    
-    
+    parser->block_stmt_should_begin_scope = false;
+    P_ScopeContext scope_context = BeginScope(parser, ScopeType_If);
     P_Stmt* then = P_Statement(parser);
-    if (P_Match(parser, TokenType_Else)) {
-        P_Stmt* else_s = P_Statement(parser);
-        return P_MakeIfElseStmtNode(parser, condition, then, else_s);
-    }
+    EndScope(parser, scope_context);
+    parser->block_stmt_should_begin_scope = true;
     
-    parser->is_directly_in_func_body = prev_directly_in_func_body;
-    if (reset) {
-        parser->scope_depth--;
+    if (P_Match(parser, TokenType_Else)) {
+        parser->block_stmt_should_begin_scope = false;
+        P_ScopeContext scope_context = BeginScope(parser, ScopeType_Else);
+        P_Stmt* else_s = P_Statement(parser);
+        EndScope(parser, scope_context);
+        parser->block_stmt_should_begin_scope = true;
+        
+        return P_MakeIfElseStmtNode(parser, condition, then, else_s);
     }
     
     return P_MakeIfStmtNode(parser, condition, then);
@@ -1927,6 +1963,8 @@ static P_Stmt* P_StmtIf(P_Parser* parser) {
 static P_Stmt* P_StmtFor(P_Parser* parser) {
     P_Consume(parser, TokenType_OpenParenthesis, str_lit("Expected ( after for\n"));
     
+    parser->block_stmt_should_begin_scope = false;
+    P_ScopeContext scope_context = BeginScope(parser, ScopeType_For);
     P_Stmt* initializer = nullptr;
     if (!P_Match(parser, TokenType_Semicolon)) {
         initializer = P_Declaration(parser);
@@ -1942,22 +1980,21 @@ static P_Stmt* P_StmtFor(P_Parser* parser) {
         P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression\n"));
     }
     
-    b8 reset = false;
-    b8 prev_directly_in_func_body = parser->is_directly_in_func_body;
-    parser->is_directly_in_func_body = false;
-    if (parser->current.type != TokenType_OpenBrace) {
-        parser->scope_depth++;
-        reset = true;
-    }
     
     P_Stmt* then = P_Statement(parser);
-    
-    parser->is_directly_in_func_body = prev_directly_in_func_body;
-    if (reset) {
-        parser->scope_depth--;
-    }
+    EndScope(parser, scope_context);
+    parser->block_stmt_should_begin_scope = true;
     
     return P_MakeForStmtNode(parser, initializer, condition, loopexec, then);
+}
+
+static P_Stmt* P_StmtBreak(P_Parser* parser) {
+    if (!(parser->scopetype_stack[parser->scopetype_tos-1] == ScopeType_For   ||
+          parser->scopetype_stack[parser->scopetype_tos-1] == ScopeType_While ||
+          parser->scopetype_stack[parser->scopetype_tos-1] == ScopeType_DoWhile))
+        report_error(parser, str_lit("Cannot have break statement in this block\n"));
+    P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after break\n"));
+    return P_MakeBreakStmtNode(parser);
 }
 
 static P_Stmt* P_StmtWhile(P_Parser* parser) {
@@ -1968,48 +2005,32 @@ static P_Stmt* P_StmtWhile(P_Parser* parser) {
     }
     P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression\n"));
     
-    b8 reset = false;
-    b8 prev_directly_in_func_body = parser->is_directly_in_func_body;
-    parser->is_directly_in_func_body = false;
-    if (parser->current.type != TokenType_OpenBrace) {
-        parser->scope_depth++;
-        reset = true;
-    }
+    parser->block_stmt_should_begin_scope = false;
+    P_ScopeContext scope_context = BeginScope(parser, ScopeType_None);
     
     P_Stmt* then = P_Statement(parser);
     
-    parser->is_directly_in_func_body = prev_directly_in_func_body;
-    if (reset) {
-        parser->scope_depth--;
-    }
+    EndScope(parser, scope_context);
+    parser->block_stmt_should_begin_scope = true;
     
     return P_MakeWhileStmtNode(parser, condition, then);
 }
 
 static P_Stmt* P_StmtDoWhile(P_Parser* parser) {
-    b8 reset = false;
-    b8 prev_directly_in_func_body = parser->is_directly_in_func_body;
-    
-    parser->is_directly_in_func_body = false;
-    if (parser->current.type != TokenType_OpenBrace) {
-        parser->scope_depth++;
-        reset = true;
-    }
+    parser->block_stmt_should_begin_scope = false;
+    P_ScopeContext scope_context = BeginScope(parser, ScopeType_DoWhile);
     
     P_Stmt* then = P_Statement(parser);
     P_Consume(parser, TokenType_While, str_lit("Expected 'while'"));
     P_Consume(parser, TokenType_OpenParenthesis, str_lit("Expected ( after while\n"));
     P_Expr* condition = P_Expression(parser);
-    if (!type_check(condition->ret_type, ValueType_Bool)) {
+    if (!type_check(condition->ret_type, ValueType_Bool))
         report_error(parser, str_lit("While loop condition doesn't resolve to boolean\n"));
-    }
     P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression"));
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after )"));
     
-    parser->is_directly_in_func_body = prev_directly_in_func_body;
-    if (reset) {
-        parser->scope_depth--;
-    }
+    EndScope(parser, scope_context);
+    parser->block_stmt_should_begin_scope = true;
     
     return P_MakeDoWhileStmtNode(parser, condition, then);
 }
@@ -2024,17 +2045,20 @@ static P_Stmt* P_Statement(P_Parser* parser) {
     if (!type_check(parser->function_body_ret, ValueType_Invalid)) {
         if (P_Match(parser, TokenType_OpenBrace))
             return P_StmtBlock(parser);
-        if (P_Match(parser, TokenType_Return))
+        else if (P_Match(parser, TokenType_Return))
             return P_StmtReturn(parser);
-        if (P_Match(parser, TokenType_If))
+        else if (P_Match(parser, TokenType_If))
             return P_StmtIf(parser);
-        if (P_Match(parser, TokenType_While))
+        else if (P_Match(parser, TokenType_While))
             return P_StmtWhile(parser);
-        if (P_Match(parser, TokenType_For))
-            return P_StmtFor(parser);
-        if (P_Match(parser, TokenType_Do))
+        else if (P_Match(parser, TokenType_Do))
             return P_StmtDoWhile(parser);
-        return P_StmtExpression(parser);
+        else if (P_Match(parser, TokenType_For))
+            return P_StmtFor(parser);
+        else if (P_Match(parser, TokenType_Break))
+            return P_StmtBreak(parser);
+        else
+            return P_StmtExpression(parser);
     }
     report_error(parser, str_lit("Cannot Have Statements that exist outside of functions\n"));
     return nullptr;
@@ -2082,7 +2106,7 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
     while (!P_Match(parser, TokenType_CloseParenthesis)) {
         if (P_Match(parser, TokenType_Dot)) {
             P_Consume(parser, TokenType_Dot, str_lit("Expected .. after .\n"));
-            P_Consume(parser, TokenType_Dot, str_lit("Expected .. after .\n"));
+            P_Consume(parser, TokenType_Dot, str_lit("Expected . after ..\n"));
             
             if (arity == 0)
                 report_error(parser, str_lit("Only varargs function not allowed\n"));
@@ -2234,7 +2258,10 @@ void P_Initialize(P_Parser* parser, string source) {
     parser->encountered_return = false;
     parser->all_code_paths_return = false;
     parser->lambda_number = 0;
+    parser->scopetype_stack = arena_alloc(&parser->arena, 1024 * sizeof(P_ScopeType));
+    parser->scopetype_tos = 0;
     parser->expected_fnptr = nullptr;
+    parser->block_stmt_should_begin_scope = true;
     var_hash_table_init(&parser->variables);
     func_hash_table_init(&parser->functions);
     type_array_init(&parser->types);
@@ -2475,11 +2502,16 @@ static void P_PrintAST_Indent(M_Arena* arena, P_Stmt* stmt, u8 indent) {
             P_PrintAST_Indent(arena, stmt->op.while_s.then, indent + 1);
         } break;
         
+        case StmtType_Break: {
+            printf("Break\n");
+        } break;
+        
         case StmtType_DoWhile: {
             printf("Do-While Loop:\n");
             P_PrintExprAST_Indent(arena, stmt->op.do_while.condition, indent + 1);
             P_PrintAST_Indent(arena, stmt->op.do_while.then, indent + 1);
         } break;
+        
     }
     
     if (stmt->next != nullptr)
