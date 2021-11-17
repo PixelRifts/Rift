@@ -362,8 +362,12 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
     }
 }
 
+static void E_WriteIndent(E_Emitter* emitter, u32 indent) {
+    for (int i = 0; i < indent; i++)
+        E_Write(emitter, "\t");
+}
+
 static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
-    for (int i = 0; i < indent; i++) E_Write(emitter, "\t");
     switch (stmt->type) {
         case StmtType_Expression: {
             E_EmitExpression(emitter, stmt->op.expression);
@@ -379,6 +383,7 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
         case StmtType_Block: {
             E_WriteLine(emitter, "{");
             E_EmitStatementChain(emitter, stmt->op.block, indent + 1);
+            E_WriteIndent(emitter, indent);
             E_WriteLine(emitter, "}");
         } break;
         
@@ -411,11 +416,14 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             
             E_EmitStatementChain(emitter, stmt->op.func_decl.block, indent + 1);
             
+            // TODO(voxel): Move this to just before any returns
             if (stmt->op.func_decl.varargs)
                 E_WriteLineF(emitter, "va_end(%.*s);", str_expand(varargs));
             
-            if (stmt->op.func_decl.block->type != StmtType_Block)
+            if (stmt->op.func_decl.block->type != StmtType_Block) {
+                E_WriteIndent(emitter, indent);
                 E_WriteLine(emitter, "}");
+            }
         } break;
         
         case StmtType_StructDecl: {
@@ -483,16 +491,20 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             E_EmitStatement(emitter, stmt->op.while_s.then, indent + 1);
         } break;
         
-        case StmtType_Break: {
-            E_WriteLine(emitter, "break;");
-        } break;
-        
         case StmtType_DoWhile: {
             E_WriteLine(emitter, "do");
             E_EmitStatement(emitter, stmt->op.do_while.then, indent + 1);
             E_Write(emitter, " while (");
             E_EmitExpression(emitter, stmt->op.while_s.condition);
             E_WriteLine(emitter, ");");
+        } break;
+        
+        case StmtType_Break: {
+            E_WriteLine(emitter, "break;");
+        } break;
+        
+        case StmtType_Continue: {
+            E_WriteLine(emitter, "continue;");
         } break;
     }
 }

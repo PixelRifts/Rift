@@ -86,7 +86,7 @@ enum {
     StmtType_Expression, StmtType_Block, StmtType_Return, StmtType_If,
     StmtType_IfElse, StmtType_While, StmtType_DoWhile, StmtType_VarDecl,
     StmtType_VarDeclAssign, StmtType_FuncDecl, StmtType_NativeFuncDecl, StmtType_StructDecl,
-    StmtType_EnumDecl, StmtType_For, StmtType_Break,
+    StmtType_EnumDecl, StmtType_For, StmtType_Break, StmtType_Continue,
 };
 
 typedef struct P_Stmt P_Stmt;

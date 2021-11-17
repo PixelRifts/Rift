@@ -7,12 +7,12 @@
 int main(void);
 
 int main(void) {
-	for (int x = 0;
+for (int x = 0;
 (x<10);x = (x+1))
-		{
-			printf("Loop%d\n", x);
-			break;
-}
-	printf("Exited successfully");
-	return 0;
+{
+printf("Loop%d\n", x);
+continue;
+		}
+printf("Exited successfully");
+return 0;
 }

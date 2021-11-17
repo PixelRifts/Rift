@@ -62,6 +62,7 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_Null: return str_lit("Null");
         case TokenType_Nullptr: return str_lit("Nullptr");
         case TokenType_Break: return str_lit("Break");
+        case TokenType_Continue: return str_lit("Continue");
         case TokenType_If: return str_lit("If");
         case TokenType_Else: return str_lit("Else");
         case TokenType_Do: return str_lit("Do");
@@ -210,7 +211,12 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                 case 'r': return L_MatchType(lexer, 2, str_lit("eak"), TokenType_Break);
             }
         }
-        case 'c': return L_MatchType(lexer, 1, str_lit("har"), TokenType_Char);
+        case 'c': {
+            switch (lexer->start[1]) {
+                case 'h': return L_MatchType(lexer, 2, str_lit("ar"), TokenType_Char);
+                case 'o': return L_MatchType(lexer, 2, str_lit("ntinue"), TokenType_Continue);
+            }
+        }
         case 'l': return L_MatchType(lexer, 1, str_lit("ong"), TokenType_Long);
         case 'v': return L_MatchType(lexer, 1, str_lit("oid"), TokenType_Void);
         case 't': return L_MatchType(lexer, 1, str_lit("rue"), TokenType_True);

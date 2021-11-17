@@ -1544,15 +1544,15 @@ P_ParseRule parse_rules[] = {
     [TokenType_Tilde]              = { P_ExprUnary, nullptr,  Prec_Unary, Prec_None },
     [TokenType_Bang]               = { P_ExprUnary, nullptr,  Prec_Unary, Prec_None },
     [TokenType_Equal]              = { nullptr, P_ExprAssign, Prec_None, Prec_Assignment },
-    [TokenType_PlusEqual]          = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_MinusEqual]         = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_StarEqual]          = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_SlashEqual]         = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_PercentEqual]       = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_AmpersandEqual]     = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_PipeEqual]          = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_HatEqual]           = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_TildeEqual]         = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_PlusEqual]          = { nullptr, nullptr, Prec_None, Prec_None }, // TODO(voxel): 
+    [TokenType_MinusEqual]         = { nullptr, nullptr, Prec_None, Prec_None }, // TODO(voxel): 
+    [TokenType_StarEqual]          = { nullptr, nullptr, Prec_None, Prec_None }, // TODO(voxel): 
+    [TokenType_SlashEqual]         = { nullptr, nullptr, Prec_None, Prec_None }, // TODO(voxel): 
+    [TokenType_PercentEqual]       = { nullptr, nullptr, Prec_None, Prec_None }, // TODO(voxel): 
+    [TokenType_AmpersandEqual]     = { nullptr, nullptr, Prec_None, Prec_None }, // TODO(voxel): 
+    [TokenType_PipeEqual]          = { nullptr, nullptr, Prec_None, Prec_None }, // TODO(voxel): 
+    [TokenType_HatEqual]           = { nullptr, nullptr, Prec_None, Prec_None }, // TODO(voxel): 
+    [TokenType_TildeEqual]         = { nullptr, nullptr, Prec_None, Prec_None }, // TODO(voxel): 
     [TokenType_EqualEqual]         = { nullptr, P_ExprBinary, Prec_None, Prec_Equality },
     [TokenType_BangEqual]          = { nullptr, P_ExprBinary, Prec_None, Prec_Equality },
     [TokenType_Less]               = { nullptr, P_ExprBinary, Prec_None, Prec_Comparison },
@@ -1997,6 +1997,15 @@ static P_Stmt* P_StmtBreak(P_Parser* parser) {
     return P_MakeBreakStmtNode(parser);
 }
 
+static P_Stmt* P_StmtContinue(P_Parser* parser) {
+    if (!(parser->scopetype_stack[parser->scopetype_tos-1] == ScopeType_For   ||
+          parser->scopetype_stack[parser->scopetype_tos-1] == ScopeType_While ||
+          parser->scopetype_stack[parser->scopetype_tos-1] == ScopeType_DoWhile))
+        report_error(parser, str_lit("Cannot have continue statement in this block\n"));
+    P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after continue\n"));
+    return P_MakeContinueStmtNode(parser);
+}
+
 static P_Stmt* P_StmtWhile(P_Parser* parser) {
     P_Consume(parser, TokenType_OpenParenthesis, str_lit("Expected ( after while\n"));
     P_Expr* condition = P_Expression(parser);
@@ -2057,6 +2066,8 @@ static P_Stmt* P_Statement(P_Parser* parser) {
             return P_StmtFor(parser);
         else if (P_Match(parser, TokenType_Break))
             return P_StmtBreak(parser);
+        else if (P_Match(parser, TokenType_Continue))
+            return P_StmtContinue(parser);
         else
             return P_StmtExpression(parser);
     }
@@ -2504,6 +2515,10 @@ static void P_PrintAST_Indent(M_Arena* arena, P_Stmt* stmt, u8 indent) {
         
         case StmtType_Break: {
             printf("Break\n");
+        } break;
+        
+        case StmtType_Continue: {
+            printf("Continue\n");
         } break;
         
         case StmtType_DoWhile: {
