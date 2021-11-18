@@ -1290,6 +1290,7 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
         if (left->ret_type.type == ValueTypeType_FuncPointer)
             parser->expected_fnptr = &left->ret_type;
         else parser->expected_fnptr = nullptr;
+        
         P_Expr* xpr = P_Expression(parser);
         if (xpr == nullptr) return nullptr;
         
@@ -1330,7 +1331,7 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
 static P_Expr* P_ExprGroup(P_Parser* parser) {
     P_Expr* in = P_Expression(parser);
     if (in == nullptr) return nullptr;
-
+    
     if (in->type == ExprType_Typename) {
         // Explicit Cast syntax
         P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after typename\n"));
