@@ -45,7 +45,7 @@ enum {
     ExprType_Funcname, ExprType_Unary, ExprType_Binary, ExprType_Assignment,
     ExprType_Variable, ExprType_FuncCall, ExprType_Dot, ExprType_EnumDot,
     ExprType_Cast, ExprType_Index, ExprType_Addr, ExprType_Deref,
-    ExprType_Nullptr, ExprType_ArrayLit, ExprType_Lambda,
+    ExprType_Nullptr, ExprType_ArrayLit, ExprType_Lambda, ExprType_Call,
 };
 
 struct P_Stmt;
@@ -78,6 +78,7 @@ struct P_Expr {
         struct { P_Expr* name; P_Expr* value; } assignment;
         string variable;
         struct { string name; P_Expr** params; u32 call_arity; } func_call;
+        struct { P_Expr* left; P_Expr** params; u32 call_arity; } call;
     } op;
 };
 
@@ -168,8 +169,6 @@ typedef struct P_Parser {
     var_hash_table variables;
     func_hash_table functions;
     type_array types;
-    
-    P_ValueType* expected_fnptr;
     
     b8 had_error;
     b8 panik_mode;

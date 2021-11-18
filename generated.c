@@ -6,23 +6,12 @@
 
 int main(void);
 
-void maintest_0(void) {
-printf("Test\n");
-}
-void lambda0_0(void){
-maintest_0();
-printf("Test Lambda\n");
+int lambda0_1int(int x){
+printf("%d\n", x);
+return x;
 	}
 int main(void) {
-for (int x = 0;
-(x<10);x = (x+1))
-{
-printf("Loop%d\n", x);
-continue;
-		}
-int x;
-void (*testLambda)() = lambda0_0;
-testLambda();
+int m = lambda0_1int(10);
 printf("Exited successfully");
 return 0;
 }

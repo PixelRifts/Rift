@@ -311,6 +311,17 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
             E_Write(emitter, ")");
         } break;
         
+        case ExprType_Call: {
+            E_EmitExpression(emitter, expr->op.call.left);
+            E_WriteF(emitter, "(");
+            for (u32 i = 0; i < expr->op.call.call_arity; i++) {
+                E_EmitExpression(emitter, expr->op.call.params[i]);
+                if (i != expr->op.call.call_arity - 1)
+                    E_Write(emitter, ", ");
+            }
+            E_Write(emitter, ")");
+        } break;
+        
         case ExprType_Typename: {
             E_EmitTypeAndName(emitter, &expr->op.typename, (string) {0}, false);
         } break;
