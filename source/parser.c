@@ -1301,6 +1301,22 @@ static P_Expr* P_ExprCall(P_Parser* parser, P_Expr* left) {
     P_Expr** param_buffer = arena_alloc(&parser->arena, call_arity * sizeof(P_Expr*));
     memcpy(param_buffer, params, call_arity * sizeof(P_Expr*));
     
+    if (left->type == ExprType_Funcname) {
+        // Fix funcname if possible.
+        // Only possible if there is only one overload for the funcname.... IS IT?
+        func_entry_val* val = nullptr;
+        u32 subset;
+        func_entry_key key = { .name = left->op.funcname, .depth = parser->scope_depth };
+        
+        while (key.depth != -1) {
+            if (func_hash_table_get(&parser->functions, key, &param_types, &val,  &subset, false)) {
+                left->ret_type = P_CreateFnpointerType(parser, &val->value, &val->param_types);
+                left->op.funcname = val->mangled_name;
+            }
+            key.depth--;
+        }
+    }
+    
     // Check required params against what we got
     // If it wants more parameters than currently provided, just dont check anything. parameters are wrong
     if (left->ret_type.op.func_ptr.func_param_types->node_count - 1 <= param_types.node_count) {

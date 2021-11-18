@@ -4,17 +4,20 @@
 #include <stdlib.h>
 #include <string.h>
 
-void foo_0(void);
+int foo_0(void);
+int (*getFoo_1int(int wee))();
 int main(void);
 
-int lambda0_1int(int x){
-printf("%d\n", x);
-return x;
-	}
-void foo_0(void){}
+int foo_0(void) {
+printf("Foo called\n");
+return 69;
+}
+int (*getFoo_1int(int wee))() {
+printf("%d\n", wee);
+return foo_0;
+}
 int main(void) {
-void (*meh)() = foo_0;
-int m = lambda0_1int(10);
+int m = getFoo_1int(10)();
 printf("Exited successfully");
 return 0;
 }
