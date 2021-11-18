@@ -1379,7 +1379,7 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
                 func_entry_key key = { .name = xpr->op.funcname, .depth = parser->scope_depth };
                 func_entry_val* val = nullptr;
                 u32 subset;
-                while (key.depth == -1) {
+                while (key.depth != -1) {
                     if (func_hash_table_get(&parser->functions, key, left->ret_type.op.func_ptr.func_param_types, &val, &subset, true)) {
                         // Fix the xpr
                         xpr->ret_type.op.func_ptr.func_param_types = &val->param_types;
@@ -1903,7 +1903,7 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name) {
                 func_entry_key key = { .name = value->op.funcname, .depth = parser->scope_depth };
                 func_entry_val* val = nullptr;
                 u32 subset;
-                while (key.depth == -1) {
+                while (key.depth != -1) {
                     if (func_hash_table_get(&parser->functions, key, type.op.func_ptr.func_param_types, &val, &subset, true)) {
                         // Fix the value
                         value->ret_type.op.func_ptr.func_param_types = &val->param_types;
@@ -2056,7 +2056,7 @@ static P_Stmt* P_StmtReturn(P_Parser* parser) {
             func_entry_key key = { .name = val->op.funcname, .depth = parser->scope_depth };
             func_entry_val* ret_val = nullptr;
             u32 subset;
-            while (key.depth == -1) {
+            while (key.depth != -1) {
                 if (func_hash_table_get(&parser->functions, key, parser->function_body_ret.op.func_ptr.func_param_types, &ret_val, &subset, true)) {
                     // Fix the val
                     val->ret_type.op.func_ptr.func_param_types = &ret_val->param_types;

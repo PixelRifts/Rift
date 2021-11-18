@@ -417,23 +417,27 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             string varargs;
             string arg_before_varargs;
             E_EmitTypeAndName_Fndecl(emitter, &type, stmt->op.func_decl.name, false, stmt->op.func_decl.param_names, stmt->op.func_decl.param_types, stmt->op.func_decl.arity, stmt->op.func_decl.varargs, &varargs, &arg_before_varargs);
-            if (stmt->op.func_decl.block->type != StmtType_Block)
-                E_WriteLine(emitter, " {");
-            
-            if (stmt->op.func_decl.varargs) {
-                E_WriteLineF(emitter, "va_list %.*s;", str_expand(varargs));
-                E_WriteLineF(emitter, "va_start(%.*s, %.*s);", str_expand(varargs), str_expand(arg_before_varargs));
-            }
-            
-            E_EmitStatementChain(emitter, stmt->op.func_decl.block, indent + 1);
-            
-            // TODO(voxel): Move this to just before any returns
-            if (stmt->op.func_decl.varargs)
-                E_WriteLineF(emitter, "va_end(%.*s);", str_expand(varargs));
-            
-            if (stmt->op.func_decl.block->type != StmtType_Block) {
-                E_WriteIndent(emitter, indent);
-                E_WriteLine(emitter, "}");
+            if (stmt->op.func_decl.block != nullptr) {
+                if (stmt->op.func_decl.block->type != StmtType_Block)
+                    E_WriteLine(emitter, " {");
+
+                if (stmt->op.func_decl.varargs) {
+                    E_WriteLineF(emitter, "va_list %.*s;", str_expand(varargs));
+                    E_WriteLineF(emitter, "va_start(%.*s, %.*s);", str_expand(varargs), str_expand(arg_before_varargs));
+                }
+
+                E_EmitStatementChain(emitter, stmt->op.func_decl.block, indent + 1);
+
+                // TODO(voxel): Move this to just before any returns
+                if (stmt->op.func_decl.varargs)
+                    E_WriteLineF(emitter, "va_end(%.*s);", str_expand(varargs));
+
+                if (stmt->op.func_decl.block->type != StmtType_Block) {
+                    E_WriteIndent(emitter, indent);
+                    E_WriteLine(emitter, "}");
+                }
+            } else {
+                E_WriteLine(emitter, "{}");
             }
         } break;
         
