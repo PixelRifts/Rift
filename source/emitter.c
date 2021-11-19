@@ -420,18 +420,18 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             if (stmt->op.func_decl.block != nullptr) {
                 if (stmt->op.func_decl.block->type != StmtType_Block)
                     E_WriteLine(emitter, " {");
-
+                
                 if (stmt->op.func_decl.varargs) {
                     E_WriteLineF(emitter, "va_list %.*s;", str_expand(varargs));
                     E_WriteLineF(emitter, "va_start(%.*s, %.*s);", str_expand(varargs), str_expand(arg_before_varargs));
                 }
-
+                
                 E_EmitStatementChain(emitter, stmt->op.func_decl.block, indent + 1);
-
+                
                 // TODO(voxel): Move this to just before any returns
                 if (stmt->op.func_decl.varargs)
                     E_WriteLineF(emitter, "va_end(%.*s);", str_expand(varargs));
-
+                
                 if (stmt->op.func_decl.block->type != StmtType_Block) {
                     E_WriteIndent(emitter, indent);
                     E_WriteLine(emitter, "}");
@@ -549,9 +549,8 @@ static void E_EmitPreStatementChain(E_Emitter* emitter, P_PreStmt* stmts, u32 in
     }
 }
 
-void E_Initialize(E_Emitter* emitter, string source) {
-    P_Initialize(&emitter->parser, source);
-    emitter->line = 0;
+void E_Initialize(E_Emitter* emitter, string source, string filename) {
+    P_Initialize(&emitter->parser, source, filename);
     emitter->output_file = fopen("./generated.c", "w");
 }
 

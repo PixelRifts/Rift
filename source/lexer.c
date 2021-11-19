@@ -57,6 +57,7 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_Colon: return str_lit(":");
         case TokenType_Question: return str_lit("?");
         case TokenType_Return: return str_lit("Return");
+        case TokenType_Import: return str_lit("Import");
         case TokenType_Struct: return str_lit("Struct");
         case TokenType_Enum: return str_lit("Enum");
         case TokenType_Null: return str_lit("Null");
@@ -243,6 +244,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
         }
         case 'i': {
             switch (lexer->start[1]) {
+                case 'm': return L_MatchType(lexer, 2, str_lit("port"), TokenType_Import);
                 case 'n': return L_MatchType(lexer, 2, str_lit("t"), TokenType_Int);
                 default: return L_MatchType(lexer, 1, str_lit("f"), TokenType_If);
             }

@@ -34,6 +34,7 @@ enum {
     TokenType_Question, TokenType_Arrow,
     
     TokenType_Return, TokenType_Struct, TokenType_Enum, TokenType_Break, TokenType_Continue,
+    TokenType_Import,
     TokenType_Null, TokenType_Nullptr, TokenType_Native,
     TokenType_If, TokenType_Else, TokenType_Do, TokenType_For, TokenType_While,
     TokenType_True, TokenType_False,

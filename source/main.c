@@ -24,6 +24,7 @@ int main(int argc, char **argv) {
         printf("yo gimme a file\n");
     } else {
         char* source = readFile(argv[1]);
+        string filename = (string) { .str = (u8*)argv[1], .size = strlen(argv[1]) };
         
 #ifdef CPLEXER
         L_Lexer lexer = {0};
@@ -36,7 +37,7 @@ int main(int argc, char **argv) {
         
 #ifdef CPPARSER
         P_Parser parser = {0};
-        P_Initialize(&parser, (string) { .str = (u8*)source, .size = strlen(source) });
+        P_Initialize(&parser, (string) { .str = (u8*)source, .size = strlen(source) }, filename);
         P_Parse(&parser);
         if (!parser.had_error)
             P_PrintAST(parser.root);
@@ -45,7 +46,7 @@ int main(int argc, char **argv) {
         
 #ifdef CPLATEST
         E_Emitter emitter = {0};
-        E_Initialize(&emitter, (string) { .str = (u8*)source, .size = strlen(source) });
+        E_Initialize(&emitter, (string) { .str = (u8*)source, .size = strlen(source) }, filename);
         E_Emit(&emitter);
         E_Free(&emitter);
 #endif

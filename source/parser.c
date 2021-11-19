@@ -8,11 +8,16 @@
 #include "operator_bindings.h"
 #include "types.h"
 
+//~ Globals
+static var_hash_table variables;
+static func_hash_table functions;
+static type_array types;
+
 //~ Errors
 static void report_error_at(P_Parser* parser, L_Token* token, string message, ...) {
     if (parser->panik_mode) exit(1);
     
-    fprintf(stderr, "Error:%d: ", token->line);
+    fprintf(stderr, "Error:%.*s:%d: ", str_expand(parser->filename), token->line);
     if (token->type != TokenType_Error && token->type != TokenType_EOF)
         fprintf(stderr, "At '%.*s' ", token->length, token->start);
     
@@ -30,16 +35,16 @@ static void report_error_at(P_Parser* parser, L_Token* token, string message, ..
 
 //~ Elpers
 static P_Container* type_array_get(P_Parser* parser, string struct_name, u32 depth) {
-    for (u32 i = 0; i < parser->types.count; i++) {
-        if (str_eq(struct_name, parser->types.elements[i].name) && parser->types.elements[i].depth <= depth)
-            return &parser->types.elements[i];
+    for (u32 i = 0; i < types.count; i++) {
+        if (str_eq(struct_name, types.elements[i].name) && types.elements[i].depth <= depth)
+            return &types.elements[i];
     }
     return nullptr;
 }
 
 static b8 container_type_exists(P_Parser* parser, string struct_name, u32 depth) {
-    for (u32 i = 0; i < parser->types.count; i++) {
-        if (str_eq(struct_name, parser->types.elements[i].name) && parser->types.elements[i].depth <= depth)
+    for (u32 i = 0; i < types.count; i++) {
+        if (str_eq(struct_name, types.elements[i].name) && types.elements[i].depth <= depth)
             return true;
     }
     return false;
@@ -499,13 +504,13 @@ static P_ValueType P_GetNumberBinaryValType(P_Expr* a, P_Expr* b) {
 static b8 P_GetVariable(P_Parser* parser, string name, P_ValueType* type) {
     if (parser->is_in_private_scope) {
         var_entry_key key = { .name = name, .depth = parser->scope_depth };
-        if (var_hash_table_get(&parser->variables, key, type)) {
+        if (var_hash_table_get(&variables, key, type)) {
             return true;
         }
     } else {
         var_entry_key key = { .name = name, .depth = parser->scope_depth };
         while (key.depth != -1) {
-            if (var_hash_table_get(&parser->variables, key, type)) {
+            if (var_hash_table_get(&variables, key, type)) {
                 return true;
             }
             key.depth++;
@@ -542,15 +547,15 @@ static void P_EndScope(P_Parser* parser, P_ScopeContext context) {
     parser->scopetype_tos--;
     
     // Remove all variables from the current scope
-    for (u32 i = 0; i < parser->variables.capacity; i++) {
-        if (parser->variables.entries[i].key.depth == parser->scope_depth)
-            var_hash_table_del(&parser->variables, parser->variables.entries[i].key);
+    for (u32 i = 0; i < variables.capacity; i++) {
+        if (variables.entries[i].key.depth == parser->scope_depth)
+            var_hash_table_del(&variables, variables.entries[i].key);
     }
     
     // Remove all functions from the current scope
-    for (u32 i = 0; i < parser->functions.capacity; i++) {
-        if (parser->functions.entries[i].key.depth == parser->scope_depth)
-            func_hash_table_del(&parser->functions, parser->functions.entries[i].key);
+    for (u32 i = 0; i < functions.capacity; i++) {
+        if (functions.entries[i].key.depth == parser->scope_depth)
+            func_hash_table_del(&functions, functions.entries[i].key);
     }
     
     parser->scope_depth--;
@@ -1062,7 +1067,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         
         u32 subset_match = 1024; // Invalid cuz max param count is 256
         while (key.depth != -1) {
-            if (func_hash_table_get(&parser->functions, key, &param_types, &value, &subset_match, true)) {
+            if (func_hash_table_get(&functions, key, &param_types, &value, &subset_match, true)) {
                 // Convert any ref takers to a &(Addr) node
                 value_type_list_node* curr = value->param_types.first;
                 u32 i = 0;
@@ -1083,7 +1088,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         // Reset key depth for a fuzzy type search
         key.depth = parser->scope_depth;
         while (key.depth != -1) {
-            if (func_hash_table_get(&parser->functions, key, &param_types, &value, &subset_match, false)) {
+            if (func_hash_table_get(&functions, key, &param_types, &value, &subset_match, false)) {
                 // Convert any ref takers to a &(Addr) node
                 value_type_list_node* curr = value->param_types.first;
                 u32 i = 0;
@@ -1170,7 +1175,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         
         func_entry_key fnkey = { .name = name, .depth = parser->scope_depth };
         while (fnkey.depth != -1) {
-            if (func_hash_table_has_name(&parser->functions, fnkey)) {
+            if (func_hash_table_has_name(&functions, fnkey)) {
                 // Return a stub name
                 return P_MakeFuncnameNode(parser, (P_ValueType){ .type = ValueTypeType_FuncPointer }, name);
             }
@@ -1229,7 +1234,7 @@ static P_Expr* P_ExprLambda(P_Parser* parser) {
         P_Consume(parser, TokenType_Identifier, str_lit("Expected param name\n"));
         string param_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
         string_list_push(&parser->arena, &param_names, param_name);
-        var_hash_table_set(&parser->variables, (var_entry_key) { .name = param_name, .depth = parser->scope_depth }, param_type);
+        var_hash_table_set(&variables, (var_entry_key) { .name = param_name, .depth = parser->scope_depth }, param_type);
         
         arity++;
         if (!P_Match(parser, TokenType_Comma)) {
@@ -1309,7 +1314,7 @@ static P_Expr* P_ExprCall(P_Parser* parser, P_Expr* left) {
         func_entry_key key = { .name = left->op.funcname, .depth = parser->scope_depth };
         
         while (key.depth != -1) {
-            if (func_hash_table_get(&parser->functions, key, &param_types, &val,  &subset, false)) {
+            if (func_hash_table_get(&functions, key, &param_types, &val,  &subset, false)) {
                 left->ret_type = P_CreateFnpointerType(parser, &val->value, &val->param_types);
                 left->op.funcname = val->mangled_name;
             }
@@ -1396,7 +1401,7 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
                 func_entry_val* val = nullptr;
                 u32 subset;
                 while (key.depth != -1) {
-                    if (func_hash_table_get(&parser->functions, key, left->ret_type.op.func_ptr.func_param_types, &val, &subset, true)) {
+                    if (func_hash_table_get(&functions, key, left->ret_type.op.func_ptr.func_param_types, &val, &subset, true)) {
                         // Fix the xpr
                         xpr->ret_type.op.func_ptr.func_param_types = &val->param_types;
                         xpr->ret_type.op.func_ptr.ret_type = left->ret_type.op.func_ptr.ret_type;
@@ -1797,7 +1802,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         string_list_push(&parser->arena, &param_names, param_name);
         
         if (!native)
-            var_hash_table_set(&parser->variables, (var_entry_key) { .name = param_name, .depth = parser->scope_depth }, param_type);
+            var_hash_table_set(&variables, (var_entry_key) { .name = param_name, .depth = parser->scope_depth }, param_type);
         
         arity++;
         if (!P_Match(parser, TokenType_Comma)) {
@@ -1827,13 +1832,13 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         
         u32 subset_match = 1024;
         func_entry_val* test = nullptr;
-        if (!func_hash_table_get(&parser->functions, key, &params, &test, &subset_match, true)) {
+        if (!func_hash_table_get(&functions, key, &params, &test, &subset_match, true)) {
             func_entry_val* val = arena_alloc(&parser->arena, sizeof(func_entry_val)); val->value = type;
             val->is_native = native;
             val->param_types = params;
             val->mangled_name = mangled;
             
-            func_hash_table_set(&parser->functions, key, val);
+            func_hash_table_set(&functions, key, val);
         } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), str_expand(name));
     }
     
@@ -1888,8 +1893,8 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
 static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name) {
     P_ValueType test;
     var_entry_key key = (var_entry_key) { .name = name, .depth = parser->scope_depth };
-    if (!var_hash_table_get(&parser->variables, key, &test)) {
-        var_hash_table_set(&parser->variables, key, type);
+    if (!var_hash_table_get(&variables, key, &test)) {
+        var_hash_table_set(&variables, key, type);
     }
     else report_error(parser, str_lit("Cannot redeclare variable %.*s\n"), str_expand(name));
     if (type_check(type, ValueType_Void))
@@ -1920,7 +1925,7 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name) {
                 func_entry_val* val = nullptr;
                 u32 subset;
                 while (key.depth != -1) {
-                    if (func_hash_table_get(&parser->functions, key, type.op.func_ptr.func_param_types, &val, &subset, true)) {
+                    if (func_hash_table_get(&functions, key, type.op.func_ptr.func_param_types, &val, &subset, true)) {
                         // Fix the value
                         value->ret_type.op.func_ptr.func_param_types = &val->param_types;
                         value->ret_type.op.func_ptr.ret_type = type.op.func_ptr.ret_type;
@@ -1969,8 +1974,8 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser) {
         report_error(parser, str_lit("Cannot redeclare type with name %.*s\n"), str_expand(name));
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Struct Name\n"));
     
-    u64 idx = parser->types.count;
-    type_array_add(&parser->types, (P_Container) { .type = ContainerType_Struct, .name = name, .depth = parser->scope_depth });
+    u64 idx = types.count;
+    type_array_add(&types, (P_Container) { .type = ContainerType_Struct, .name = name, .depth = parser->scope_depth });
     u32 tmp_member_count = 0;
     string_list member_names = {0};
     value_type_list member_types = {0};
@@ -1989,9 +1994,9 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser) {
             report_error(parser, str_lit("Unterminated block for structure definition\n"));
     }
     
-    parser->types.elements[idx].member_count = tmp_member_count;
-    parser->types.elements[idx].member_types = member_types;
-    parser->types.elements[idx].member_names = member_names;
+    types.elements[idx].member_count = tmp_member_count;
+    types.elements[idx].member_types = member_types;
+    types.elements[idx].member_names = member_names;
     
     return P_MakeStructDeclStmtNode(parser, name, tmp_member_count, member_types, member_names);
 }
@@ -2003,8 +2008,8 @@ static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser) {
         report_error(parser, str_lit("Cannot redeclare type with name %.*s\n"), str_expand(name));
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Enum Name\n"));
     
-    u64 idx = parser->types.count;
-    type_array_add(&parser->types, (P_Container) { .type = ContainerType_Enum, .name = name, .depth = parser->scope_depth });
+    u64 idx = types.count;
+    type_array_add(&types, (P_Container) { .type = ContainerType_Enum, .name = name, .depth = parser->scope_depth });
     u32 member_count = 0;
     string_list member_names = {0};
     value_type_list member_types = {0};
@@ -2023,11 +2028,35 @@ static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser) {
             report_error(parser, str_lit("Unterminated block for enum definition\n"));
     }
     
-    parser->types.elements[idx].member_count = member_count;
-    parser->types.elements[idx].member_types = member_types;
-    parser->types.elements[idx].member_names = member_names;
+    types.elements[idx].member_count = member_count;
+    types.elements[idx].member_types = member_types;
+    types.elements[idx].member_names = member_names;
     
     return P_MakeEnumDeclStmtNode(parser, name, member_count, member_names);
+}
+
+static P_Stmt* P_StmtImport(P_Parser* parser) {
+    P_Consume(parser, TokenType_StringLit, str_lit("Expected Filename after 'import'\n"));
+    
+    P_Parser* child_parser = parser->sub[parser->import_number++];
+    
+    P_Initialize(child_parser, child_parser->source, child_parser->filename);
+    P_Parse(child_parser);
+    P_Stmt* stmt_list = child_parser->root;
+    P_Stmt* curr = stmt_list;
+    while (curr != nullptr) {
+        if (parser->end != nullptr) {
+            parser->end->next = curr;
+            parser->end = curr;
+        } else {
+            parser->root = curr;
+            parser->end = curr;
+        }
+        curr = curr->next;
+    }
+    
+    P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after Filename\n"));
+    return P_MakeNothingNode(parser);
 }
 
 static P_Stmt* P_StmtBlock(P_Parser* parser) {
@@ -2073,7 +2102,7 @@ static P_Stmt* P_StmtReturn(P_Parser* parser) {
             func_entry_val* ret_val = nullptr;
             u32 subset;
             while (key.depth != -1) {
-                if (func_hash_table_get(&parser->functions, key, parser->function_body_ret.op.func_ptr.func_param_types, &ret_val, &subset, true)) {
+                if (func_hash_table_get(&functions, key, parser->function_body_ret.op.func_ptr.func_param_types, &ret_val, &subset, true)) {
                     // Fix the val
                     val->ret_type.op.func_ptr.func_param_types = &ret_val->param_types;
                     val->ret_type.op.func_ptr.ret_type = parser->function_body_ret.op.func_ptr.ret_type;
@@ -2271,6 +2300,16 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
         s = P_StmtStructureDecl(parser);
     } else if (P_Match(parser, TokenType_Enum)) {
         s = P_StmtEnumerationDecl(parser);
+    } else if (P_Match(parser, TokenType_Import)) {
+        if (parser->scope_depth == 0)
+            s = P_StmtImport(parser);
+        else {
+            report_error(parser, str_lit("Cannot have an import statement in another declaration\n"));
+            s = nullptr;
+        }
+    } else if (P_Match(parser, TokenType_EOF)) {
+        report_error(parser, str_lit("Nothing to compile :|\n"));
+        s = nullptr;
     } else
         s = P_Statement(parser);
     
@@ -2332,13 +2371,13 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
     u32 subset_match = 1024;
     func_entry_key key = (func_entry_key) { .name = name, .depth = 0 };
     func_entry_val* test = nullptr;
-    if (!func_hash_table_get(&parser->functions, key, &params, &test, &subset_match, true)) {
+    if (!func_hash_table_get(&functions, key, &params, &test, &subset_match, true)) {
         func_entry_val* val = arena_alloc(&parser->arena, sizeof(func_entry_val));
         val->value = type;
         val->is_native = false;
         val->param_types = params;
         val->mangled_name = mangled;
-        func_hash_table_set(&parser->functions, key, val);
+        func_hash_table_set(&functions, key, val);
     } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), str_expand(name));
     
     P_PreStmt* func = P_MakePreFuncStmtNode(parser, type, mangled, arity, params, param_names);
@@ -2367,6 +2406,65 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
     return func;
 }
 
+static string read_file(M_Arena* arena, const char* path, b8* file_exists) {
+    FILE* file = fopen(path, "rb");
+    if (file == nullptr) {
+        *file_exists = false;
+        return (string) {0};
+    } else {
+        *file_exists = true;
+    }
+    
+    fseek(file, 0L, SEEK_END);
+    size_t fileSize = ftell(file);
+    rewind(file);
+    
+    char* buffer = arena_alloc(arena, fileSize + 1);
+    size_t bytesRead = fread(buffer, sizeof(char), fileSize, file);
+    buffer[bytesRead] = '\0';
+    
+    fclose(file);
+    return (string) { .str = (u8*)buffer, .size = bytesRead };
+}
+
+static P_PreStmt* P_PreStmtImport(P_Parser* parser) {
+    P_Consume(parser, TokenType_StringLit, str_lit("Expected string after 'import'\n"));
+    // String adjusted to be only the filename without quotes
+    string name = { .str = (u8*)parser->previous.start + 1, .size = parser->previous.length - 2 };
+    // Convert non-nullterminated string to nullterminated string
+    string filename = str_copy(&parser->arena, name);
+    
+    // Adds a new parser to the children list.
+    b8 file_exists;
+    string content = read_file(&parser->arena, (const char*)filename.str, &file_exists);
+    if (!file_exists) {
+        // File doesn't exist
+        report_error(parser, str_lit("File %.*s doesn't exist\n"), str_expand(name));
+        return nullptr;
+    }
+    P_Parser* child = P_AddChild(parser, content, filename);
+    
+    // Pre-Parse this file
+    P_PreParse(child);
+    P_PreStmt* prestmt_list = child->pre_root;
+    
+    // Add all the pre statements to the current list...
+    P_PreStmt* curr = prestmt_list;
+    while (curr != nullptr) {
+        // TODO(voxel): Make Macro SLL Push
+        if (parser->pre_end != nullptr) {
+            parser->pre_end->next = curr;
+            parser->pre_end = curr;
+        } else {
+            parser->pre_root = curr;
+            parser->pre_end = curr;
+        }
+        curr = curr->next;
+    }
+    
+    return nullptr;
+}
+
 static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
     if (P_IsTypeToken(parser)) {
         P_ValueType type = P_ConsumeType(parser, str_lit("This is an error in the Parser. (P_PreDeclaration)\n"));
@@ -2385,11 +2483,30 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
         if (P_Match(parser, TokenType_OpenParenthesis)) {
             return P_PreFuncDecl(parser, type, name);
         }
+    } else if (P_Match(parser, TokenType_Import)) {
+        P_PreStmtImport(parser);
     }
     return nullptr;
 }
 
 //~ API
+P_Parser* P_AddChild(P_Parser* parent, string source, string filename) {
+    P_Parser* child = arena_alloc(&parent->arena, sizeof(P_Parser));
+    P_Initialize(child, source, filename);
+    child->parent = parent;
+    
+    if (parent->sub_count + 1 > parent->sub_cap) {
+        void* prev = parent->sub;
+        parent->sub_cap = GROW_CAPACITY(parent->sub_cap);
+        parent->sub = arena_alloc(&parent->arena, parent->sub_cap * sizeof(P_Parser*));
+        memmove(parent->sub, prev, parent->sub_count * sizeof(P_Parser*));
+    }
+    *(parent->sub + parent->sub_count) = child;
+    parent->sub_count++;
+    
+    return child;
+}
+
 void P_PreParse(P_Parser* parser) {
     L_Initialize(&parser->lexer, parser->source);
     // Triple advance to pipe stuff to current and not just next and next_two
@@ -2397,29 +2514,17 @@ void P_PreParse(P_Parser* parser) {
     P_Advance(parser);
     P_Advance(parser);
     
-    parser->pre_root = P_PreDeclaration(parser);
-    while (parser->pre_root == nullptr) {
-        P_Advance(parser);
-        if (parser->current.type == TokenType_EOF)
-            return;
-        parser->pre_root = P_PreDeclaration(parser);
-    }
-    
-    P_PreStmt* c = parser->pre_root;
-    
     while (parser->current.type != TokenType_EOF && !parser->had_error) {
         P_PreStmt* tmp = P_PreDeclaration(parser);
         if (tmp != nullptr) {
-            c->next = tmp;
-            c = c->next;
+            if (parser->pre_end != nullptr) {
+                parser->pre_end->next = tmp;
+                parser->pre_end = tmp;
+            } else {
+                parser->pre_root = tmp;
+                parser->pre_end = tmp;
+            }
         } else P_Advance(parser);
-    }
-    
-    u32 subset_match = 1024;
-    func_entry_val* v = nullptr;
-    value_type_list noargs = (value_type_list){0};
-    if (!func_hash_table_get(&parser->functions, (func_entry_key) { .name = str_lit("main"), .depth = 0 }, &noargs, &v, &subset_match, true)) {
-        report_error(parser, str_lit("No main function definition found\n"));
     }
 }
 
@@ -2432,17 +2537,41 @@ void P_Parse(P_Parser* parser) {
     
     parser->root = P_Declaration(parser);
     
-    P_Stmt* c = parser->root;
     while (parser->current.type != TokenType_EOF && !parser->had_error) {
-        c->next = P_Declaration(parser);
-        c = c->next;
+        P_Stmt* tmp = P_Declaration(parser);
+        if (parser->end != nullptr) {
+            parser->end->next = tmp;
+            parser->end = tmp;
+        } else {
+            parser->root = tmp;
+            parser->end = tmp;
+        }
+    }
+    
+    // Only check for main function if it is the entry point
+    if (parser->parent == nullptr) {
+        u32 subset_match = 1024;
+        func_entry_val* v = nullptr;
+        value_type_list noargs = (value_type_list){0};
+        if (!func_hash_table_get(&functions, (func_entry_key) { .name = str_lit("main"), .depth = 0 }, &noargs, &v, &subset_match, true)) {
+            report_error(parser, str_lit("No main function definition found\n"));
+        }
     }
 }
 
-void P_Initialize(P_Parser* parser, string source) {
+void P_GlobalInit() {
+    var_hash_table_init(&variables);
+    func_hash_table_init(&functions);
+    type_array_init(&types);
+}
+
+void P_Initialize(P_Parser* parser, string source, string filename) {
     arena_init(&parser->arena);
     types_init(&parser->arena);
     parser->source = source;
+    parser->filename = filename;
+    parser->pre_root = nullptr;
+    parser->pre_end = nullptr;
     parser->root = nullptr;
     parser->next = (L_Token) {0};
     parser->current = (L_Token) {0};
@@ -2460,15 +2589,12 @@ void P_Initialize(P_Parser* parser, string source) {
     parser->current_function = (string) {0};
     parser->block_stmt_should_begin_scope = true;
     parser->is_in_private_scope = false;
-    var_hash_table_init(&parser->variables);
-    func_hash_table_init(&parser->functions);
-    type_array_init(&parser->types);
 }
 
 void P_Free(P_Parser* parser) {
-    var_hash_table_free(&parser->variables);
-    func_hash_table_free(&parser->functions);
-    type_array_free(&parser->types);
+    var_hash_table_free(&variables);
+    func_hash_table_free(&functions);
+    type_array_free(&types);
     arena_free(&parser->arena);
 }
 

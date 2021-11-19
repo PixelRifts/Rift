@@ -117,7 +117,7 @@ struct P_Stmt {
 
 typedef u32 P_PreStmtType;
 enum {
-    PreStmtType_ForwardDecl
+    PreStmtType_ForwardDecl,
 };
 
 typedef struct P_PreStmt P_PreStmt;
@@ -152,9 +152,12 @@ typedef struct P_Parser {
     M_Arena arena;
     L_Lexer lexer;
     string source;
+    string filename;
     
     P_PreStmt* pre_root;
+    P_PreStmt* pre_end;
     P_Stmt*    root;
+    P_Stmt*    end;
     
     P_Stmt* lambda_functions_start;
     P_Stmt* lambda_functions_curr;
@@ -166,9 +169,6 @@ typedef struct P_Parser {
     L_Token previous_two;
     
     u32 scope_depth;
-    var_hash_table variables;
-    func_hash_table functions;
-    type_array types;
     
     b8 had_error;
     b8 panik_mode;
@@ -185,10 +185,21 @@ typedef struct P_Parser {
     b8 is_in_private_scope; // This is temporary until I come up with a solution for closures
     b8 encountered_return;
     u32 lambda_number;
+    u32 import_number;
+    
+    struct P_Parser* parent;
+    // Dynamic array of Parsers for imports and multiple files. Is this a bad idea?
+    struct P_Parser** sub;
+    u32 sub_cap;
+    u32 sub_count;
 } P_Parser;
 
+// Heirarchy stuff
+P_Parser* P_AddChild(P_Parser* parent, string source, string filename);
+
+// API
 void P_Advance(P_Parser* parser);
-void P_Initialize(P_Parser* parser, string source);
+void P_Initialize(P_Parser* parser, string source, string filename);
 void P_PreParse(P_Parser* parser);
 void P_Parse(P_Parser* parser);
 void P_Free(P_Parser* parser);
