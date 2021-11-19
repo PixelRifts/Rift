@@ -4,20 +4,18 @@
 #include <stdlib.h>
 #include <string.h>
 
-int foo_0(void);
-int (*getFoo_1int(int wee))();
 int main(void);
 
-int foo_0(void) {
-printf("Foo called\n");
-return 69;
-}
-int (*getFoo_1int(int wee))() {
-printf("%d\n", wee);
-return foo_0;
-}
+int lambda0_2intint(int x, int y){
+return (x+y);
+	}
+int lambda1_2intint(int x, int y){
+return (x*y);
+	}
 int main(void) {
-int m = getFoo_1int(10)();
-printf("Exited successfully");
+int (*add)(int , int ) = lambda0_2intint;
+int multiplied = lambda1_2intint(16, 16);
+int c = add(20, 30);
+printf("%d, %d", c, multiplied);
 return 0;
 }

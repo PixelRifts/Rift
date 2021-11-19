@@ -1,3 +1,2 @@
 bin/
-/generated.c
-/generated.exe
+generated.*
