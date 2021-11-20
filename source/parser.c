@@ -1208,7 +1208,6 @@ static P_Expr* P_ExprLambda(P_Parser* parser) {
     
     parser->block_stmt_should_begin_scope = false;
     
-    // CHECK THIS
     parser->all_code_paths_return = false;
     parser->encountered_return = false;
     parser->function_body_ret = ValueType_Any;
@@ -1242,7 +1241,13 @@ static P_Expr* P_ExprLambda(P_Parser* parser) {
         P_Consume(parser, TokenType_Identifier, str_lit("Expected param name\n"));
         string param_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
         string_list_push(&parser->arena, &param_names, param_name);
-        var_hash_table_set(&variables, (var_entry_key) { .name = param_name, .depth = parser->scope_depth }, param_type);
+        
+        var_entry_key key = (var_entry_key) { .name = param_name, .depth = parser->scope_depth };
+        P_ValueType test;
+        if (!var_hash_table_get(&variables, key, &test))
+            var_hash_table_set(&variables, key, param_type);
+        else
+            report_error(parser, str_lit("Multiple Parameters with the same name\n"));
         
         arity++;
         if (!P_Match(parser, TokenType_Comma)) {
@@ -1809,8 +1814,14 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         string param_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
         string_list_push(&parser->arena, &param_names, param_name);
         
-        if (!native)
-            var_hash_table_set(&variables, (var_entry_key) { .name = param_name, .depth = parser->scope_depth }, param_type);
+        if (!native) {
+            var_entry_key key = (var_entry_key) { .name = param_name, .depth = parser->scope_depth };
+            P_ValueType test;
+            if (!var_hash_table_get(&variables, key, &test))
+                var_hash_table_set(&variables, key, param_type);
+            else
+                report_error(parser, str_lit("Multiple Parameters with the same name\n"));
+        }
         
         arity++;
         if (!P_Match(parser, TokenType_Comma)) {
