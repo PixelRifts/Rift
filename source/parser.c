@@ -5,6 +5,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef CPCOM_WIN
+#include <direct.h>
+#define get_cwd _getcwd
+#define PATH_MAX 4096
+#endif
+// @linux Add linux branch here
+
 #include "operator_bindings.h"
 #include "types.h"
 
@@ -12,6 +19,7 @@
 static var_hash_table variables;
 static func_hash_table functions;
 static type_array types;
+static string cwd;
 
 //~ Errors
 static void report_error_at(P_Parser* parser, L_Token* token, string message, ...) {
@@ -2563,6 +2571,9 @@ void P_GlobalInit() {
     var_hash_table_init(&variables);
     func_hash_table_init(&functions);
     type_array_init(&types);
+    char* buffer = malloc(PATH_MAX);
+    get_cwd(buffer, PATH_MAX);
+    cwd = (string){ .str = (u8*)buffer, .size = strlen(buffer) };
 }
 
 void P_Initialize(P_Parser* parser, string source, string filename) {
@@ -2589,13 +2600,23 @@ void P_Initialize(P_Parser* parser, string source, string filename) {
     parser->current_function = (string) {0};
     parser->block_stmt_should_begin_scope = true;
     parser->is_in_private_scope = false;
+    parser->parent = nullptr;
+    parser->sub = nullptr;
+    parser->sub_cap = 0;
+    parser->sub_count = 0;
 }
 
 void P_Free(P_Parser* parser) {
+    for (u32 i = 0; i < parser->sub_count; i++)
+        P_Free(parser->sub[i]);
+    arena_free(&parser->arena);
+}
+
+void P_GlobalFree() {
     var_hash_table_free(&variables);
     func_hash_table_free(&functions);
     type_array_free(&types);
-    arena_free(&parser->arena);
+    free(cwd.str);
 }
 
 static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {

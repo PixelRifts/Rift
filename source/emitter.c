@@ -550,6 +550,7 @@ static void E_EmitPreStatementChain(E_Emitter* emitter, P_PreStmt* stmts, u32 in
 }
 
 void E_Initialize(E_Emitter* emitter, string source, string filename) {
+    P_GlobalInit();
     P_Initialize(&emitter->parser, source, filename);
     emitter->output_file = fopen("./generated.c", "w");
 }
@@ -574,4 +575,5 @@ void E_Emit(E_Emitter* emitter) {
 void E_Free(E_Emitter* emitter) {
     fclose(emitter->output_file);
     P_Free(&emitter->parser);
+    P_GlobalFree();
 }

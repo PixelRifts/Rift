@@ -41,6 +41,7 @@ exit(-10);          \
 #define CPCOM_WIN
 #elif defined(__linux__) || defined(__gnu_linux__)
 #define CPCOM_LINUX
+// @linux Remove this error
 #error "The compiler only supports windows for now"
 #else
 #error "The compiler only supports windows for now"

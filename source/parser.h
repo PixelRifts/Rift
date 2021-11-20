@@ -194,6 +194,9 @@ typedef struct P_Parser {
     u32 sub_count;
 } P_Parser;
 
+void P_GlobalInit();
+void P_GlobalFree();
+
 // Heirarchy stuff
 P_Parser* P_AddChild(P_Parser* parent, string source, string filename);
 

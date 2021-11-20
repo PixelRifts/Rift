@@ -36,12 +36,14 @@ int main(int argc, char **argv) {
 #endif
         
 #ifdef CPPARSER
+        P_GlobalInit();
         P_Parser parser = {0};
         P_Initialize(&parser, (string) { .str = (u8*)source, .size = strlen(source) }, filename);
         P_Parse(&parser);
         if (!parser.had_error)
             P_PrintAST(parser.root);
         P_Free(&parser);
+        P_GlobalFree();
 #endif
         
 #ifdef CPLATEST

@@ -6,6 +6,8 @@
 #include <windows.h>
 #endif
 
+// @linux Add mem stuff
+
 static void* mem_reserve(u64 size) {
 #ifdef CPCOM_WIN
     void* memory = VirtualAlloc(0, size, MEM_RESERVE, PAGE_NOACCESS);
