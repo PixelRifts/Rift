@@ -5,10 +5,18 @@
 #include <string.h>
 
 int add_2intint(int a, int b);
+void bar_0(void);
+void foo_0(void);
 int main(void);
 
 int add_2intint(int a, int b) {
 return (a+b);
+}
+void bar_0(void) {
+printf("Bar\n");
+}
+void foo_0(void) {
+printf("Foo\n");
 }
 int main(void) {
 printf("Started successfully\n");

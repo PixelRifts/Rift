@@ -62,7 +62,7 @@ string_const str_replace_all(M_Arena* arena, string_const to_fix, string_const n
     u64 replaceable = str_substr_count(to_fix, needle);
     if (replaceable == 0) return to_fix;
     
-    u64 new_size = (to_fix.size - replaceable) + (replaceable * replacement.size);
+    u64 new_size = (to_fix.size - replaceable) + (replaceable * replacement.size) - 1;
     string_const ret = str_alloc(arena, new_size);
     
     b8 replaced;
@@ -132,12 +132,13 @@ u64 str_find_first(string_const str, string_const needle, u32 offset) {
 
 u64 str_find_last(string_const str, string_const needle, u32 offset) {
     u64 prev = str.size;
-    u64 idx = offset;
+    if (offset == 0)
+        offset = str.size;
+    u64 idx = 0;
     while (true) {
         prev = idx;
         idx = str_find_first(str, needle, idx);
-        if (idx == str.size)
-            break;
+        if (idx >= offset) break;
         idx++;
     }
     return prev;
@@ -176,6 +177,16 @@ b8 string_list_equals(string_const_list* a, string_const_list* b) {
         curr_b = curr_b->next;
     }
     return true;
+}
+
+b8 string_list_contains(string_const_list* a, string_const needle) {
+    string_const_list_node* curr = a->first;
+    while (curr != nullptr) {
+        if (str_str_node_eq(needle, curr))
+            return true;
+        curr = curr->next;
+    }
+    return false;
 }
 
 string_const string_list_flatten(M_Arena* arena, string_const_list* list) {

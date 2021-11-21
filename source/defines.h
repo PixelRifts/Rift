@@ -26,7 +26,11 @@ typedef char b8;
 #define false 0
 
 #define null 0
+
+#ifndef __cplusplus
 #define nullptr (void*)0
+#endif
+
 #define trace printf("Trace\n")
 
 #define REDUCTION_ERROR -1

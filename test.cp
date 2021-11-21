@@ -1,8 +1,6 @@
-void native printf(string format, ... rest);
-void* native calloc(int count, int elem_size);
-void native free(void* buffer);
-
+import "standard.cp";
 import "examples/add_import.cp";
+import "foo.cp";
 
 int main() {
 	printf("Started successfully\n");
