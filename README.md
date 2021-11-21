@@ -19,7 +19,6 @@ Rift - A Language Transpiler
 - Switch Statements
 - Operator Overloading
 - Inline struct initializers
-- Multifile projects
 - Standard Library
 - Typedefs
 - Preprocessor stuff 
