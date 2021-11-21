@@ -551,7 +551,7 @@ static void E_EmitPreStatementChain(E_Emitter* emitter, P_PreStmt* stmts, u32 in
 
 void E_Initialize(E_Emitter* emitter, string source, string filename) {
     P_GlobalInit();
-    P_Initialize(&emitter->parser, source, filename);
+    P_Initialize(&emitter->parser, source, filename, true);
     emitter->output_file = fopen("./generated.c", "w");
 }
 

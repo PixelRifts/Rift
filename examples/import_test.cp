@@ -2,7 +2,7 @@ void native printf(string format, ... rest);
 void* native calloc(int count, int elem_size);
 void native free(void* buffer);
 
-import "examples/add_import.cp";
+import "./add_import.cp";
 
 int main() {
 	printf("Started successfully\n");

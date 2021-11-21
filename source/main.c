@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
 #ifdef CPPARSER
         P_GlobalInit();
         P_Parser parser = {0};
-        P_Initialize(&parser, (string) { .str = (u8*)source, .size = strlen(source) }, filename);
+        P_Initialize(&parser, (string) { .str = (u8*)source, .size = strlen(source) }, filename, true);
         P_Parse(&parser);
         if (!parser.had_error)
             P_PrintAST(parser.root);

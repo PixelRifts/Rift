@@ -16,6 +16,7 @@
 #include "types.h"
 
 //~ Globals
+static M_Arena global_arena;
 static var_hash_table variables;
 static func_hash_table functions;
 static type_array types;
@@ -2064,7 +2065,7 @@ static P_Stmt* P_StmtImport(P_Parser* parser) {
     
     P_Parser* child_parser = parser->sub[parser->import_number++];
     
-    P_Initialize(child_parser, child_parser->source, child_parser->filename);
+    P_Initialize(child_parser, child_parser->source, child_parser->filename, false);
     P_Parse(child_parser);
     P_Stmt* stmt_list = child_parser->root;
     P_Stmt* curr = stmt_list;
@@ -2455,8 +2456,25 @@ static P_PreStmt* P_PreStmtImport(P_Parser* parser) {
     P_Consume(parser, TokenType_StringLit, str_lit("Expected string after 'import'\n"));
     // String adjusted to be only the filename without quotes
     string name = { .str = (u8*)parser->previous.start + 1, .size = parser->previous.length - 2 };
-    // Convert non-nullterminated string to nullterminated string
-    string filename = str_copy(&parser->arena, name);
+    
+    // TODO(voxel): Some utilities for such things perhaps?
+    u64 possible_last_fslash = str_find_last(parser->abspath, str_lit("/"), 0);
+    u64 possible_last_bslash = str_find_last(parser->abspath, str_lit("\\"), 0);
+    u64 last_slash = 0;
+    if (possible_last_bslash == parser->abspath.size)
+        last_slash = possible_last_bslash;
+    else if (possible_last_fslash == parser->abspath.size)
+        last_slash = possible_last_fslash;
+    else {
+        // TODO(voxel): max macro
+        last_slash = possible_last_bslash > possible_last_fslash
+            ? possible_last_bslash : possible_last_fslash;
+    }
+    
+    // Maybe +1
+    string current_folder = (string) { .str = parser->abspath.str, .size = last_slash };
+    
+    string filename = str_cat(&parser->arena, current_folder, name);
     
     // Adds a new parser to the children list.
     b8 file_exists;
@@ -2466,7 +2484,8 @@ static P_PreStmt* P_PreStmtImport(P_Parser* parser) {
         report_error(parser, str_lit("File %.*s doesn't exist\n"), str_expand(name));
         return nullptr;
     }
-    P_Parser* child = P_AddChild(parser, content, filename);
+    P_Parser* child = P_AddChild(parser, content, name);
+    child->abspath = filename;
     
     // Pre-Parse this file
     P_PreParse(child);
@@ -2516,7 +2535,7 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
 //~ API
 P_Parser* P_AddChild(P_Parser* parent, string source, string filename) {
     P_Parser* child = arena_alloc(&parent->arena, sizeof(P_Parser));
-    P_Initialize(child, source, filename);
+    P_Initialize(child, source, filename, false);
     child->parent = parent;
     
     if (parent->sub_count + 1 > parent->sub_cap) {
@@ -2584,19 +2603,26 @@ void P_Parse(P_Parser* parser) {
 }
 
 void P_GlobalInit() {
+    arena_init(&global_arena);
     var_hash_table_init(&variables);
     func_hash_table_init(&functions);
+    types_init(&global_arena);
     type_array_init(&types);
-    char* buffer = malloc(PATH_MAX);
+    char* buffer = arena_alloc(&global_arena, PATH_MAX);
     get_cwd(buffer, PATH_MAX);
     cwd = (string){ .str = (u8*)buffer, .size = strlen(buffer) };
 }
 
-void P_Initialize(P_Parser* parser, string source, string filename) {
-    arena_init(&parser->arena);
-    types_init(&parser->arena);
+void P_Initialize(P_Parser* parser, string source, string filename, b8 is_root) {
+    if (!parser->initialized) {
+        arena_init(&parser->arena);
+    }
     parser->source = source;
     parser->filename = filename;
+    if (is_root) {
+        parser->abspath = str_cat(&parser->arena, cwd, str_lit("\\"));
+        parser->abspath = str_cat(&parser->arena, parser->abspath, parser->filename);
+    }
     parser->pre_root = nullptr;
     parser->pre_end = nullptr;
     parser->root = nullptr;
@@ -2620,6 +2646,7 @@ void P_Initialize(P_Parser* parser, string source, string filename) {
     parser->sub = nullptr;
     parser->sub_cap = 0;
     parser->sub_count = 0;
+    parser->initialized = true;
 }
 
 void P_Free(P_Parser* parser) {
@@ -2632,7 +2659,7 @@ void P_GlobalFree() {
     var_hash_table_free(&variables);
     func_hash_table_free(&functions);
     type_array_free(&types);
-    free(cwd.str);
+    arena_free(&global_arena);
 }
 
 static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {

@@ -153,6 +153,8 @@ typedef struct P_Parser {
     L_Lexer lexer;
     string source;
     string filename;
+    string abspath;
+    b8 initialized;
     
     P_PreStmt* pre_root;
     P_PreStmt* pre_end;
@@ -202,7 +204,7 @@ P_Parser* P_AddChild(P_Parser* parent, string source, string filename);
 
 // API
 void P_Advance(P_Parser* parser);
-void P_Initialize(P_Parser* parser, string source, string filename);
+void P_Initialize(P_Parser* parser, string source, string filename, b8 is_root);
 void P_PreParse(P_Parser* parser);
 void P_Parse(P_Parser* parser);
 void P_Free(P_Parser* parser);
