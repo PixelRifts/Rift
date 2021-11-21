@@ -243,8 +243,10 @@ static P_ValueType P_ConsumeType(P_Parser* parser, string message);
 
 static b8 P_MatchType(P_Parser* parser, P_ValueType* rettype, string* custom_err) {
     if (parser->current.type == TokenType_Int || parser->current.type == TokenType_Long ||
-        parser->current.type == TokenType_Float || parser->current.type == TokenType_Double || parser->current.type == TokenType_Bool || parser->current.type == TokenType_Char ||
-        parser->current.type == TokenType_Void || parser->current.type == TokenType_String) {
+        parser->current.type == TokenType_Float || parser->current.type == TokenType_Double ||
+        parser->current.type == TokenType_Bool || parser->current.type == TokenType_Char ||
+        parser->current.type == TokenType_Void || parser->current.type == TokenType_String ||
+        parser->current.type == TokenType_Identifier) {
         if (parser->current.type == TokenType_Identifier) {
             if (container_type_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
                 P_Advance(parser);
@@ -2001,7 +2003,10 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser) {
     
     // Parse Members
     while (!P_Match(parser, TokenType_CloseBrace)) {
-        value_type_list_push(&parser->arena, &member_types, P_ConsumeType(parser, str_lit("Expected Type or }\n")));
+        P_ValueType type = P_ConsumeType(parser, str_lit("Expected Type or }\n"));
+        if (str_eq(type.full_type, name))
+            report_error(parser, str_lit("Recursive Definition of structures disallowed. You should store a pointer instead\n"));
+        value_type_list_push(&parser->arena, &member_types, type);
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
         string_list_push(&parser->arena, &member_names, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });

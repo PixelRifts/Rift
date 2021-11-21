@@ -442,7 +442,7 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
         } break;
         
         case StmtType_StructDecl: {
-            E_WriteLineF(emitter, "typedef struct %.*s {", str_expand(stmt->op.struct_decl.name));
+            E_WriteLineF(emitter, "typedef struct %.*s %.*s;", str_expand(stmt->op.struct_decl.name), str_expand(stmt->op.struct_decl.name)); E_WriteLineF(emitter, "struct %.*s {", str_expand(stmt->op.struct_decl.name));
             string_list_node* curr_name = stmt->op.struct_decl.member_names.first;
             value_type_list_node* curr_type = stmt->op.struct_decl.member_types.first;
             for (u32 i = 0; i < stmt->op.struct_decl.member_count; i++) {
@@ -451,12 +451,12 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
                 for (u32 idt = 0; idt < indent + 1; idt++)
                     E_Write(emitter, "\t");
                 E_EmitTypeAndName(emitter, &c_type, (string) { .str = curr_name->str, .size = curr_name->size }, false);
-                E_Write(emitter, ";");
+                E_WriteLine(emitter, ";");
                 
                 curr_name = curr_name->next;
                 curr_type = curr_type->next;
             }
-            E_WriteLineF(emitter, "} %.*s;", str_expand(stmt->op.struct_decl.name));
+            E_WriteLine(emitter, "};");
         } break;
         
         case StmtType_EnumDecl: {

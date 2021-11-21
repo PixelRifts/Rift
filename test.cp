@@ -4,14 +4,14 @@ void native free(void* buffer);
 
 import "blah.cp";
 
+struct meh {
+	meh a;
+}
+
 int main() {
 	printf("Started successfully\n");
 	int m = x(10, 20);
 	printf("%d\n", m);
 	printf("Exited successfully\n");
 	return 0;
-}
-
-int foo(int x, int x) {
-	
 }

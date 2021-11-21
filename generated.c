@@ -6,5 +6,4 @@
 
 int x_2intint(int y, int z);
 int main(void);
-int foo_2intint(int x, int x);
 
