@@ -474,6 +474,16 @@ static string P_FuncNameMangle(P_Parser* parser, string name, u32 arity, value_t
     return string_list_flatten(&parser->arena, &sl);
 }
 
+static b8 P_IsInScope(P_Parser* parser, P_ScopeType type) {
+    u32 scope_idx = parser->scopetype_tos - 1;
+    while (scope_idx != -1) {
+        if (parser->scopetype_stack[scope_idx] == type)
+            return true;
+        scope_idx--;
+    }
+    return false;
+}
+
 //~ Binding
 static b8 P_CheckValueType(P_ValueTypeCollection expected, P_ValueType type) {
     if (expected == ValueTypeCollection_Number) {
@@ -2253,18 +2263,18 @@ static P_Stmt* P_StmtFor(P_Parser* parser) {
 }
 
 static P_Stmt* P_StmtBreak(P_Parser* parser) {
-    if (!(parser->scopetype_stack[parser->scopetype_tos-1] == ScopeType_For   ||
-          parser->scopetype_stack[parser->scopetype_tos-1] == ScopeType_While ||
-          parser->scopetype_stack[parser->scopetype_tos-1] == ScopeType_DoWhile))
+    if (!(P_IsInScope(parser, ScopeType_For)   ||
+          P_IsInScope(parser, ScopeType_While) ||
+          P_IsInScope(parser,  ScopeType_DoWhile)))
         report_error(parser, str_lit("Cannot have break statement in this block\n"));
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after break\n"));
     return P_MakeBreakStmtNode(parser);
 }
 
 static P_Stmt* P_StmtContinue(P_Parser* parser) {
-    if (!(parser->scopetype_stack[parser->scopetype_tos-1] == ScopeType_For   ||
-          parser->scopetype_stack[parser->scopetype_tos-1] == ScopeType_While ||
-          parser->scopetype_stack[parser->scopetype_tos-1] == ScopeType_DoWhile))
+    if (!(P_IsInScope(parser, ScopeType_For)   ||
+          P_IsInScope(parser, ScopeType_While) ||
+          P_IsInScope(parser,  ScopeType_DoWhile)))
         report_error(parser, str_lit("Cannot have continue statement in this block\n"));
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after continue\n"));
     return P_MakeContinueStmtNode(parser);
