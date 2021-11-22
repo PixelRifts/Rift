@@ -4,11 +4,17 @@ import "foo.cp";
 
 int main() {
 	printf("Started successfully\n");
-	int m = add(10, 20);
-	for (int i = 0; i < 10; i = i + 1) {
-		if (true) { break; }
+	int x = 10;
+	match (x) {
+		case 10: printf("Ten\n");
+		case 20: printf("Twenty\n");
+		default: printf("wee");
 	}
-	printf("%d\n", m);
+	switch (x) {
+		case 10: printf("Ten\n");
+		case 20: printf("Twenty\n");
+		default: printf("wee");
+	}
 	printf("Exited successfully\n");
 	return 0;
 }

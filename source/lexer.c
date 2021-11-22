@@ -64,6 +64,10 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_Nullptr: return str_lit("Nullptr");
         case TokenType_Break: return str_lit("Break");
         case TokenType_Continue: return str_lit("Continue");
+        case TokenType_Switch: return str_lit("Switch");
+        case TokenType_Match: return str_lit("Match");
+        case TokenType_Case: return str_lit("Case");
+        case TokenType_Default: return str_lit("Default");
         case TokenType_If: return str_lit("If");
         case TokenType_Else: return str_lit("Else");
         case TokenType_Do: return str_lit("Do");
@@ -205,33 +209,46 @@ static L_TokenType L_MatchType(L_Lexer* lexer, u32 start, string needle, L_Token
 static L_TokenType L_IdentifierType(L_Lexer* lexer) {
     switch (lexer->start[0]) {
         case 'r': return L_MatchType(lexer, 1, str_lit("eturn"), TokenType_Return);
+        case 'm': return L_MatchType(lexer, 1, str_lit("atch"), TokenType_Match);
         case 'w': return L_MatchType(lexer, 1, str_lit("hile"), TokenType_While);
+        
         case 'b': {
             switch (lexer->start[1]) {
                 case 'o': return L_MatchType(lexer, 2, str_lit("ol"), TokenType_Bool);
                 case 'r': return L_MatchType(lexer, 2, str_lit("eak"), TokenType_Break);
             }
         }
+        
         case 'c': {
             switch (lexer->start[1]) {
                 case 'h': return L_MatchType(lexer, 2, str_lit("ar"), TokenType_Char);
                 case 'o': return L_MatchType(lexer, 2, str_lit("ntinue"), TokenType_Continue);
+                case 'a': return L_MatchType(lexer, 2, str_lit("se"), TokenType_Case);
             }
         }
+        
         case 'l': return L_MatchType(lexer, 1, str_lit("ong"), TokenType_Long);
         case 'v': return L_MatchType(lexer, 1, str_lit("oid"), TokenType_Void);
         case 't': return L_MatchType(lexer, 1, str_lit("rue"), TokenType_True);
+        
         case 's': {
-            if (L_MatchType(lexer, 1, str_lit("truct"), TokenType_Struct) == TokenType_Struct) {
-                return TokenType_Struct;
-            } else return L_MatchType(lexer, 1, str_lit("tring"), TokenType_String);
+            switch (lexer->start[1]) {
+                case 't': {
+                    if (L_MatchType(lexer, 2, str_lit("ruct"), TokenType_Struct) == TokenType_Struct) {
+                        return TokenType_Struct;
+                    } else return L_MatchType(lexer, 2, str_lit("ring"), TokenType_String);
+                }
+                case 'w': return L_MatchType(lexer, 2, str_lit("itch"), TokenType_Switch);
+            }
         }
+        
         case 'e': {
             switch (lexer->start[1]) {
                 case 'n': return L_MatchType(lexer, 2, str_lit("um"), TokenType_Enum);
                 case 'l': return L_MatchType(lexer, 2, str_lit("se"), TokenType_Else);
             }
         }
+        
         case 'n': {
             switch (lexer->start[1]) {
                 case 'a': return L_MatchType(lexer, 2, str_lit("tive"), TokenType_Native);
@@ -242,6 +259,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                 }
             }
         }
+        
         case 'i': {
             switch (lexer->start[1]) {
                 case 'm': return L_MatchType(lexer, 2, str_lit("port"), TokenType_Import);
@@ -249,11 +267,18 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                 default: return L_MatchType(lexer, 1, str_lit("f"), TokenType_If);
             }
         }
+        
         case 'd': {
-            if (L_MatchType(lexer, 1, str_lit("ouble"), TokenType_Double) == TokenType_Double) {
-                return TokenType_Double;
-            } else return L_MatchType(lexer, 1, str_lit("o"), TokenType_Do);
+            switch (lexer->start[1]) {
+                case 'o': {
+                    if (L_MatchType(lexer, 2, str_lit("uble"), TokenType_Double) == TokenType_Double) {
+                        return TokenType_Double;
+                    } else return L_MatchType(lexer, 1, str_lit("o"), TokenType_Do);
+                }
+                case 'e': return L_MatchType(lexer, 2, str_lit("fault"), TokenType_Default);
+            }
         }
+        
         case 'f': {
             switch (lexer->start[1]) {
                 case 'o': return L_MatchType(lexer, 2, str_lit("r"), TokenType_For);

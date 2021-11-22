@@ -55,6 +55,7 @@ struct P_Expr {
     P_ExprType type;
     P_ValueType ret_type;
     b8 can_assign;
+    b8 is_constant; // TODO: convert to bitfield
     union {
         i32    integer_lit;
         i64    long_lit;
@@ -89,6 +90,8 @@ enum {
     StmtType_IfElse, StmtType_While, StmtType_DoWhile, StmtType_VarDecl,
     StmtType_VarDeclAssign, StmtType_FuncDecl, StmtType_NativeFuncDecl, StmtType_StructDecl,
     StmtType_EnumDecl, StmtType_For, StmtType_Break, StmtType_Continue,
+    StmtType_Switch, StmtType_Match, StmtType_Case, StmtType_MatchCase,
+    StmtType_Default, StmtType_MatchDefault,
 };
 
 typedef struct P_Stmt P_Stmt;
@@ -107,6 +110,12 @@ struct P_Stmt {
         struct { string name; u32 member_count; value_type_list member_types; string_list member_names; } struct_decl;
         struct { string name; u32 member_count; string_list member_names; } enum_decl;
         
+        struct { P_Expr* switched;  P_Stmt* then; } switch_s;
+        struct { P_Expr* matched;   P_Stmt* then; } match_s;
+        struct { P_Expr* value;     P_Stmt* then; } case_s;
+        struct { P_Expr* value;     P_Stmt* then; } mcase_s;
+        struct { P_Stmt* then; } default_s;
+        struct { P_Stmt* then; } mdefault_s;
         struct { P_Expr* condition; P_Stmt* then; } if_s;
         struct { P_Expr* condition; P_Stmt* then; P_Stmt* else_s; } if_else;
         struct { P_Expr* condition; P_Stmt* then; } while_s;
@@ -140,6 +149,10 @@ enum {
     ScopeType_DoWhile,
     ScopeType_If,
     ScopeType_Else,
+    ScopeType_Switch,
+    ScopeType_Match,
+    ScopeType_Case,
+    ScopeType_Default,
 };
 
 typedef struct P_ScopeContext {
@@ -184,8 +197,10 @@ typedef struct P_Parser {
     b8 is_directly_in_func_body;
     b8 all_code_paths_return;
     P_ValueType function_body_ret;
+    P_ValueType switch_type;
     b8 is_in_private_scope; // This is temporary until I come up with a solution for closures
     b8 encountered_return;
+    b8 encountered_default;
     u32 lambda_number;
     u32 import_number;
     

@@ -37,6 +37,7 @@ enum {
     TokenType_Import,
     TokenType_Null, TokenType_Nullptr, TokenType_Native,
     TokenType_If, TokenType_Else, TokenType_Do, TokenType_For, TokenType_While,
+    TokenType_Switch, TokenType_Match, TokenType_Case, TokenType_Default,
     TokenType_True, TokenType_False,
     TokenType_Int, TokenType_String, TokenType_Float, TokenType_Bool, TokenType_Double, TokenType_Char, TokenType_Long, TokenType_Void,
     

@@ -514,6 +514,54 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             E_WriteLine(emitter, ");");
         } break;
         
+        case StmtType_Switch: {
+            E_Write(emitter, "switch (");
+            E_EmitExpression(emitter, stmt->op.switch_s.switched);
+            E_WriteLine(emitter, ")");
+            E_EmitStatement(emitter, stmt->op.switch_s.then, indent + 1);
+        } break;
+        
+        case StmtType_Match: {
+            E_Write(emitter, "switch (");
+            E_EmitExpression(emitter, stmt->op.match_s.matched);
+            E_WriteLine(emitter, ")");
+            E_EmitStatement(emitter, stmt->op.match_s.then, indent + 1);
+        } break;
+        
+        case StmtType_Case: {
+            E_Write(emitter, "case ");
+            E_EmitExpression(emitter, stmt->op.case_s.value);
+            E_WriteLine(emitter, ":");
+            E_EmitStatementChain(emitter, stmt->op.case_s.then, indent + 1);
+        } break;
+        
+        case StmtType_MatchCase: {
+            E_Write(emitter, "case ");
+            E_EmitExpression(emitter, stmt->op.mcase_s.value);
+            E_WriteLine(emitter, ":");
+            if (stmt->op.mcase_s.then->type != StmtType_Block)
+                E_WriteLine(emitter, "{");
+            E_EmitStatement(emitter, stmt->op.mcase_s.then, indent + 1);
+            if (stmt->op.mcase_s.then->type != StmtType_Block)
+                E_WriteLine(emitter, "}");
+            E_WriteLine(emitter, "break;");
+        } break;
+        
+        case StmtType_Default: {
+            E_WriteLine(emitter, "default:");
+            E_EmitStatement(emitter, stmt->op.default_s.then, indent + 1);
+        } break;
+        
+        case StmtType_MatchDefault: {
+            E_WriteLine(emitter, "default:");
+            if (stmt->op.mdefault_s.then->type != StmtType_Block)
+                E_WriteLine(emitter, "{");
+            E_EmitStatementChain(emitter, stmt->op.mdefault_s.then, indent + 1);
+            if (stmt->op.mdefault_s.then->type != StmtType_Block)
+                E_WriteLine(emitter, "}");
+            E_WriteLine(emitter, "break;");
+        } break;
+        
         case StmtType_Break: {
             E_WriteLine(emitter, "break;");
         } break;
