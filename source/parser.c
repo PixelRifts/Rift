@@ -100,6 +100,9 @@ static P_ValueType member_type_get(P_Container* structure, string reqd) {
 }
 
 static b8 member_exists(P_Container* structure, string reqd) {
+    // Can't check the struct
+    if (structure->is_native) return true;
+    
     string_list_node* curr = structure->member_names.first;
     for (u32 i = 0; i < structure->member_count; i++) {
         if (curr->size == reqd.size) {
@@ -1067,14 +1070,6 @@ static P_Stmt* P_MakeFuncStmtNode(P_Parser* parser, P_ValueType type, string nam
     return stmt;
 }
 
-static P_Stmt* P_MakeNativeFuncStmtNode(P_Parser* parser, P_ValueType type, string name, u32 arity, value_type_list param_types, string_list param_names) {
-    P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
-    stmt->type = StmtType_NativeFuncDecl;
-    stmt->next = nullptr;
-    stmt->op.native_func_decl = name;
-    return stmt;
-}
-
 static P_PreStmt* P_MakePreFuncStmtNode(P_Parser* parser, P_ValueType type, string name, u32 arity, value_type_list param_types, string_list param_names) {
     P_PreStmt* stmt = arena_alloc(&parser->arena, sizeof(P_PreStmt));
     stmt->type = PreStmtType_ForwardDecl;
@@ -1550,7 +1545,7 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
             return P_MakeAssignmentNode(parser, left, xpr);
         }
         
-        report_error(parser, str_lit("Cannot assign %.*s to variable\n"), str_expand(xpr->ret_type.full_type));
+        report_error(parser, str_lit("Cannot assign %.*s to variable of type %.*s\n"), str_expand(xpr->ret_type.full_type), str_expand(left->ret_type.full_type));
     }
     return nullptr;
 }
@@ -1764,7 +1759,9 @@ static P_Expr* P_ExprDot(P_Parser* parser, P_Expr* left) {
             if (!member_exists(type, reqd)) {
                 report_error(parser, str_lit("No member %.*s in struct %.*s\n"), str_expand(reqd), str_expand(valtype.full_type));
             }
-            P_ValueType member_type = member_type_get(type, reqd);
+            P_ValueType member_type;
+            if (type->is_native) member_type = ValueType_Any;
+            else member_type = member_type_get(type, reqd);
             return P_MakeDotNode(parser, member_type, left, reqd);
         }
     }
@@ -2011,7 +2008,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         if (!parser->all_code_paths_return) report_error(parser, str_lit("Not all code paths return a value\n"));
     } else {
         P_Consume(parser, TokenType_Semicolon, str_lit("Can't have function body on a native function\n"));
-        func = P_MakeNativeFuncStmtNode(parser, type, name, arity, params, param_names);
+        func = P_MakeNothingNode(parser);
     }
     
     return func;
@@ -2093,12 +2090,19 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name) {
     return P_MakeVarDeclStmtNode(parser, type, name);
 }
 
-static P_Stmt* P_StmtStructureDecl(P_Parser* parser) {
+static P_Stmt* P_StmtStructureDecl(P_Parser* parser, b8 native) {
     P_Consume(parser, TokenType_Identifier, str_lit("Expected Struct name after keyword 'struct'\n"));
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     
     if (container_type_exists(parser, name, parser->scope_depth))
         report_error(parser, str_lit("Cannot redeclare type with name %.*s\n"), str_expand(name));
+    
+    if (native) {
+        P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after native struct name\n"));
+        type_array_add(&types, (P_Container) { .type = ContainerType_Struct, .name = name, .depth = parser->scope_depth, .is_native = true });
+        return P_MakeNothingNode(parser);
+    }
+    
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Struct Name\n"));
     
     u64 idx = types.count;
@@ -2594,7 +2598,7 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
             s = P_StmtVarDecl(parser, type, name);
         }
     } else if (P_Match(parser, TokenType_Struct)) {
-        s = P_StmtStructureDecl(parser);
+        s = P_StmtStructureDecl(parser, native);
     } else if (P_Match(parser, TokenType_Enum)) {
         s = P_StmtEnumerationDecl(parser);
     } else if (P_Match(parser, TokenType_Import)) {
@@ -2777,12 +2781,14 @@ static P_PreStmt* P_PreStmtImport(P_Parser* parser) {
 static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
     // No preparsing for native tagged stuff
     if (P_Match(parser, TokenType_TagNative)) {
-        while (!P_Match(parser, TokenType_CloseParenthesis)) {
-            if (P_Match(parser, TokenType_EOF))
-                return nullptr;
-            P_Advance(parser);
-        }
-        return nullptr;
+        if (P_IsTypeToken(parser)) {
+            while (!P_Match(parser, TokenType_CloseParenthesis)) {
+                if (P_Match(parser, TokenType_EOF))
+                    return nullptr;
+                P_Advance(parser);
+            }
+        } else if (P_Match(parser, TokenType_Struct))
+            return nullptr;
     }
     
     if (P_IsTypeToken(parser)) {
@@ -2921,8 +2927,8 @@ void P_Initialize(P_Parser* parser, string source, string filename, b8 is_root) 
     parser->current_function = (string) {0};
     parser->block_stmt_should_begin_scope = true;
     parser->is_in_private_scope = false;
-    parser->parent = nullptr;
     if (!parser->initialized) {
+        parser->parent = nullptr;
         parser->sub = nullptr;
         parser->sub_cap = 0;
         parser->sub_count = 0;

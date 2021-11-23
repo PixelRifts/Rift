@@ -83,6 +83,7 @@ typedef struct P_Container {
     u32 member_count;
     value_type_list member_types;
     string_list member_names;
+    b8 is_native;
 } P_Container;
 
 typedef struct type_array {

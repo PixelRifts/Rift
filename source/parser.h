@@ -88,7 +88,7 @@ enum {
     StmtType_Nothing, // Used Successful parsing but no code emission e.g. Inner scope functions
     StmtType_Expression, StmtType_Block, StmtType_Return, StmtType_If,
     StmtType_IfElse, StmtType_While, StmtType_DoWhile, StmtType_VarDecl,
-    StmtType_VarDeclAssign, StmtType_FuncDecl, StmtType_NativeFuncDecl, StmtType_StructDecl,
+    StmtType_VarDeclAssign, StmtType_FuncDecl, StmtType_StructDecl,
     StmtType_EnumDecl, StmtType_For, StmtType_Break, StmtType_Continue,
     StmtType_Switch, StmtType_Match, StmtType_Case, StmtType_MatchCase,
     StmtType_Default, StmtType_MatchDefault,
@@ -102,7 +102,6 @@ struct P_Stmt {
         P_Expr* expression;
         P_Expr* returned;
         P_Stmt* block;
-        string native_func_decl;
         
         struct { P_ValueType type; string name; } var_decl;
         struct { P_ValueType type; string name; P_Expr* val; } var_decl_assign;
