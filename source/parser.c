@@ -24,7 +24,6 @@ static string_list imports_parsing;
 static type_array types;
 static string cwd;
 
-
 static string fix_filepath(M_Arena* arena, string path) {
     string fixed = path;
     while (true) {
@@ -121,7 +120,7 @@ void P_Advance(P_Parser* parser) {
     while (true) {
         parser->next_two = L_LexToken(&parser->lexer);
         if (parser->next_two.type != TokenType_Error) break;
-        report_error_at_current(parser, (string) { .str = (u8*)parser->current.start, .size = parser->current.length });
+        report_error_at_current(parser, str_lit("%.*s\n"), (i32)parser->current.length, parser->current.start);
     }
 }
 
@@ -2578,10 +2577,14 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
     // Consume semicolons
     while (P_Match(parser, TokenType_Semicolon));
     
+    // Native Tag
+    b8 native = false;
+    if (P_Match(parser, TokenType_TagNative))
+        native = true;
+    
     if (P_IsTypeToken(parser)) {
         P_ValueType type = P_ConsumeType(parser, str_lit("There's an error in the parser. (P_Declaration)\n"));
-        b8 native = false;
-        if (P_Match(parser, TokenType_Native)) native = true;
+        
         P_Consume(parser, TokenType_Identifier, str_lit("Expected Identifier after variable type\n"));
         
         string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
@@ -2772,16 +2775,18 @@ static P_PreStmt* P_PreStmtImport(P_Parser* parser) {
 }
 
 static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
+    // No preparsing for native tagged stuff
+    if (P_Match(parser, TokenType_TagNative)) {
+        while (!P_Match(parser, TokenType_CloseParenthesis)) {
+            if (P_Match(parser, TokenType_EOF))
+                return nullptr;
+            P_Advance(parser);
+        }
+        return nullptr;
+    }
+    
     if (P_IsTypeToken(parser)) {
         P_ValueType type = P_ConsumeType(parser, str_lit("This is an error in the Parser. (P_PreDeclaration)\n"));
-        if (P_Match(parser, TokenType_Native)) {
-            while (!P_Match(parser, TokenType_CloseParenthesis)) {
-                if (P_Match(parser, TokenType_EOF))
-                    return nullptr;
-                P_Advance(parser);
-            }
-            return nullptr;
-        }
         
         if (!P_Match(parser, TokenType_Identifier)) return nullptr;
         
