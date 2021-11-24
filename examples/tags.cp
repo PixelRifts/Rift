@@ -1,4 +1,6 @@
-import "standard.cp";
+native void printf(string format, ... rest);
+native void* calloc(int count, int elem_size);
+native void free(void* buffer);
 
 @linux
 void tagged() {
@@ -11,8 +13,6 @@ void tagged() {
 }
 
 int main() {
-	printf("Started successfully\n");
 	tagged();
-	printf("Exited successfully\n");
 	return 0;
 }
