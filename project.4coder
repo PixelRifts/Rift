@@ -49,7 +49,7 @@ command_list =
 		.cursor_at_end = false,
 		.cmd =
 		{
-			{ "del /f ./generated.c & bin\cpcom.exe ./test.cp", .os = "win" },
+			{ "del /f ./generated.c & bin\cpcom.exe ./test.cp @test_tag", .os = "win" },
 		},
 	},
 	{

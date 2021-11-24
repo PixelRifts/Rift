@@ -12,7 +12,7 @@ typedef struct E_Emitter {
     FILE* output_file;
 } E_Emitter;
 
-void E_Initialize(E_Emitter* emitter, string source, string filename);
+void E_Initialize(E_Emitter* emitter, string source, string filename, string_list tags);
 void E_Emit(E_Emitter* emitter);
 void E_Free(E_Emitter* emitter);
 

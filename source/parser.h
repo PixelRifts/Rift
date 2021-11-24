@@ -210,7 +210,7 @@ typedef struct P_Parser {
     u32 sub_count;
 } P_Parser;
 
-void P_GlobalInit();
+void P_GlobalInit(string_list tags);
 void P_GlobalFree();
 
 // Heirarchy stuff

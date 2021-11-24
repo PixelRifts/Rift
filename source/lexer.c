@@ -81,7 +81,7 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_Double: return str_lit("Double");
         case TokenType_Char: return str_lit("Char");
         case TokenType_Long: return str_lit("Long");
-        case TokenType_TagNative: return str_lit("@native");
+        case TokenType_Native: return str_lit("Native");
         case TokenType_String: return str_lit("String");
     }
     return str_lit("unreachable");
@@ -206,13 +206,6 @@ static L_TokenType L_MatchType(L_Lexer* lexer, u32 start, string needle, L_Token
     return TokenType_Identifier;
 }
 
-static L_TokenType L_MatchTagType(L_Lexer* lexer, u32 start, string needle, L_TokenType yes) {
-    if (lexer->current - lexer->start == start + needle.size && memcmp(lexer->start + start, needle.str, needle.size) == 0) {
-        return yes;
-    }
-    return TokenType_Error;
-}
-
 static L_TokenType L_IdentifierType(L_Lexer* lexer) {
     switch (lexer->start[0]) {
         case 'r': return L_MatchType(lexer, 1, str_lit("eturn"), TokenType_Return);
@@ -257,9 +250,14 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
         }
         
         case 'n': {
-            if (L_MatchType(lexer, 1, str_lit("ullptr"), TokenType_Nullptr) == TokenType_Nullptr) {
-                return TokenType_Nullptr;
-            } else return L_MatchType(lexer, 1, str_lit("ull"), TokenType_Null);
+            switch (lexer->start[1]) {
+                case 'u': {
+                    if (L_MatchType(lexer, 2, str_lit("llptr"), TokenType_Nullptr) == TokenType_Nullptr) {
+                        return TokenType_Nullptr;
+                    } else return L_MatchType(lexer, 2, str_lit("ll"), TokenType_Null);
+                }
+                case 'a': return L_MatchType(lexer, 2, str_lit("tive"), TokenType_Native);
+            }
         }
         
         case 'i': {
@@ -300,23 +298,12 @@ static L_Token L_Identifier(L_Lexer* lexer) {
     return L_MakeToken(lexer, L_IdentifierType(lexer));
 }
 
-static L_Token L_TagCreate(L_Lexer* lexer) {
-    switch (lexer->start[1]) {
-        case 'n': {
-            if (L_MatchTagType(lexer, 2, str_lit("ative"), TokenType_TagNative) != TokenType_Error)
-                return L_MakeToken(lexer, TokenType_TagNative);
-        }
-    }
-    
-    return L_ErrorToken(lexer, str_lit("Unknown Tag\n"));
-}
-
 static L_Token L_Tag(L_Lexer* lexer) {
     while (is_alpha(L_Peek(lexer)) || is_digit(L_Peek(lexer))) {
         L_Advance(lexer);
     }
     
-    return L_TagCreate(lexer);
+    return L_MakeToken(lexer, TokenType_Tag);
 }
 
 void L_Initialize(L_Lexer* lexer, string source) {

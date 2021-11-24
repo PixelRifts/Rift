@@ -1,15 +1,20 @@
 import "standard.cp";
-import "examples/add_import.cp";
-import "foo.cp";
+// import "examples/add_import.cp";
+// import "foo.cp";
 
-@native struct meh;
+@linux
+void tagged() {
+	printf("Linux");
+}
+
+@windows
+void tagged() {
+	printf("Windows");
+}
 
 int main() {
 	printf("Started successfully\n");
-
-	meh we;
-	we.no_memberchecking_here = "haha yes";
-
+	tagged();
 	printf("Exited successfully\n");
 	return 0;
 }

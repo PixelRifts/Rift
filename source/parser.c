@@ -21,6 +21,7 @@ static var_hash_table variables;
 static func_hash_table functions;
 static string_list imports;
 static string_list imports_parsing;
+static string_list active_tags;
 static type_array types;
 static string cwd;
 
@@ -484,6 +485,29 @@ static b8 P_IsInScope(P_Parser* parser, P_ScopeType type) {
         scope_idx--;
     }
     return false;
+}
+
+static b8 P_HasTag(string_list* list, string_list_node* tagname) {
+    string_list_node* curr = list->first;
+    while (curr != nullptr) {
+        if (curr->size == tagname->size) {
+            if (memcmp(curr->str, tagname->str, tagname->size) == 0)
+                return true;
+        }
+        curr = curr->next;
+    }
+    return false;
+}
+
+static b8 P_CheckTags(string_list* check, string_list* enabled) {
+    string_list_node* curr = check->first;
+    while (curr != nullptr) {
+        if (!P_HasTag(enabled, curr))
+            return false;
+        curr = curr->next;
+    }
+    
+    return true;
 }
 
 //~ Binding
@@ -1871,7 +1895,7 @@ static P_Expr* P_Expression(P_Parser* parser) {
 }
 
 //~ Statements
-static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b8 native) {
+static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b8 native, string_list tags) {
     value_type_list params = {0};
     string_list param_names = {0};
     u32 arity = 0;
@@ -1935,6 +1959,38 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         }
     }
     
+    if (tags.node_count != 0) {
+        
+        // if has all its tags are active, go ahead. otherwise....
+        if (!P_CheckTags(&tags, &active_tags)) {
+            
+            P_Consume(parser, TokenType_OpenBrace, str_lit("Expected {\n"));
+            u32 outer_depth = parser->scope_depth++;
+            
+            // Skip function body
+            
+            while (true) {
+                if (P_Match(parser, TokenType_OpenBrace)) {
+                    parser->scope_depth++;
+                    continue;
+                } else if (P_Match(parser, TokenType_CloseBrace)) {
+                    parser->scope_depth--;
+                    if (parser->scope_depth == outer_depth)
+                        break;
+                    continue;
+                }
+                
+                P_Advance(parser);
+                
+                if (parser->current.type == TokenType_EOF)
+                    report_error(parser, str_lit("Unterminated Function Block. Expected }\n"));
+            }
+            
+            P_EndScope(parser, scope_context);
+            return P_MakeNothingNode(parser);
+        }
+    }
+    
     string additional = {0};
     if (varargs) additional = str_cat(&parser->arena, additional, str_lit("varargs"));
     
@@ -1951,6 +2007,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     
     // Don't try to add the outermost scope functions since they get added during preparsing
     if (parser->scope_depth != 1 || native) {
+        
         func_entry_key key = (func_entry_key) { .name = name, .depth = native ? parser->scope_depth : parser->scope_depth - 1 };
         // -1 When not native because the scope depth is changed by this point if the function has a body
         
@@ -1964,6 +2021,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
             
             func_hash_table_set(&functions, key, val);
         } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), str_expand(name));
+        
     }
     
     // Block Stuff
@@ -2581,9 +2639,15 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
     // Consume semicolons
     while (P_Match(parser, TokenType_Semicolon));
     
-    // Native Tag
+    string_list tags = {0};
+    while (P_Match(parser, TokenType_Tag)) {
+        string tagstr = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        string_list_push(&parser->arena, &tags, tagstr);
+    }
+    
+    // Native
     b8 native = false;
-    if (P_Match(parser, TokenType_TagNative))
+    if (P_Match(parser, TokenType_Native))
         native = true;
     
     if (P_IsTypeToken(parser)) {
@@ -2593,7 +2657,7 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
         
         string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
         if (P_Match(parser, TokenType_OpenParenthesis)) {
-            s = P_StmtFuncDecl(parser, type, name, native);
+            s = P_StmtFuncDecl(parser, type, name, native, tags);
         } else {
             s = P_StmtVarDecl(parser, type, name);
         }
@@ -2619,7 +2683,7 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
 }
 
 //~ Pre-Parsing
-static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name) {
+static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name, string_list tags) {
     value_type_list params = {0};
     string_list param_names = {0};
     u32 arity = 0;
@@ -2661,6 +2725,32 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name)
         if (!P_Match(parser, TokenType_Comma)) {
             P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after parameters\n"));
             break;
+        }
+    }
+    
+    if (tags.node_count != 0) {
+        // if has all its tags are active, go ahead. otherwise....
+        if (!P_CheckTags(&tags, &active_tags)) {
+            P_Consume(parser, TokenType_OpenBrace, str_lit("Expected {\n"));
+            parser->scope_depth = 1;
+            
+            // Consume the function body :^)
+            while (true) {
+                if (parser->current.type == TokenType_OpenBrace) {
+                    parser->scope_depth++;
+                } else if (parser->current.type == TokenType_CloseBrace) {
+                    parser->scope_depth--;
+                    if (parser->scope_depth == 0)
+                        break;
+                }
+                
+                P_Advance(parser);
+                if (P_Match(parser, TokenType_EOF)) {
+                    report_error(parser, str_lit("Unterminated function block\n"));
+                }
+            }
+            
+            return nullptr;
         }
     }
     
@@ -2779,8 +2869,17 @@ static P_PreStmt* P_PreStmtImport(P_Parser* parser) {
 }
 
 static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
-    // No preparsing for native tagged stuff
-    if (P_Match(parser, TokenType_TagNative)) {
+    string_list tags = {0};
+    while (P_Match(parser, TokenType_Tag)) {
+        string tagstr = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        string_list_push(&parser->arena, &tags, tagstr);
+    }
+    
+    // No preparsing for native stuff
+    if (P_Match(parser, TokenType_Native)) {
+        if (tags.node_count != 0)
+            report_error(parser, str_lit("Cannot add tags to native functions\n"));
+        
         if (P_IsTypeToken(parser)) {
             while (!P_Match(parser, TokenType_CloseParenthesis)) {
                 if (P_Match(parser, TokenType_EOF))
@@ -2798,7 +2897,7 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
         
         string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
         if (P_Match(parser, TokenType_OpenParenthesis)) {
-            return P_PreFuncDecl(parser, type, name);
+            return P_PreFuncDecl(parser, type, name, tags);
         }
     } else if (P_Match(parser, TokenType_Import)) {
         P_PreStmtImport(parser);
@@ -2883,12 +2982,13 @@ void P_Parse(P_Parser* parser) {
     }
 }
 
-void P_GlobalInit() {
+void P_GlobalInit(string_list tags) {
     arena_init(&global_arena);
     var_hash_table_init(&variables);
     func_hash_table_init(&functions);
     types_init(&global_arena);
     type_array_init(&types);
+    active_tags = tags;
     imports = (string_list){0};
     imports_parsing = (string_list){0};
     char* buffer = arena_alloc(&global_arena, PATH_MAX);
