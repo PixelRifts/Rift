@@ -624,7 +624,7 @@ static void P_EndScope(P_Parser* parser, P_ScopeContext context) {
     // Remove all functions from the current scope
     for (u32 i = 0; i < functions.capacity; i++) {
         if (functions.entries[i].key.depth == parser->scope_depth)
-            func_hash_table_del(&functions, functions.entries[i].key);
+            func_hash_table_del_full(&functions, functions.entries[i].key);
     }
     
     parser->scope_depth--;
@@ -1104,6 +1104,13 @@ static P_PreStmt* P_MakePreFuncStmtNode(P_Parser* parser, P_ValueType type, stri
     stmt->op.forward_decl.arity = arity;
     stmt->op.forward_decl.param_types = param_types;
     stmt->op.forward_decl.param_names = param_names;
+    return stmt;
+}
+
+static P_PreStmt* P_MakePreNothingNode(P_Parser* parser) {
+    P_PreStmt* stmt = arena_alloc(&parser->arena, sizeof(P_PreStmt));
+    stmt->type = PreStmtType_Nothing;
+    stmt->next = nullptr;
     return stmt;
 }
 
@@ -1896,7 +1903,7 @@ static P_Expr* P_Expression(P_Parser* parser) {
 }
 
 //~ Statements
-static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b8 native, string_list tags) {
+static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b8 native, b8 has_all_tags) {
     value_type_list params = {0};
     string_list param_names = {0};
     u32 arity = 0;
@@ -1960,38 +1967,6 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         }
     }
     
-    if (tags.node_count != 0) {
-        
-        // if has all its tags are active, go ahead. otherwise....
-        if (!P_CheckTags(&tags, &active_tags)) {
-            
-            P_Consume(parser, TokenType_OpenBrace, str_lit("Expected {\n"));
-            u32 outer_depth = parser->scope_depth++;
-            
-            // Skip function body
-            
-            while (true) {
-                if (P_Match(parser, TokenType_OpenBrace)) {
-                    parser->scope_depth++;
-                    continue;
-                } else if (P_Match(parser, TokenType_CloseBrace)) {
-                    parser->scope_depth--;
-                    if (parser->scope_depth == outer_depth)
-                        break;
-                    continue;
-                }
-                
-                P_Advance(parser);
-                
-                if (parser->current.type == TokenType_EOF)
-                    report_error(parser, str_lit("Unterminated Function Block. Expected }\n"));
-            }
-            
-            P_EndScope(parser, scope_context);
-            return P_MakeNothingNode(parser);
-        }
-    }
-    
     string additional = {0};
     if (varargs) additional = str_cat(&parser->arena, additional, str_lit("varargs"));
     
@@ -2006,12 +1981,11 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
             ? name : P_FuncNameMangle(parser, main_part, varargs ? arity - 1 : arity, params, additional);
     }
     
+    func_entry_key key = (func_entry_key) { .name = name, .depth = native ? parser->scope_depth : parser->scope_depth - 1 };
+    // -1 When not native because the scope depth is changed by this point if the function has a body
+    
     // Don't try to add the outermost scope functions since they get added during preparsing
-    if (parser->scope_depth != 1 || native) {
-        
-        func_entry_key key = (func_entry_key) { .name = name, .depth = native ? parser->scope_depth : parser->scope_depth - 1 };
-        // -1 When not native because the scope depth is changed by this point if the function has a body
-        
+    if ((parser->scope_depth != 1 || native) && has_all_tags) {
         u32 subset_match = 1024;
         func_entry_val* test = nullptr;
         if (!func_hash_table_get(&functions, key, &params, &test, &subset_match, true)) {
@@ -2022,7 +1996,6 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
             
             func_hash_table_set(&functions, key, val);
         } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), str_expand(name));
-        
     }
     
     // Block Stuff
@@ -2064,19 +2037,22 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         }
         
         P_EndScope(parser, scope_context);
+        
         if (!parser->all_code_paths_return) report_error(parser, str_lit("Not all code paths return a value\n"));
     } else {
         P_Consume(parser, TokenType_Semicolon, str_lit("Can't have function body on a native function\n"));
+        
+        // Allowed
         func = P_MakeNothingNode(parser);
     }
     
     return func;
 }
 
-static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name) {
+static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8 has_all_tags) {
     P_ValueType test;
     var_entry_key key = (var_entry_key) { .name = name, .depth = parser->scope_depth };
-    if (!var_hash_table_get(&variables, key, &test)) {
+    if (!var_hash_table_get(&variables, key, &test) && has_all_tags) {
         var_hash_table_set(&variables, key, type);
     }
     else report_error(parser, str_lit("Cannot redeclare variable %.*s\n"), str_expand(name));
@@ -2149,7 +2125,7 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name) {
     return P_MakeVarDeclStmtNode(parser, type, name);
 }
 
-static P_Stmt* P_StmtStructureDecl(P_Parser* parser, b8 native) {
+static P_Stmt* P_StmtStructureDecl(P_Parser* parser, b8 native, b8 has_all_tags) {
     P_Consume(parser, TokenType_Identifier, str_lit("Expected Struct name after keyword 'struct'\n"));
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     
@@ -2158,14 +2134,16 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser, b8 native) {
     
     if (native) {
         P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after native struct name\n"));
-        type_array_add(&types, (P_Container) { .type = ContainerType_Struct, .name = name, .depth = parser->scope_depth, .is_native = true });
+        if (has_all_tags)
+            type_array_add(&types, (P_Container) { .type = ContainerType_Struct, .name = name, .depth = parser->scope_depth, .is_native = true });
         return P_MakeNothingNode(parser);
     }
     
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Struct Name\n"));
     
     u64 idx = types.count;
-    type_array_add(&types, (P_Container) { .type = ContainerType_Struct, .name = name, .depth = parser->scope_depth });
+    if (has_all_tags)
+        type_array_add(&types, (P_Container) { .type = ContainerType_Struct, .name = name, .depth = parser->scope_depth });
     u32 tmp_member_count = 0;
     string_list member_names = {0};
     value_type_list member_types = {0};
@@ -2187,14 +2165,16 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser, b8 native) {
             report_error(parser, str_lit("Unterminated block for structure definition\n"));
     }
     
-    types.elements[idx].member_count = tmp_member_count;
-    types.elements[idx].member_types = member_types;
-    types.elements[idx].member_names = member_names;
+    if (has_all_tags) {
+        types.elements[idx].member_count = tmp_member_count;
+        types.elements[idx].member_types = member_types;
+        types.elements[idx].member_names = member_names;
+    }
     
     return P_MakeStructDeclStmtNode(parser, name, tmp_member_count, member_types, member_names);
 }
 
-static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser) {
+static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser, b8 has_all_tags) {
     P_Consume(parser, TokenType_Identifier, str_lit("Expected Enum name after keyword 'enum'\n"));
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     if (container_type_exists(parser, name, parser->scope_depth))
@@ -2202,7 +2182,8 @@ static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser) {
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Enum Name\n"));
     
     u64 idx = types.count;
-    type_array_add(&types, (P_Container) { .type = ContainerType_Enum, .name = name, .depth = parser->scope_depth });
+    if (has_all_tags)
+        type_array_add(&types, (P_Container) { .type = ContainerType_Enum, .name = name, .depth = parser->scope_depth });
     u32 member_count = 0;
     string_list member_names = {0};
     value_type_list member_types = {0};
@@ -2221,14 +2202,16 @@ static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser) {
             report_error(parser, str_lit("Unterminated block for enum definition\n"));
     }
     
-    types.elements[idx].member_count = member_count;
-    types.elements[idx].member_types = member_types;
-    types.elements[idx].member_names = member_names;
+    if (has_all_tags) {
+        types.elements[idx].member_count = member_count;
+        types.elements[idx].member_types = member_types;
+        types.elements[idx].member_names = member_names;
+    }
     
     return P_MakeEnumDeclStmtNode(parser, name, member_count, member_names);
 }
 
-static P_Stmt* P_StmtImport(P_Parser* parser) {
+static P_Stmt* P_StmtImport(P_Parser* parser, b8 has_all_tags) {
     P_Consume(parser, TokenType_StringLit, str_lit("Expected Filename after 'import'\n"));
     
     // String adjusted to be only the filename without quotes
@@ -2244,23 +2227,24 @@ static P_Stmt* P_StmtImport(P_Parser* parser) {
     if (string_list_contains(&imports_parsing, filename))
         return P_MakeNothingNode(parser);
     
-    string_list_push(&global_arena, &imports_parsing, filename);
-    
-    P_Parser* child_parser = parser->sub[parser->import_number++];
-    
-    P_Initialize(child_parser, child_parser->source, child_parser->filename, false);
-    P_Parse(child_parser);
-    P_Stmt* stmt_list = child_parser->root;
-    P_Stmt* curr = stmt_list;
-    while (curr != nullptr) {
-        if (parser->end != nullptr) {
-            parser->end->next = curr;
-            parser->end = curr;
-        } else {
-            parser->root = curr;
-            parser->end = curr;
+    if (has_all_tags) {
+        string_list_push(&global_arena, &imports_parsing, filename);
+        P_Parser* child_parser = parser->sub[parser->import_number++];
+        
+        P_Initialize(child_parser, child_parser->source, child_parser->filename, false);
+        P_Parse(child_parser);
+        P_Stmt* stmt_list = child_parser->root;
+        P_Stmt* curr = stmt_list;
+        while (curr != nullptr) {
+            if (parser->end != nullptr) {
+                parser->end->next = curr;
+                parser->end = curr;
+            } else {
+                parser->root = curr;
+                parser->end = curr;
+            }
+            curr = curr->next;
         }
-        curr = curr->next;
     }
     
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after Filename\n"));
@@ -2646,6 +2630,8 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
         string_list_push(&parser->arena, &tags, tagstr);
     }
     
+    b8 has_all_tags = P_CheckTags(&tags, &active_tags);
+    
     // Native
     b8 native = false;
     if (P_Match(parser, TokenType_Native))
@@ -2658,17 +2644,17 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
         
         string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
         if (P_Match(parser, TokenType_OpenParenthesis)) {
-            s = P_StmtFuncDecl(parser, type, name, native, tags);
+            s = P_StmtFuncDecl(parser, type, name, native, has_all_tags);
         } else {
-            s = P_StmtVarDecl(parser, type, name);
+            s = P_StmtVarDecl(parser, type, name, has_all_tags);
         }
     } else if (P_Match(parser, TokenType_Struct)) {
-        s = P_StmtStructureDecl(parser, native);
+        s = P_StmtStructureDecl(parser, native, has_all_tags);
     } else if (P_Match(parser, TokenType_Enum)) {
-        s = P_StmtEnumerationDecl(parser);
+        s = P_StmtEnumerationDecl(parser, has_all_tags);
     } else if (P_Match(parser, TokenType_Import)) {
         if (parser->scope_depth == 0)
-            s = P_StmtImport(parser);
+            s = P_StmtImport(parser, has_all_tags);
         else {
             report_error(parser, str_lit("Cannot have an import statement in another declaration\n"));
             s = nullptr;
@@ -2679,12 +2665,15 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
     } else
         s = P_Statement(parser);
     
+    if (!has_all_tags)
+        s = P_MakeNothingNode(parser);
+    
     P_Sync(parser);
     return s;
 }
 
 //~ Pre-Parsing
-static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name, string_list tags) {
+static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name, b8 has_all_tags) {
     value_type_list params = {0};
     string_list param_names = {0};
     u32 arity = 0;
@@ -2729,49 +2718,25 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name,
         }
     }
     
-    if (tags.node_count != 0) {
-        // if has all its tags are active, go ahead. otherwise....
-        if (!P_CheckTags(&tags, &active_tags)) {
-            P_Consume(parser, TokenType_OpenBrace, str_lit("Expected {\n"));
-            parser->scope_depth = 1;
-            
-            // Consume the function body :^)
-            while (true) {
-                if (parser->current.type == TokenType_OpenBrace) {
-                    parser->scope_depth++;
-                } else if (parser->current.type == TokenType_CloseBrace) {
-                    parser->scope_depth--;
-                    if (parser->scope_depth == 0)
-                        break;
-                }
-                
-                P_Advance(parser);
-                if (P_Match(parser, TokenType_EOF)) {
-                    report_error(parser, str_lit("Unterminated function block\n"));
-                }
-            }
-            
-            return nullptr;
-        }
-    }
-    
     string additional = {0};
     if (varargs) additional = str_cat(&parser->arena, additional, str_lit("varargs"));
     
     string mangled = str_eq(str_lit("main"), name) ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, additional);
     
-    u32 subset_match = 1024;
-    func_entry_key key = (func_entry_key) { .name = name, .depth = 0 };
-    func_entry_val* test = nullptr;
-    if (!func_hash_table_get(&functions, key, &params, &test, &subset_match, true)) {
-        func_entry_val* val = arena_alloc(&parser->arena, sizeof(func_entry_val));
-        val->value = type;
-        val->is_native = false;
-        val->param_types = params;
-        val->mangled_name = mangled;
-        func_hash_table_set(&functions, key, val);
-    } else
-        report_error(parser, str_lit("Cannot redeclare function %.*s\n"), str_expand(name));
+    if (has_all_tags) {
+        u32 subset_match = 1024;
+        func_entry_key key = (func_entry_key) { .name = name, .depth = 0 };
+        func_entry_val* test = nullptr;
+        if (!func_hash_table_get(&functions, key, &params, &test, &subset_match, true)) {
+            func_entry_val* val = arena_alloc(&parser->arena, sizeof(func_entry_val));
+            val->value = type;
+            val->is_native = false;
+            val->param_types = params;
+            val->mangled_name = mangled;
+            func_hash_table_set(&functions, key, val);
+        } else
+            report_error(parser, str_lit("Cannot redeclare function %.*s\n"), str_expand(name));
+    }
     
     P_PreStmt* func = P_MakePreFuncStmtNode(parser, type, mangled, arity, params, param_names);
     
@@ -2866,7 +2831,9 @@ static P_PreStmt* P_PreStmtImport(P_Parser* parser) {
         curr = curr->next;
     }
     
-    return nullptr;
+    P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after string\n"));
+    
+    return P_MakePreNothingNode(parser);
 }
 
 static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
@@ -2875,6 +2842,9 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
         string tagstr = { .str = (u8*)parser->previous.start + 1, .size = parser->previous.length - 1 };
         string_list_push(&parser->arena, &tags, tagstr);
     }
+    b8 has_all_tags = P_CheckTags(&tags, &active_tags);
+    
+    P_PreStmt* s = nullptr;
     
     // No preparsing for native stuff
     if (P_Match(parser, TokenType_Native)) {
@@ -2884,26 +2854,29 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
         if (P_IsTypeToken(parser)) {
             while (!P_Match(parser, TokenType_CloseParenthesis)) {
                 if (P_Match(parser, TokenType_EOF))
-                    return nullptr;
+                    s = nullptr;
                 P_Advance(parser);
             }
         } else if (P_Match(parser, TokenType_Struct))
-            return nullptr;
-    }
-    
-    if (P_IsTypeToken(parser)) {
+            s = nullptr;
+    } else if (P_IsTypeToken(parser)) {
         P_ValueType type = P_ConsumeType(parser, str_lit("This is an error in the Parser. (P_PreDeclaration)\n"));
         
-        if (!P_Match(parser, TokenType_Identifier)) return nullptr;
-        
-        string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
-        if (P_Match(parser, TokenType_OpenParenthesis)) {
-            return P_PreFuncDecl(parser, type, name, tags);
+        if (!P_Match(parser, TokenType_Identifier))
+            s = nullptr;
+        else {
+            string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+            if (P_Match(parser, TokenType_OpenParenthesis)) {
+                s = P_PreFuncDecl(parser, type, name, has_all_tags);
+            }
         }
+        
     } else if (P_Match(parser, TokenType_Import)) {
-        P_PreStmtImport(parser);
+        s = P_PreStmtImport(parser);
     }
-    return nullptr;
+    
+    if (!has_all_tags) s = P_MakePreNothingNode(parser);
+    return s;
 }
 
 //~ API

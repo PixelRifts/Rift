@@ -125,6 +125,7 @@ struct P_Stmt {
 
 typedef u32 P_PreStmtType;
 enum {
+    PreStmtType_Nothing,
     PreStmtType_ForwardDecl,
 };
 

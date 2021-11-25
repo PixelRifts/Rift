@@ -13,6 +13,11 @@ void tagged() {
 int main() {
 	printf("Started successfully\n");
 	tagged();
+
+	@!linux {
+		printf("This stmtlist was tagged!\n");
+	}
+
 	printf("Exited successfully\n");
 	return 0;
 }

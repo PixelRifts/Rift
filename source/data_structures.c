@@ -270,7 +270,32 @@ b8 func_hash_table_set(func_hash_table* table, func_entry_key key, func_entry_va
     return is_new_key;
 }
 
-b8 func_hash_table_del(func_hash_table* table, func_entry_key key) {
+b8 func_hash_table_del(func_hash_table* table, func_entry_key key, string mangled_needle) {
+    if (table->count == 0) return false;
+    func_table_entry* entry = find_func_entry(table->entries, table->capacity, key);
+    if (entry->key.name.size == 0) return false;
+    
+    func_entry_val* curr = entry->value;
+    func_entry_val* prev = curr;
+    while (curr != nullptr) {
+        if (str_eq(curr->mangled_name, mangled_needle)) {
+            if (curr == prev) {
+                entry->key = (func_entry_key) {0};
+                entry->value = &tombstone;
+            }
+            
+            prev->next = curr->next;
+            break;
+        }
+        
+        prev = curr;
+        curr = curr->next;
+    }
+    
+    return true;
+}
+
+b8 func_hash_table_del_full(func_hash_table* table, func_entry_key key) {
     if (table->count == 0) return false;
     func_table_entry* entry = find_func_entry(table->entries, table->capacity, key);
     if (entry->key.name.size == 0) return false;
@@ -278,7 +303,6 @@ b8 func_hash_table_del(func_hash_table* table, func_entry_key key) {
     entry->value = &tombstone;
     return true;
 }
-
 
 void func_hash_table_add_all(func_hash_table* from, func_hash_table* to) {
     for (u32 i = 0; i < from->capacity; i++) {
