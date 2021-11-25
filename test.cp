@@ -1,13 +1,13 @@
 import "standard.cp";
 
+@!linux
+void tagged() {
+	printf("NOT Linux");
+}
+
 @linux
 void tagged() {
 	printf("Linux");
-}
-
-@windows
-void tagged() {
-	printf("Windows");
 }
 
 int main() {

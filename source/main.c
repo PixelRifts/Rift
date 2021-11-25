@@ -26,21 +26,23 @@ int main(int argc, char **argv) {
     } else {
         M_Arena scratch = {0};
         arena_init(&scratch);
+        
+        // TODO(voxel): move source to scratch
         char* source = readFile(argv[1]);
         string filename = (string) { .str = (u8*)argv[1], .size = strlen(argv[1]) };
         string_list tags = {0};
         if (argc > 2) {
             for (u32 i = 2; i < argc; i++) {
-                string tagname = (string) { .str = (u8*)argv[i], .size = strlen(argv[i]) };
+                string tagname = (string) { .str = ((u8*)argv[i]) + 1, .size = strlen(argv[i]) - 1 };
                 string_list_push(&scratch, &tags, tagname);
             }
         }
         
 #ifdef CPCOM_WIN
-        string_list_push(&scratch, &tags, str_lit("@windows"));
+        string_list_push(&scratch, &tags, str_lit("windows"));
 #endif
 #ifdef CPCOM_LINUX
-        string_list_push(&scratch, &tags, str_lit("@linux"));
+        string_list_push(&scratch, &tags, str_lit("linux"));
 #endif
         
         

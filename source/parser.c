@@ -124,7 +124,7 @@ void P_Advance(P_Parser* parser) {
     while (true) {
         parser->next_two = L_LexToken(&parser->lexer);
         if (parser->next_two.type != TokenType_Error) break;
-        report_error_at_current(parser, str_lit("%.*s\n"), (i32)parser->current.length, parser->current.start);
+        report_error_at_current(parser, str_lit("%.*s\n"), (i32)parser->next.length, parser->next.start);
     }
 }
 
@@ -488,15 +488,16 @@ static b8 P_IsInScope(P_Parser* parser, P_ScopeType type) {
 }
 
 static b8 P_HasTag(string_list* list, string_list_node* tagname) {
+    b8 ret = tagname->str[0] != '!';
     string_list_node* curr = list->first;
     while (curr != nullptr) {
         if (curr->size == tagname->size) {
             if (memcmp(curr->str, tagname->str, tagname->size) == 0)
-                return true;
+                return !ret;
         }
         curr = curr->next;
     }
-    return false;
+    return !ret;
 }
 
 static b8 P_CheckTags(string_list* check, string_list* enabled) {
@@ -2641,7 +2642,7 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
     
     string_list tags = {0};
     while (P_Match(parser, TokenType_Tag)) {
-        string tagstr = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        string tagstr = { .str = (u8*)parser->previous.start + 1, .size = parser->previous.length - 1 };
         string_list_push(&parser->arena, &tags, tagstr);
     }
     
@@ -2871,7 +2872,7 @@ static P_PreStmt* P_PreStmtImport(P_Parser* parser) {
 static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
     string_list tags = {0};
     while (P_Match(parser, TokenType_Tag)) {
-        string tagstr = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        string tagstr = { .str = (u8*)parser->previous.start + 1, .size = parser->previous.length - 1 };
         string_list_push(&parser->arena, &tags, tagstr);
     }
     
@@ -3006,6 +3007,7 @@ void P_Initialize(P_Parser* parser, string source, string filename, b8 is_root) 
         parser->abspath = str_cat(&parser->arena, cwd, str_lit("/"));
         parser->abspath = str_cat(&parser->arena, parser->abspath, parser->filename);
         parser->abspath = str_replace_all(&parser->arena, parser->abspath, str_lit("\\"), str_lit("/"));
+        parser->abspath = fix_filepath(&global_arena, parser->abspath);
     }
     parser->pre_root = nullptr;
     parser->pre_end = nullptr;

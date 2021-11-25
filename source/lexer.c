@@ -375,7 +375,7 @@ L_Token L_LexToken(L_Lexer* lexer) {
         
         case '@': {
             i8 n = L_Advance(lexer);
-            if (!is_alpha(n))
+            if (!is_alpha(n) && n != '!')
                 return L_ErrorToken(lexer, str_lit("Expected identifier after @\n"));
             else
                 return L_Tag(lexer);
