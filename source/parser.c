@@ -17,12 +17,10 @@
 
 //~ Globals
 static M_Arena global_arena;
-static var_hash_table variables;
-static func_hash_table functions;
+static P_Namespace global_namespace;
 static string_list imports;
 static string_list imports_parsing;
 static string_list active_tags;
-static type_array types;
 static string cwd;
 
 static string fix_filepath(M_Arena* arena, string path) {
@@ -65,16 +63,18 @@ static void report_error_at(P_Parser* parser, L_Token* token, string message, ..
 
 //~ Elpers
 static P_Container* type_array_get(P_Parser* parser, string struct_name, u32 depth) {
-    for (u32 i = 0; i < types.count; i++) {
-        if (str_eq(struct_name, types.elements[i].name) && types.elements[i].depth <= depth)
-            return &types.elements[i];
+    // @namespaced
+    for (u32 i = 0; i < global_namespace.types.count; i++) {
+        if (str_eq(struct_name, global_namespace.types.elements[i].name) && global_namespace.types.elements[i].depth <= depth)
+            return &global_namespace.types.elements[i];
     }
     return nullptr;
 }
 
 static b8 container_type_exists(P_Parser* parser, string struct_name, u32 depth) {
-    for (u32 i = 0; i < types.count; i++) {
-        if (str_eq(struct_name, types.elements[i].name) && types.elements[i].depth <= depth)
+    // @namespaced
+    for (u32 i = 0; i < global_namespace.types.count; i++) {
+        if (str_eq(struct_name, global_namespace.types.elements[i].name) && global_namespace.types.elements[i].depth <= depth)
             return true;
     }
     return false;
@@ -571,15 +571,16 @@ static P_ValueType P_GetNumberBinaryValType(P_Expr* a, P_Expr* b) {
 }
 
 static b8 P_GetVariable(P_Parser* parser, string name, P_ValueType* type) {
+    // @namespaced
     if (parser->is_in_private_scope) {
         var_entry_key key = { .name = name, .depth = parser->scope_depth };
-        if (var_hash_table_get(&variables, key, type)) {
+        if (var_hash_table_get(&global_namespace.variables, key, type)) {
             return true;
         }
     } else {
         var_entry_key key = { .name = name, .depth = parser->scope_depth };
         while (key.depth != -1) {
-            if (var_hash_table_get(&variables, key, type)) {
+            if (var_hash_table_get(&global_namespace.variables, key, type)) {
                 return true;
             }
             key.depth++;
@@ -616,15 +617,15 @@ static void P_EndScope(P_Parser* parser, P_ScopeContext context) {
     parser->scopetype_tos--;
     
     // Remove all variables from the current scope
-    for (u32 i = 0; i < variables.capacity; i++) {
-        if (variables.entries[i].key.depth == parser->scope_depth)
-            var_hash_table_del(&variables, variables.entries[i].key);
+    for (u32 i = 0; i < parser->current_namespace->variables.capacity; i++) {
+        if (parser->current_namespace->variables.entries[i].key.depth == parser->scope_depth)
+            var_hash_table_del(&parser->current_namespace->variables, parser->current_namespace->variables.entries[i].key);
     }
     
     // Remove all functions from the current scope
-    for (u32 i = 0; i < functions.capacity; i++) {
-        if (functions.entries[i].key.depth == parser->scope_depth)
-            func_hash_table_del_full(&functions, functions.entries[i].key);
+    for (u32 i = 0; i < parser->current_namespace->functions.capacity; i++) {
+        if (parser->current_namespace->functions.entries[i].key.depth == parser->scope_depth)
+            func_hash_table_del_full(&parser->current_namespace->functions, parser->current_namespace->functions.entries[i].key);
     }
     
     parser->scope_depth--;
@@ -1208,9 +1209,10 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         func_entry_key key = { .name = name, .depth = parser->scope_depth };
         func_entry_val* value = nullptr;
         
+        // @namespaced
         u32 subset_match = 1024; // Invalid cuz max param count is 256
         while (key.depth != -1) {
-            if (func_hash_table_get(&functions, key, &param_types, &value, &subset_match, true)) {
+            if (func_hash_table_get(&global_namespace.functions, key, &param_types, &value, &subset_match, true)) {
                 // Convert any ref takers to a &(Addr) node
                 value_type_list_node* curr = value->param_types.first;
                 u32 i = 0;
@@ -1231,7 +1233,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         // Reset key depth for a fuzzy type search
         key.depth = parser->scope_depth;
         while (key.depth != -1) {
-            if (func_hash_table_get(&functions, key, &param_types, &value, &subset_match, false)) {
+            if (func_hash_table_get(&global_namespace.functions, key, &param_types, &value, &subset_match, false)) {
                 // Convert any ref takers to a &(Addr) node
                 value_type_list_node* curr = value->param_types.first;
                 u32 i = 0;
@@ -1316,9 +1318,10 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             return P_MakeTypenameNode(parser, (P_ValueType) { .base_type = name, .full_type = (string) { .str = name.str, .size = complete_length }, .mods = mods.elements, .mod_ct = mods.count });
         }
         
+        // @namespaced
         func_entry_key fnkey = { .name = name, .depth = parser->scope_depth };
         while (fnkey.depth != -1) {
-            if (func_hash_table_has_name(&functions, fnkey)) {
+            if (func_hash_table_has_name(&global_namespace.functions, fnkey)) {
                 // Return a stub name
                 return P_MakeFuncnameNode(parser, (P_ValueType){ .type = ValueTypeType_FuncPointer }, name);
             }
@@ -1379,8 +1382,8 @@ static P_Expr* P_ExprLambda(P_Parser* parser) {
         
         var_entry_key key = (var_entry_key) { .name = param_name, .depth = parser->scope_depth };
         P_ValueType test;
-        if (!var_hash_table_get(&variables, key, &test))
-            var_hash_table_set(&variables, key, param_type);
+        if (!var_hash_table_get(&global_namespace.variables, key, &test))
+            var_hash_table_set(&global_namespace.variables, key, param_type);
         else
             report_error(parser, str_lit("Multiple Parameters with the same name\n"));
         
@@ -1461,8 +1464,9 @@ static P_Expr* P_ExprCall(P_Parser* parser, P_Expr* left) {
         u32 subset;
         func_entry_key key = { .name = left->op.funcname, .depth = parser->scope_depth };
         
+        // @namespaced
         while (key.depth != -1) {
-            if (func_hash_table_get(&functions, key, &param_types, &val,  &subset, false)) {
+            if (func_hash_table_get(&global_namespace.functions, key, &param_types, &val,  &subset, false)) {
                 left->ret_type = P_CreateFnpointerType(parser, &val->value, &val->param_types);
                 left->op.funcname = val->mangled_name;
             }
@@ -1549,7 +1553,8 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
                 func_entry_val* val = nullptr;
                 u32 subset;
                 while (key.depth != -1) {
-                    if (func_hash_table_get(&functions, key, left->ret_type.op.func_ptr.func_param_types, &val, &subset, true)) {
+                    // @namespaced
+                    if (func_hash_table_get(&global_namespace.functions, key, left->ret_type.op.func_ptr.func_param_types, &val, &subset, true)) {
                         // Fix the xpr
                         xpr->ret_type.op.func_ptr.func_param_types = &val->param_types;
                         xpr->ret_type.op.func_ptr.ret_type = left->ret_type.op.func_ptr.ret_type;
@@ -1951,11 +1956,12 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         string param_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
         string_list_push(&parser->arena, &param_names, param_name);
         
+        // @namespaced
         if (!native) {
             var_entry_key key = (var_entry_key) { .name = param_name, .depth = parser->scope_depth };
             P_ValueType test;
-            if (!var_hash_table_get(&variables, key, &test))
-                var_hash_table_set(&variables, key, param_type);
+            if (!var_hash_table_get(&global_namespace.variables, key, &test))
+                var_hash_table_set(&global_namespace.variables, key, param_type);
             else
                 report_error(parser, str_lit("Multiple Parameters with the same name\n"));
         }
@@ -1985,16 +1991,17 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     // -1 When not native because the scope depth is changed by this point if the function has a body
     
     // Don't try to add the outermost scope functions since they get added during preparsing
+    // @namspaced
     if ((parser->scope_depth != 1 || native) && has_all_tags) {
         u32 subset_match = 1024;
         func_entry_val* test = nullptr;
-        if (!func_hash_table_get(&functions, key, &params, &test, &subset_match, true)) {
+        if (!func_hash_table_get(&global_namespace.functions, key, &params, &test, &subset_match, true)) {
             func_entry_val* val = arena_alloc(&parser->arena, sizeof(func_entry_val)); val->value = type;
             val->is_native = native;
             val->param_types = params;
             val->mangled_name = mangled;
             
-            func_hash_table_set(&functions, key, val);
+            func_hash_table_set(&global_namespace.functions, key, val);
         } else report_error(parser, str_lit("Cannot redeclare function %.*s\n"), str_expand(name));
     }
     
@@ -2052,8 +2059,8 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
 static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8 has_all_tags) {
     P_ValueType test;
     var_entry_key key = (var_entry_key) { .name = name, .depth = parser->scope_depth };
-    if (!var_hash_table_get(&variables, key, &test) && has_all_tags) {
-        var_hash_table_set(&variables, key, type);
+    if (!var_hash_table_get(&global_namespace.variables, key, &test) && has_all_tags) {
+        var_hash_table_set(&global_namespace.variables, key, type);
     }
     else report_error(parser, str_lit("Cannot redeclare variable %.*s\n"), str_expand(name));
     if (type_check(type, ValueType_Void))
@@ -2084,7 +2091,7 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8
                 func_entry_val* val = nullptr;
                 u32 subset;
                 while (key.depth != -1) {
-                    if (func_hash_table_get(&functions, key, type.op.func_ptr.func_param_types, &val, &subset, true)) {
+                    if (func_hash_table_get(&global_namespace.functions, key, type.op.func_ptr.func_param_types, &val, &subset, true)) {
                         // Fix the value
                         value->ret_type.op.func_ptr.func_param_types = &val->param_types;
                         value->ret_type.op.func_ptr.ret_type = type.op.func_ptr.ret_type;
@@ -2135,15 +2142,15 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser, b8 native, b8 has_all_tags)
     if (native) {
         P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after native struct name\n"));
         if (has_all_tags)
-            type_array_add(&types, (P_Container) { .type = ContainerType_Struct, .name = name, .depth = parser->scope_depth, .is_native = true });
+            type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Struct, .name = name, .depth = parser->scope_depth, .is_native = true });
         return P_MakeNothingNode(parser);
     }
     
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Struct Name\n"));
     
-    u64 idx = types.count;
+    u64 idx = parser->current_namespace->types.count;
     if (has_all_tags)
-        type_array_add(&types, (P_Container) { .type = ContainerType_Struct, .name = name, .depth = parser->scope_depth });
+        type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Struct, .name = name, .depth = parser->scope_depth });
     u32 tmp_member_count = 0;
     string_list member_names = {0};
     value_type_list member_types = {0};
@@ -2166,9 +2173,9 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser, b8 native, b8 has_all_tags)
     }
     
     if (has_all_tags) {
-        types.elements[idx].member_count = tmp_member_count;
-        types.elements[idx].member_types = member_types;
-        types.elements[idx].member_names = member_names;
+        parser->current_namespace->types.elements[idx].member_count = tmp_member_count;
+        parser->current_namespace->types.elements[idx].member_types = member_types;
+        parser->current_namespace->types.elements[idx].member_names = member_names;
     }
     
     return P_MakeStructDeclStmtNode(parser, name, tmp_member_count, member_types, member_names);
@@ -2181,9 +2188,9 @@ static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser, b8 has_all_tags) {
         report_error(parser, str_lit("Cannot redeclare type with name %.*s\n"), str_expand(name));
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Enum Name\n"));
     
-    u64 idx = types.count;
+    u64 idx = parser->current_namespace->types.count;
     if (has_all_tags)
-        type_array_add(&types, (P_Container) { .type = ContainerType_Enum, .name = name, .depth = parser->scope_depth });
+        type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Enum, .name = name, .depth = parser->scope_depth });
     u32 member_count = 0;
     string_list member_names = {0};
     value_type_list member_types = {0};
@@ -2203,12 +2210,42 @@ static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser, b8 has_all_tags) {
     }
     
     if (has_all_tags) {
-        types.elements[idx].member_count = member_count;
-        types.elements[idx].member_types = member_types;
-        types.elements[idx].member_names = member_names;
+        parser->current_namespace->types.elements[idx].member_count = member_count;
+        parser->current_namespace->types.elements[idx].member_types = member_types;
+        parser->current_namespace->types.elements[idx].member_names = member_names;
     }
     
     return P_MakeEnumDeclStmtNode(parser, name, member_count, member_names);
+}
+
+static P_Stmt* P_StmtNamespaceDecl(P_Parser* parser, b8 has_all_tags) {
+    P_Consume(parser, TokenType_Identifier, str_lit("Expected name of namespace after 'namespace'\n"));
+    //string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after identifier\n"));
+    
+    //parser->namespace_stack
+    
+    // Dont start a scope for namespaces.
+    // Technically there should be one, but stuff inside a namespace is basically in the global scope
+    // Just under a different name
+    while (!P_Match(parser, TokenType_CloseBrace)) {
+        P_Stmt* curr = P_Declaration(parser);
+        
+        if (parser->end != nullptr) {
+            parser->end->next = curr;
+            parser->end = curr;
+        } else {
+            parser->root = curr;
+            parser->end = curr;
+        }
+        
+        if (P_Match(parser, TokenType_EOF)) {
+            report_error(parser, str_lit("Unterminated Namespace block\n"));
+            break;
+        }
+    }
+    
+    return P_MakeNothingNode(parser);
 }
 
 static P_Stmt* P_StmtImport(P_Parser* parser, b8 has_all_tags) {
@@ -2294,7 +2331,7 @@ static P_Stmt* P_StmtReturn(P_Parser* parser) {
             func_entry_val* ret_val = nullptr;
             u32 subset;
             while (key.depth != -1) {
-                if (func_hash_table_get(&functions, key, parser->function_body_ret.op.func_ptr.func_param_types, &ret_val, &subset, true)) {
+                if (func_hash_table_get(&global_namespace.functions, key, parser->function_body_ret.op.func_ptr.func_param_types, &ret_val, &subset, true)) {
                     // Fix the val
                     val->ret_type.op.func_ptr.func_param_types = &ret_val->param_types;
                     val->ret_type.op.func_ptr.ret_type = parser->function_body_ret.op.func_ptr.ret_type;
@@ -2652,6 +2689,8 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
         s = P_StmtStructureDecl(parser, native, has_all_tags);
     } else if (P_Match(parser, TokenType_Enum)) {
         s = P_StmtEnumerationDecl(parser, has_all_tags);
+    } else if (P_Match(parser, TokenType_Namespace)) {
+        s = P_StmtNamespaceDecl(parser, has_all_tags);
     } else if (P_Match(parser, TokenType_Import)) {
         if (parser->scope_depth == 0)
             s = P_StmtImport(parser, has_all_tags);
@@ -2727,13 +2766,13 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name,
         u32 subset_match = 1024;
         func_entry_key key = (func_entry_key) { .name = name, .depth = 0 };
         func_entry_val* test = nullptr;
-        if (!func_hash_table_get(&functions, key, &params, &test, &subset_match, true)) {
+        if (!func_hash_table_get(&global_namespace.functions, key, &params, &test, &subset_match, true)) {
             func_entry_val* val = arena_alloc(&parser->arena, sizeof(func_entry_val));
             val->value = type;
             val->is_native = false;
             val->param_types = params;
             val->mangled_name = mangled;
-            func_hash_table_set(&functions, key, val);
+            func_hash_table_set(&global_namespace.functions, key, val);
         } else
             report_error(parser, str_lit("Cannot redeclare function %.*s\n"), str_expand(name));
     }
@@ -2741,7 +2780,7 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name,
     P_PreStmt* func = P_MakePreFuncStmtNode(parser, type, mangled, arity, params, param_names);
     
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected {\n"));
-    parser->scope_depth++;
+    u32 init = parser->scope_depth++;
     
     // Consume the function body :^)
     while (true) {
@@ -2750,7 +2789,7 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name,
             continue;
         } else if (P_Match(parser, TokenType_CloseBrace)) {
             parser->scope_depth--;
-            if (parser->scope_depth == 0)
+            if (parser->scope_depth == init)
                 break;
             continue;
         }
@@ -2783,6 +2822,37 @@ static string read_file(M_Arena* arena, const char* path, b8* file_exists) {
     
     fclose(file);
     return (string) { .str = (u8*)buffer, .size = bytesRead };
+}
+
+static P_PreStmt* P_PreDeclaration(P_Parser* parser);
+
+static P_PreStmt* P_PreNamespace(P_Parser* parser) {
+    P_Consume(parser, TokenType_Identifier, str_lit("Expected name of namespace after 'namespace'\n"));
+    
+    P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after identifier\n"));
+    
+    u32 init = parser->scope_depth++;
+    
+    while (true) {
+        if (parser->current.type == TokenType_OpenBrace) {
+            parser->scope_depth++;
+        } else if (parser->current.type == TokenType_CloseBrace) {
+            parser->scope_depth--;
+            if (parser->scope_depth == init) break;
+        }
+        P_PreStmt* curr = P_PreDeclaration(parser);
+        if (curr != nullptr) {
+            if (parser->pre_end != nullptr) {
+                parser->pre_end->next = curr;
+                parser->pre_end = curr;
+            } else {
+                parser->pre_root = curr;
+                parser->pre_end = curr;
+            }
+        }
+    }
+    
+    return P_MakePreNothingNode(parser);
 }
 
 static P_PreStmt* P_PreStmtImport(P_Parser* parser) {
@@ -2871,6 +2941,9 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
             }
         }
         
+    } else if (P_Match(parser, TokenType_Namespace)) {
+        s = P_PreNamespace(parser);
+        
     } else if (P_Match(parser, TokenType_Import)) {
         s = P_PreStmtImport(parser);
     }
@@ -2950,7 +3023,7 @@ void P_Parse(P_Parser* parser) {
         u32 subset_match = 1024;
         func_entry_val* v = nullptr;
         value_type_list noargs = (value_type_list){0};
-        if (!func_hash_table_get(&functions, (func_entry_key) { .name = str_lit("main"), .depth = 0 }, &noargs, &v, &subset_match, true)) {
+        if (!func_hash_table_get(&global_namespace.functions, (func_entry_key) { .name = str_lit("main"), .depth = 0 }, &noargs, &v, &subset_match, true)) {
             report_error(parser, str_lit("No main function definition found\n"));
         }
     }
@@ -2958,10 +3031,10 @@ void P_Parse(P_Parser* parser) {
 
 void P_GlobalInit(string_list tags) {
     arena_init(&global_arena);
-    var_hash_table_init(&variables);
-    func_hash_table_init(&functions);
+    var_hash_table_init(&global_namespace.variables);
+    func_hash_table_init(&global_namespace.functions);
     types_init(&global_arena);
-    type_array_init(&types);
+    type_array_init(&global_namespace.types);
     active_tags = tags;
     imports = (string_list){0};
     imports_parsing = (string_list){0};
@@ -2985,11 +3058,13 @@ void P_Initialize(P_Parser* parser, string source, string filename, b8 is_root) 
     parser->pre_root = nullptr;
     parser->pre_end = nullptr;
     parser->root = nullptr;
+    parser->end = nullptr;
     parser->next = (L_Token) {0};
     parser->current = (L_Token) {0};
     parser->previous = (L_Token) {0};
     parser->had_error = false;
     parser->panik_mode = false;
+    parser->current_namespace = &global_namespace;
     parser->scope_depth = 0;
     parser->function_body_ret = ValueType_Invalid;
     parser->switch_type = ValueType_Invalid;
@@ -3018,9 +3093,9 @@ void P_Free(P_Parser* parser) {
 }
 
 void P_GlobalFree() {
-    var_hash_table_free(&variables);
-    func_hash_table_free(&functions);
-    type_array_free(&types);
+    var_hash_table_free(&global_namespace.variables);
+    func_hash_table_free(&global_namespace.functions);
+    type_array_free(&global_namespace.types);
     arena_free(&global_arena);
 }
 

@@ -5,6 +5,7 @@
 
 #define TABLE_MAX_LOAD 0.75
 #define GROW_CAPACITY(capacity) ((capacity) < 8 ? 8 : (capacity) * 2)
+#define GROW_CAPACITY_BIGGER(capacity) ((capacity) < 32 ? 32 : (capacity) * 2)
 
 #include "defines.h"
 #include "str.h"
@@ -113,5 +114,16 @@ typedef struct expr_array {
 } expr_array;
 
 void expr_array_add(M_Arena* arena, expr_array* array, struct P_Expr* mod);
+
+struct P_Namespace;
+
+typedef struct namespace_array {
+    u32 capacity;
+    u32 count;
+    struct P_Namespace** elements;
+} namespace_array;
+
+void namespace_array_add(M_Arena* arena, namespace_array* array, struct P_Namespace* mod);
+
 
 #endif //DATA_STRUCTURES_H

@@ -361,3 +361,15 @@ void expr_array_add(M_Arena* arena, expr_array* array, struct P_Expr* mod) {
     *(array->elements + array->count) = mod;
     array->count++;
 }
+
+//~ Namespaces
+void namespace_array_add(M_Arena* arena, namespace_array* array, struct P_Namespace* mod)  {
+    if (array->count + 1 > array->capacity) {
+        void* prev = array->elements;
+        array->capacity = GROW_CAPACITY_BIGGER(array->capacity);
+        array->elements = arena_alloc(arena, array->capacity * sizeof(struct P_Namespace*));
+        memmove(array->elements, prev, array->count * sizeof(struct P_Namespace*));
+    }
+    *(array->elements + array->count) = mod;
+    array->count++;
+}

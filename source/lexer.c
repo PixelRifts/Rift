@@ -81,8 +81,10 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_Double: return str_lit("Double");
         case TokenType_Char: return str_lit("Char");
         case TokenType_Long: return str_lit("Long");
-        case TokenType_Native: return str_lit("Native");
         case TokenType_String: return str_lit("String");
+        case TokenType_Native: return str_lit("Native");
+        case TokenType_Namespace: return str_lit("Namespace");
+        case TokenType_Using: return str_lit("Using");
     }
     return str_lit("unreachable");
 }
@@ -211,6 +213,10 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
         case 'r': return L_MatchType(lexer, 1, str_lit("eturn"), TokenType_Return);
         case 'm': return L_MatchType(lexer, 1, str_lit("atch"), TokenType_Match);
         case 'w': return L_MatchType(lexer, 1, str_lit("hile"), TokenType_While);
+        case 'u': return L_MatchType(lexer, 1, str_lit("sing"), TokenType_Using);
+        case 'l': return L_MatchType(lexer, 1, str_lit("ong"), TokenType_Long);
+        case 'v': return L_MatchType(lexer, 1, str_lit("oid"), TokenType_Void);
+        case 't': return L_MatchType(lexer, 1, str_lit("rue"), TokenType_True);
         
         case 'b': {
             switch (lexer->start[1]) {
@@ -226,10 +232,6 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                 case 'a': return L_MatchType(lexer, 2, str_lit("se"), TokenType_Case);
             }
         }
-        
-        case 'l': return L_MatchType(lexer, 1, str_lit("ong"), TokenType_Long);
-        case 'v': return L_MatchType(lexer, 1, str_lit("oid"), TokenType_Void);
-        case 't': return L_MatchType(lexer, 1, str_lit("rue"), TokenType_True);
         
         case 's': {
             switch (lexer->start[1]) {
@@ -256,7 +258,11 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                         return TokenType_Nullptr;
                     } else return L_MatchType(lexer, 2, str_lit("ll"), TokenType_Null);
                 }
-                case 'a': return L_MatchType(lexer, 2, str_lit("tive"), TokenType_Native);
+                case 'a': {
+                    if (L_MatchType(lexer, 2, str_lit("tive"), TokenType_Native) == TokenType_Native) {
+                        return TokenType_Native;
+                    } else return L_MatchType(lexer, 2, str_lit("mespace"), TokenType_Namespace);
+                }
             }
         }
         

@@ -138,7 +138,17 @@ struct P_PreStmt {
     } op;
 };
 
+
 #include "data_structures.h"
+
+typedef struct P_Namespace {
+    string unitname;
+    string flatname;
+    var_hash_table variables;
+    func_hash_table functions;
+    type_array types;
+    namespace_array subspaces;
+} P_Namespace;
 
 typedef u32 P_ScopeType;
 enum {
@@ -187,6 +197,8 @@ typedef struct P_Parser {
     
     b8 had_error;
     b8 panik_mode;
+    
+    P_Namespace* current_namespace;
     
     P_ScopeType* scopetype_stack;
     u32 scopetype_tos;

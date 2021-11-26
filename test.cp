@@ -1,5 +1,9 @@
 import "standard.cp";
 
+namespace booyeah {
+	void booyah() {}
+}
+
 @!linux
 void tagged() {
 	printf("NOT Linux");
