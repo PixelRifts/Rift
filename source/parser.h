@@ -199,6 +199,7 @@ typedef struct P_Parser {
     b8 panik_mode;
     
     P_Namespace* current_namespace;
+    using_stack usings;
     
     P_ScopeType* scopetype_stack;
     u32 scopetype_tos;

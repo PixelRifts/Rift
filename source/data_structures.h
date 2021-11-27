@@ -99,6 +99,7 @@ void type_array_free(type_array* array);
 void type_array_add(type_array* array, P_Container structure);
 
 
+
 typedef struct type_mod_array {
     u32 capacity;
     u32 count;
@@ -106,6 +107,8 @@ typedef struct type_mod_array {
 } type_mod_array;
 
 void type_mod_array_add(M_Arena* arena, type_mod_array* array, P_ValueTypeMod mod);
+
+
 
 typedef struct expr_array {
     u32 capacity;
@@ -115,7 +118,10 @@ typedef struct expr_array {
 
 void expr_array_add(M_Arena* arena, expr_array* array, struct P_Expr* mod);
 
+
+
 struct P_Namespace;
+typedef struct P_Namespace* P_NamespacePtr;
 
 typedef struct namespace_array {
     u32 capacity;
@@ -125,5 +131,16 @@ typedef struct namespace_array {
 
 void namespace_array_add(M_Arena* arena, namespace_array* array, struct P_Namespace* mod);
 
+
+
+typedef struct using_stack {
+    u32 capacity;
+    u32 tos;
+    struct P_Namespace** stack;
+} using_stack;
+
+void using_stack_push(M_Arena* arena, using_stack* stack, struct P_Namespace* mod);
+void using_stack_pop(using_stack* stack, struct P_Namespace** ret);
+void using_stack_peek(using_stack* stack, struct P_Namespace** ret);
 
 #endif //DATA_STRUCTURES_H

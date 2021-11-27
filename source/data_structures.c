@@ -120,6 +120,7 @@ static u32 hash_func_key(func_entry_key k) {
         hash ^= k.name.str[i];
         hash *= 16777619;
     }
+    hash += k.depth;
     return hash;
 }
 
@@ -372,4 +373,26 @@ void namespace_array_add(M_Arena* arena, namespace_array* array, struct P_Namesp
     }
     *(array->elements + array->count) = mod;
     array->count++;
+}
+
+//~ Usings Stack
+void using_stack_push(M_Arena* arena, using_stack* stack, struct P_Namespace* mod) {
+    if (stack->tos + 1 > stack->capacity) {
+        void* prev = stack->stack;
+        stack->capacity = GROW_CAPACITY_BIGGER(stack->capacity);
+        stack->stack = arena_alloc(arena, stack->capacity * sizeof(struct P_Namespace*));
+        memmove(stack->stack, prev, stack->tos * sizeof(struct P_Namespace*));
+    }
+    *(stack->stack + stack->tos) = mod;
+    stack->tos++;
+}
+
+void using_stack_pop(using_stack* stack, struct P_Namespace** ret) {
+    stack->tos--;
+    if (ret != nullptr)
+        *ret = stack->stack[stack->tos];
+}
+
+void using_stack_peek(using_stack* stack, struct P_Namespace** ret) {
+    *ret = stack->stack[stack->tos - 1];
 }

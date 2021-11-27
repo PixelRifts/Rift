@@ -1,9 +1,5 @@
 import "standard.cp";
 
-namespace booyeah {
-	void booyah() {}
-}
-
 @!linux
 void tagged() {
 	printf("NOT Linux");
@@ -15,9 +11,8 @@ void tagged() {
 }
 
 int main() {
-	printf("Started successfully\n");
 	tagged();
-
+	printf("Started successfully\n");
 	@!linux {
 		printf("This stmtlist was tagged!\n");
 	}
