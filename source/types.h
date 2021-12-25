@@ -39,6 +39,10 @@ typedef struct P_ValueType {
     u32 mod_ct;
     union {
         struct {
+            string no_nmspc_name;
+        } basic;
+        
+        struct {
             struct P_ValueType* ret_type;
             struct value_type_list* func_param_types;
         } func_ptr;
@@ -57,8 +61,9 @@ typedef struct value_type_list {
     i32 node_count;
 } value_type_list;
 
-#define value_type_abs(s) (P_ValueType) { .base_type = str_lit(s), .full_type = str_lit(s) }
 #define value_type_from_str(s) (P_ValueType) { .base_type = (string) { .str = s.str, .size = s.size }, .full_type = (string) { .str = s.str, .size = s.size } }
+#define value_type_abs(s) (P_ValueType) { .base_type = (string) { .str = (u8*)s, .size = sizeof(s)-1 }, .full_type = (string) { .str = (u8*)s, .size = sizeof(s)-1 } }
+#define value_type_abs_nc(s) { .base_type = (string) { .str = (u8*)s, .size = sizeof(s)-1 }, .full_type = (string) { .str = (u8*)s, .size = sizeof(s)-1 } }
 
 
 extern const P_ValueType ValueType_Invalid;

@@ -358,8 +358,9 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
         } break;
         
         case ExprType_Deref: {
-            E_Write(emitter, "*");
+            E_Write(emitter, "(*");
             E_EmitExpression(emitter, expr->op.deref);
+            E_Write(emitter, ")");
         } break;
         
         case ExprType_Dot: {
@@ -369,6 +370,18 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
         
         case ExprType_EnumDot: {
             E_WriteF(emitter, "_enum_%.*s_%.*s", str_expand(expr->op.enum_dot.left), str_expand(expr->op.enum_dot.right));
+        } break;
+        
+        case ExprType_Sizeof: {
+            E_Write(emitter, "sizeof(");
+            E_EmitExpression(emitter, expr->op.sizeof_e);
+            E_Write(emitter, ")");
+        } break;
+        
+        case ExprType_Offsetof: {
+            E_Write(emitter, "offsetof(");
+            E_EmitExpression(emitter, expr->op.offsetof_e.typename);
+            E_WriteF(emitter, ", %.*s)", str_expand(expr->op.offsetof_e.member_name));
         } break;
     }
 }
@@ -606,12 +619,16 @@ void E_Initialize(E_Emitter* emitter, string source, string filename, string_lis
 void E_Emit(E_Emitter* emitter) {
     E_BeginEmitting(emitter);
     P_PreParse(&emitter->parser);
-    if (!emitter->parser.had_error)
+    if (!emitter->parser.had_error) {
         E_EmitPreStatementChain(emitter, emitter->parser.pre_root, 0);
+        E_EmitStatementChain(emitter, emitter->parser.root, 0);
+    }
     else return;
     
     E_WriteLine(emitter, "");
     
+    emitter->parser.root = nullptr;
+    emitter->parser.end = nullptr;
     P_Parse(&emitter->parser);
     if (!emitter->parser.had_error) {
         E_EmitStatementChain(emitter, emitter->parser.lambda_functions_start, 0);

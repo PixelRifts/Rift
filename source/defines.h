@@ -42,13 +42,11 @@ exit(-10);          \
 } while(false)
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
-#define CPCOM_WIN
+# define CPCOM_WIN
 #elif defined(__linux__) || defined(__gnu_linux__)
-#define CPCOM_LINUX
-// @linux Remove this error
-#error "The compiler only supports windows for now"
+# define CPCOM_LINUX
 #else
-#error "The compiler only supports windows for now"
+# error "The compiler only supports windows and linux for now"
 #endif
 
 #endif //DEFINES_H

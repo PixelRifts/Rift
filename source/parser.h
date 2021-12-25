@@ -46,16 +46,18 @@ enum {
     ExprType_Variable, ExprType_FuncCall, ExprType_Dot, ExprType_EnumDot,
     ExprType_Cast, ExprType_Index, ExprType_Addr, ExprType_Deref,
     ExprType_Nullptr, ExprType_ArrayLit, ExprType_Lambda, ExprType_Call,
+    ExprType_Sizeof, ExprType_Offsetof, ExprType_Namespacename
 };
 
 struct P_Stmt;
 
+typedef struct P_Namespace P_Namespace;
 typedef struct P_Expr P_Expr;
 struct P_Expr {
     P_ExprType type;
     P_ValueType ret_type;
     b8 can_assign;
-    b8 is_constant; // TODO: convert to bitfield
+    b8 is_constant; // TODO(voxel): convert to bitfield maybe
     union {
         i32    integer_lit;
         i64    long_lit;
@@ -66,18 +68,21 @@ struct P_Expr {
         string string_lit;
         P_ValueType typename;
         string funcname;
+        P_Namespace* namespace;
         string lambda;
         P_Expr* cast;
         P_Expr* addr;
         P_Expr* deref;
         expr_array array;
+        string variable;
+        P_Expr* sizeof_e;
+        struct { P_Expr* typename; string member_name; } offsetof_e;
         struct { L_TokenType operator; P_Expr* left; P_Expr* right; } binary;
         struct { L_TokenType operator; P_Expr* operand; } unary;
         struct { P_Expr* left; string right; } dot;
         struct { P_Expr* operand; P_Expr* index; } index;
         struct { string left; string right; } enum_dot;
         struct { P_Expr* name; P_Expr* value; } assignment;
-        string variable;
         struct { string name; P_Expr** params; u32 call_arity; } func_call;
         struct { P_Expr* left; P_Expr** params; u32 call_arity; } call;
     } op;
@@ -91,7 +96,7 @@ enum {
     StmtType_VarDeclAssign, StmtType_FuncDecl, StmtType_StructDecl,
     StmtType_EnumDecl, StmtType_For, StmtType_Break, StmtType_Continue,
     StmtType_Switch, StmtType_Match, StmtType_Case, StmtType_MatchCase,
-    StmtType_Default, StmtType_MatchDefault,
+    StmtType_Default, StmtType_MatchDefault
 };
 
 typedef struct P_Stmt P_Stmt;
@@ -169,7 +174,29 @@ typedef struct P_ScopeContext {
     P_ValueType prev_function_body_ret;
     b8 prev_directly_in_func_body;
     b8 prev_was_in_private_scope;
+    struct P_ScopeContext* prev_scope_ctx;
+    u32 usings_pop;
 } P_ScopeContext;
+
+typedef struct P_ParserSnap {
+    L_Lexer lexer;
+    
+    L_Token next_two;
+    L_Token next;
+    L_Token current;
+    L_Token previous;
+    L_Token previous_two;
+    
+    u32 scope_depth;
+    
+    b8 had_error;
+    b8 panik_mode;
+} P_ParserSnap;
+
+struct P_Parser;
+P_ParserSnap P_TakeSnapshot(struct P_Parser* parser);
+void         P_ApplySnapshot(struct P_Parser* parser, P_ParserSnap snap);
+
 
 typedef struct P_Parser {
     M_Arena arena;
@@ -186,6 +213,7 @@ typedef struct P_Parser {
     
     P_Stmt* lambda_functions_start;
     P_Stmt* lambda_functions_curr;
+    P_ScopeContext* curr_scope_ctx;
     
     L_Token next_two;
     L_Token next;

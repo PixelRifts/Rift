@@ -217,6 +217,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
         case 'l': return L_MatchType(lexer, 1, str_lit("ong"), TokenType_Long);
         case 'v': return L_MatchType(lexer, 1, str_lit("oid"), TokenType_Void);
         case 't': return L_MatchType(lexer, 1, str_lit("rue"), TokenType_True);
+        case 'o': return L_MatchType(lexer, 1, str_lit("ffsetof"), TokenType_Offsetof);
         
         case 'b': {
             switch (lexer->start[1]) {
@@ -241,6 +242,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                     } else return L_MatchType(lexer, 2, str_lit("ring"), TokenType_String);
                 }
                 case 'w': return L_MatchType(lexer, 2, str_lit("itch"), TokenType_Switch);
+                case 'i': return L_MatchType(lexer, 2, str_lit("zeof"), TokenType_Sizeof);
             }
         }
         

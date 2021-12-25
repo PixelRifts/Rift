@@ -16,9 +16,14 @@ typedef struct var_entry_key {
     u32 depth;
 } var_entry_key;
 
+typedef struct var_entry_val {
+    string mangled_name;
+    P_ValueType type;
+} var_entry_val;
+
 typedef struct var_table_entry {
     var_entry_key key;
-    P_ValueType value;
+    var_entry_val value;
 } var_table_entry;
 
 typedef struct var_hash_table {
@@ -29,8 +34,8 @@ typedef struct var_hash_table {
 
 void var_hash_table_init(var_hash_table* table);
 void var_hash_table_free(var_hash_table* table);
-b8   var_hash_table_get(var_hash_table* table, var_entry_key key, P_ValueType* value);
-b8   var_hash_table_set(var_hash_table* table, var_entry_key key, P_ValueType  value);
+b8   var_hash_table_get(var_hash_table* table, var_entry_key key, var_entry_val* value);
+b8   var_hash_table_set(var_hash_table* table, var_entry_key key, var_entry_val  value);
 b8   var_hash_table_del(var_hash_table* table, var_entry_key key);
 void var_hash_table_add_all(var_hash_table* from, var_hash_table* to);
 
@@ -81,6 +86,7 @@ enum {
 typedef struct P_Container {
     P_ContainerType type;
     string name;
+    string mangled_name;
     u32 depth;
     u32 member_count;
     value_type_list member_types;

@@ -1,11 +1,19 @@
 #include "data_structures.h"
 
 static const func_entry_val tombstone = {
-    .value = (P_ValueType) {
+    .value = {
         .base_type = str_lit("tombstone"),
         .mods = nullptr
     },
     .is_native = false
+};
+
+static const var_entry_val tombstone_var = {
+    .mangled_name = { .str = nullptr, .size = 0 },
+    .type = {
+        .base_type = str_lit("tombstone"),
+        .mods = nullptr
+    }
 };
 
 //~ Variable Hashtable
@@ -26,7 +34,7 @@ static var_table_entry* find_var_entry(var_table_entry* entries, i32 cap, var_en
     while (true) {
         var_table_entry* entry = &entries[idx];
         if (entry->key.name.size == 0) {
-            if (entry->value.base_type.size == 0)
+            if (entry->value.type.base_type.size == 0)
                 return tombstone_e != nullptr ? tombstone_e : entry;
             else
                 if (tombstone_e == nullptr) tombstone_e = entry;
@@ -71,7 +79,7 @@ void var_hash_table_free(var_hash_table* table) {
     table->entries = nullptr;
 }
 
-b8 var_hash_table_get(var_hash_table* table, var_entry_key key, P_ValueType* value) {
+b8 var_hash_table_get(var_hash_table* table, var_entry_key key, var_entry_val* value) {
     if (table->count == 0) return false;
     var_table_entry* entry = find_var_entry(table->entries, table->capacity, key);
     if (entry->key.name.size == 0) return false;
@@ -79,7 +87,7 @@ b8 var_hash_table_get(var_hash_table* table, var_entry_key key, P_ValueType* val
     return true;
 }
 
-b8 var_hash_table_set(var_hash_table* table, var_entry_key key, P_ValueType value) {
+b8 var_hash_table_set(var_hash_table* table, var_entry_key key, var_entry_val value) {
     if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
         i32 cap = GROW_CAPACITY(table->capacity);
         var_table_adjust_cap(table, cap);
@@ -87,7 +95,7 @@ b8 var_hash_table_set(var_hash_table* table, var_entry_key key, P_ValueType valu
     
     var_table_entry* entry = find_var_entry(table->entries, table->capacity, key);
     b8 is_new_key = entry->key.name.size == 0;
-    if (is_new_key && entry->value.base_type.size == 0)
+    if (is_new_key && entry->value.type.base_type.size == 0)
         table->count++;
     
     entry->key = key;
@@ -100,7 +108,7 @@ b8 var_hash_table_del(var_hash_table* table, var_entry_key key) {
     var_table_entry* entry = find_var_entry(table->entries, table->capacity, key);
     if (entry->key.name.size == 0) return false;
     entry->key = (var_entry_key) {0};
-    entry->value = ValueType_Tombstone;
+    entry->value = tombstone_var;
     return true;
 }
 
