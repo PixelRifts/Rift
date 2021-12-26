@@ -67,7 +67,6 @@ struct P_Expr {
         string char_lit; // Is a string for transpiling reasons. :(
         string string_lit;
         P_ValueType typename;
-        string funcname;
         P_Namespace* namespace;
         string lambda;
         P_Expr* cast;
@@ -76,6 +75,7 @@ struct P_Expr {
         expr_array array;
         string variable;
         P_Expr* sizeof_e;
+        struct { string name; P_Namespace* namespace; } funcname;
         struct { P_Expr* typename; string member_name; } offsetof_e;
         struct { L_TokenType operator; P_Expr* left; P_Expr* right; } binary;
         struct { L_TokenType operator; P_Expr* operand; } unary;
@@ -132,6 +132,8 @@ typedef u32 P_PreStmtType;
 enum {
     PreStmtType_Nothing,
     PreStmtType_ForwardDecl,
+    PreStmtType_StructForwardDecl,
+    PreStmtType_EnumForwardDecl,
 };
 
 typedef struct P_PreStmt P_PreStmt;
@@ -140,6 +142,8 @@ struct P_PreStmt {
     P_PreStmt* next;
     union {
         struct { string name; u32 arity; value_type_list param_types; string_list param_names; P_ValueType type; } forward_decl;
+        string struct_fd;
+        string enum_fd;
     } op;
 };
 

@@ -30,6 +30,7 @@ enum {
     ValueTypeType_FuncPointer
 };
 
+struct P_Namespace;
 typedef struct P_ValueType {
     P_ValueTypeType type;
     
@@ -40,6 +41,7 @@ typedef struct P_ValueType {
     union {
         struct {
             string no_nmspc_name;
+            struct P_Namespace* nmspc;
         } basic;
         
         struct {

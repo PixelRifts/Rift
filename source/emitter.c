@@ -327,7 +327,7 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
         } break;
         
         case ExprType_Funcname: {
-            E_WriteF(emitter, "%.*s", str_expand(expr->op.funcname));
+            E_WriteF(emitter, "%.*s", str_expand(expr->op.funcname.name));
         } break;
         
         case ExprType_Lambda: {
@@ -600,7 +600,12 @@ static void E_EmitPreStatement(E_Emitter* emitter, P_PreStmt* stmt, u32 indent) 
             string _, __;
             E_EmitTypeAndName_Fndecl(emitter, &type, stmt->op.forward_decl.name, false, stmt->op.forward_decl.param_names, stmt->op.forward_decl.param_types, stmt->op.forward_decl.arity, false, &_, &__);
             E_WriteLine(emitter, ";");
-        }
+        } break;
+        
+        case PreStmtType_StructForwardDecl: {
+            E_WriteLineF(emitter, "typedef struct %.*s %.*s;", str_expand(stmt->op.struct_fd), str_expand(stmt->op.struct_fd));
+            E_WriteLineF(emitter, "struct %.*s;", str_expand(stmt->op.struct_fd));
+        } break;
     }
 }
 

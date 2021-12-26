@@ -9,32 +9,32 @@ namespace TEST {
         char m;
         long n;
     }
+    
+    enum yesnt {
+        yes,
+        no,
+        ja,
+        nein
+    }
+    
+    void proc() {
+        
+    }
 }
 
-@!linux
-void tagged() {
-    printf("NOT Linux");
+struct binomial {
+    int k;
 }
 
-@linux
-void tagged() {
-    printf("Linux");
-}
-
-void assign_ten(int& mu_ref) {
-    mu_ref = 10;
+void assign_ten(TEST.meh& mu_ref) {
+    mu_ref.k = 10;
 }
 
 int main() {
-    using TEST;
-    meh yes;
+    TEST.meh yes;
+    TEST.proc();
+    int kek = TEST.yesnt.ja;
+    //assign_ten(yes);
     
-    assign_ten(mu);
-    // tagged();
-	
-    @!linux {
-		printf("This stmtlist was tagged!\n");
-	}
-	
     return 0;
 }

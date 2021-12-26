@@ -89,6 +89,23 @@ static b8 container_type_exists(P_Parser* parser, string struct_name, u32 depth)
     return false;
 }
 
+static P_Container* type_array_get_in_namespace(P_Parser* parser, P_Namespace* nmspc, string struct_name, u32 depth) {
+    for (u32 i = 0; i < nmspc->types.count; i++) {
+        if (str_eq(struct_name, nmspc->types.elements[i].name) && nmspc->types.elements[i].depth <= depth)
+            return &nmspc->types.elements[i];
+    }
+    return nullptr;
+}
+
+static b8 container_type_exists_in_namespace(P_Parser* parser, P_Namespace* nmspc, string struct_name, u32 depth) {
+    for (u32 i = 0; i < nmspc->types.count; i++) {
+        if (str_eq(struct_name, nmspc->types.elements[i].name) && nmspc->types.elements[i].depth <= depth)
+            return true;
+    }
+    
+    return false;
+}
+
 static P_ValueType member_type_get(P_Container* structure, string reqd) {
     string_list_node* curr = structure->member_names.first;
     value_type_list_node* type = structure->member_types.first;
@@ -159,6 +176,8 @@ static void P_Sync(P_Parser* parser) {
     }
 }
 
+static b8 P_GetSubspace(P_Namespace* root, string childname, u32* index);
+
 static b8 P_IsTypeToken(P_Parser* parser) {
     if (parser->current.type == TokenType_Int    ||
         parser->current.type == TokenType_Long   ||
@@ -180,6 +199,43 @@ static b8 P_IsTypeToken(P_Parser* parser) {
         if (container_type_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
             return true;
         }
+        
+        P_ParserSnap snap = P_TakeSnapshot(parser);
+        P_Advance(parser);
+        
+        // @namespaced
+        b8 is_type = false;
+        string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        for (i32 u = parser->usings.tos - 1; u >= 0; u--) {
+            P_Namespace* using_c = parser->usings.stack[u];
+            u32 idx;
+            b8 abnormal = false;
+            
+            P_Namespace* curr = using_c;
+            while (P_GetSubspace(curr, name, &idx)) {
+                curr = curr->subspaces.elements[idx];
+                if (!P_Match(parser, TokenType_Dot)) {
+                    abnormal = true;
+                    break;
+                }
+                if (!P_Match(parser, TokenType_Identifier)) {
+                    abnormal = true;
+                    break;
+                }
+                
+                name.str = (u8*)parser->previous.start;
+                name.size = parser->previous.length;
+            }
+            
+            if (!abnormal) {
+                if (container_type_exists_in_namespace(parser, curr, name, parser->scope_depth)) {
+                    is_type = true;
+                }
+            }
+        }
+        
+        P_ApplySnapshot(parser, snap);
+        return is_type;
     }
     return false;
 }
@@ -282,12 +338,52 @@ static b8 P_MatchType(P_Parser* parser, P_ValueType* rettype, string* custom_err
         parser->current.type == TokenType_Void || parser->current.type == TokenType_String ||
         parser->current.type == TokenType_Identifier) {
         string with_nmspc = {0};
+        P_Namespace* nmspc = &global_namespace;
         if (parser->current.type == TokenType_Identifier) {
-            if (container_type_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
-                P_Container* c = type_array_get(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth);
-                P_Advance(parser);
-                with_nmspc = c->mangled_name;
-            } else {
+            // Namespaced Types
+            P_ParserSnap snap = P_TakeSnapshot(parser);
+            P_Advance(parser);
+            b8 found = false;
+            {
+                // @namespaced
+                string name = { .str = parser->previous.start, .size = parser->previous.length };
+                
+                for (i32 u = parser->usings.tos - 1; u >= 0; u--) {
+                    P_Namespace* using_c = parser->usings.stack[u];
+                    u32 idx;
+                    b8 abnormal = false;
+                    
+                    P_Namespace* curr = using_c;
+                    while (P_GetSubspace(curr, name, &idx)) {
+                        curr = curr->subspaces.elements[idx];
+                        if (!P_Match(parser, TokenType_Dot)) {
+                            abnormal = true;
+                            break;
+                        }
+                        if (!P_Match(parser, TokenType_Identifier)) {
+                            abnormal = true;
+                            break;
+                        }
+                        
+                        name.str = (u8*)parser->previous.start;
+                        name.size = parser->previous.length;
+                    }
+                    
+                    if (!abnormal) {
+                        if (container_type_exists_in_namespace(parser, curr, name, parser->scope_depth)) {
+                            nmspc = curr;
+                            P_Container* c = type_array_get_in_namespace(parser, curr, name, parser->scope_depth);
+                            with_nmspc = c->mangled_name;
+                            found = true;
+                        }
+                    }
+                    
+                    if (found) break;
+                }
+            }
+            
+            if (!found) {
+                P_ApplySnapshot(parser, snap);
                 *rettype = ValueType_Invalid;
                 return false;
             }
@@ -305,6 +401,7 @@ static b8 P_MatchType(P_Parser* parser, P_ValueType* rettype, string* custom_err
         *rettype = (P_ValueType) {
             .type = ValueTypeType_Basic,
             .op.basic.no_nmspc_name = base_type,
+            .op.basic.nmspc = nmspc,
             .base_type = with_nmspc,
             .full_type = (string) { .str = base_type.str, .size = complete_length },
             .mods = mods.elements,
@@ -693,6 +790,25 @@ static b8 P_GetVariable(P_Parser* parser, string name, var_entry_val* val) {
     return false;
 }
 
+static b8 P_GetVariable_InNamespace(P_Parser* parser, P_Namespace* nmspc, string name, var_entry_val* val) {
+    // @namespaced
+    if (parser->is_in_private_scope) {
+        var_entry_key key = { .name = name, .depth = parser->scope_depth };
+        if (var_hash_table_get(&nmspc->variables, key, val)) {
+            return true;
+        }
+    } else {
+        var_entry_key key = { .name = name, .depth = parser->scope_depth };
+        while (key.depth != -1) {
+            if (var_hash_table_get(&nmspc->variables, key, val)) {
+                return true;
+            }
+            key.depth--;
+        }
+    }
+    return false;
+}
+
 static P_ScopeContext* P_BeginScope(P_Parser* parser, P_ScopeType scope_type) {
     P_ScopeContext* context = calloc(1, sizeof(P_ScopeContext));;
     
@@ -970,13 +1086,14 @@ static P_Expr* P_MakeTypenameNode(P_Parser* parser, P_ValueType name) {
     return expr;
 }
 
-static P_Expr* P_MakeFuncnameNode(P_Parser* parser, P_ValueType type, string name) {
+static P_Expr* P_MakeFuncnameNode(P_Parser* parser, P_ValueType type, string name, P_Namespace* nmspc) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_Funcname;
     expr->ret_type = type;
     expr->can_assign = false;
     expr->is_constant = true;
-    expr->op.funcname = name;
+    expr->op.funcname.name = name;
+    expr->op.funcname.namespace = nmspc;
     return expr;
 }
 
@@ -996,7 +1113,7 @@ static P_Expr* P_MakeLambdaNode(P_Parser* parser, P_ValueType type, string name)
     expr->ret_type = type;
     expr->can_assign = false;
     expr->is_constant = false;
-    expr->op.funcname = name;
+    expr->op.lambda = name;
     return expr;
 }
 
@@ -1255,6 +1372,22 @@ static P_PreStmt* P_MakePreFuncStmtNode(P_Parser* parser, P_ValueType type, stri
     return stmt;
 }
 
+static P_PreStmt* P_MakePreStructDeclStmtNode(P_Parser* parser, string name) {
+    P_PreStmt* stmt = arena_alloc(&parser->arena, sizeof(P_PreStmt));
+    stmt->type = PreStmtType_StructForwardDecl;
+    stmt->next = nullptr;
+    stmt->op.struct_fd = name;
+    return stmt;
+}
+
+static P_PreStmt* P_MakePreEnumDeclStmtNode(P_Parser* parser, string name) {
+    P_PreStmt* stmt = arena_alloc(&parser->arena, sizeof(P_PreStmt));
+    stmt->type = PreStmtType_EnumForwardDecl;
+    stmt->next = nullptr;
+    stmt->op.enum_fd = name;
+    return stmt;
+}
+
 static P_PreStmt* P_MakePreNothingNode(P_Parser* parser) {
     P_PreStmt* stmt = arena_alloc(&parser->arena, sizeof(P_PreStmt));
     stmt->type = PreStmtType_Nothing;
@@ -1327,6 +1460,50 @@ static P_Expr* P_ExprArray(P_Parser* parser) {
     return P_MakeArrayLiteralNode(parser, array_type, arr);
 }
 
+
+static P_Expr* P_ExprVar_NamespaceOverride(P_Parser* parser, P_Namespace* nmspc) {
+    string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    
+    var_entry_val value = {0};
+    if (P_GetVariable_InNamespace(parser, nmspc, name, &value)) {
+        if (is_ref(&value.type)) {
+            P_ValueType ret = P_ReduceType(value.type);
+            return P_MakeDerefNode(parser, ret, P_MakeVariableNode(parser, name, value.type));
+        }
+        return P_MakeVariableNode(parser, value.mangled_name, value.type);
+    }
+    
+    P_Container* type = type_array_get_in_namespace(parser, nmspc, name, parser->scope_depth);
+    if (type != nullptr) {
+        type_mod_array mods = {0};
+        P_ConsumeTypeMods(parser, &mods);
+        u64 complete_length = ((u64)parser->previous.start + (u64)parser->previous.length) - (u64)name.str;
+        
+        string actual = str_cat(&parser->arena, nmspc->flatname, name);
+        return P_MakeTypenameNode(parser, (P_ValueType) { .base_type = actual, .full_type = (string) { .str = name.str, .size = complete_length }, .mods = mods.elements, .mod_ct = mods.count, .op.basic.nmspc = nmspc, .op.basic.no_nmspc_name = name });
+    }
+    
+    // @namespaced
+    func_entry_key fnkey = { .name = name, .depth = parser->scope_depth };
+    while (fnkey.depth != -1) {
+        if (func_hash_table_has_name(&nmspc->functions, fnkey)) {
+            // Return a stub name
+            return P_MakeFuncnameNode(parser, (P_ValueType){ .type = ValueTypeType_FuncPointer }, name, nmspc);
+        }
+        
+        fnkey.depth--;
+    }
+    
+    u32 idx;
+    if (P_GetSubspace(nmspc, name, &idx)) {
+        return P_MakeNamespacenameNode(parser, nmspc->subspaces.elements[idx]);
+    }
+    
+    report_error(parser, str_lit("Undefined variable %.*s\n"), str_expand(name));
+    return nullptr;
+}
+
+
 static P_Expr* P_ExprVar(P_Parser* parser) {
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     
@@ -1354,7 +1531,7 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
             P_Namespace* curr = parser->usings.stack[u];
             if (func_hash_table_has_name(&curr->functions, fnkey)) {
                 // Return a stub name
-                return P_MakeFuncnameNode(parser, (P_ValueType){ .type = ValueTypeType_FuncPointer }, name);
+                return P_MakeFuncnameNode(parser, (P_ValueType){ .type = ValueTypeType_FuncPointer }, name, curr);
             }
         }
         
@@ -1503,16 +1680,12 @@ static P_Expr* P_ExprCall(P_Parser* parser, P_Expr* left) {
         // Only possible if there is only one overload for the funcname.... IS IT?
         func_entry_val* val = nullptr;
         u32 subset;
-        func_entry_key key = { .name = left->op.funcname, .depth = parser->scope_depth };
+        func_entry_key key = { .name = left->op.funcname.name, .depth = parser->scope_depth };
         
-        // @namespaced
         while (key.depth != -1) {
-            for (i32 u = parser->usings.tos - 1; u >= 0; u--) {
-                P_Namespace* curr = parser->usings.stack[u];
-                if (func_hash_table_get(&curr->functions, key, &param_types, &val,  &subset, false)) {
-                    left->ret_type = P_CreateFnpointerType(parser, &val->value, &val->param_types);
-                    left->op.funcname = val->mangled_name;
-                }
+            if (func_hash_table_get(&left->op.funcname.namespace->functions, key, &param_types, &val,  &subset, false)) {
+                left->ret_type = P_CreateFnpointerType(parser, &val->value, &val->param_types);
+                left->op.funcname.name = val->mangled_name;
             }
             
             key.depth--;
@@ -1592,24 +1765,21 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
         
         if (left->ret_type.type == ValueTypeType_FuncPointer) {
             if (xpr->type == ExprType_Funcname) {
-                string start_name = xpr->op.funcname;
+                string start_name = xpr->op.funcname.name;
                 // Differentiate the Funcname based on what params we need
-                func_entry_key key = { .name = xpr->op.funcname, .depth = parser->scope_depth };
+                func_entry_key key = { .name = xpr->op.funcname.name, .depth = parser->scope_depth };
                 func_entry_val* val = nullptr;
                 u32 subset;
                 while (key.depth != -1) {
                     // @namespaced
-                    for (i32 u = parser->usings.tos - 1; u >= 0; u--) {
-                        P_Namespace* curr = parser->usings.stack[u];
-                        if (func_hash_table_get(&curr->functions, key, left->ret_type.op.func_ptr.func_param_types, &val, &subset, true)) {
-                            // Fix the xpr
-                            xpr->ret_type.op.func_ptr.func_param_types = &val->param_types;
-                            xpr->ret_type.op.func_ptr.ret_type = left->ret_type.op.func_ptr.ret_type;
-                            xpr->ret_type.full_type = left->ret_type.full_type;
-                            xpr->op.funcname = val->mangled_name;
-                            
-                            return P_MakeAssignmentNode(parser, left, xpr);
-                        }
+                    if (func_hash_table_get(&xpr->op.funcname.namespace->functions, key, left->ret_type.op.func_ptr.func_param_types, &val, &subset, true)) {
+                        // Fix the xpr
+                        xpr->ret_type.op.func_ptr.func_param_types = &val->param_types;
+                        xpr->ret_type.op.func_ptr.ret_type = left->ret_type.op.func_ptr.ret_type;
+                        xpr->ret_type.full_type = left->ret_type.full_type;
+                        xpr->op.funcname.name = val->mangled_name;
+                        
+                        return P_MakeAssignmentNode(parser, left, xpr);
                     }
                     
                     key.depth--;
@@ -1832,42 +2002,63 @@ static P_Expr* P_ExprBinary(P_Parser* parser, P_Expr* left) {
 static P_Expr* P_ExprDot(P_Parser* parser, P_Expr* left) {
     if (left != nullptr) {
         if (left->type == ExprType_Typename) {
-            if (!container_type_exists(parser, left->op.typename.full_type, parser->scope_depth)) {
-                report_error(parser, str_lit("%.*s Is not a namespace or enum.\n"));
-                return nullptr;
+            if (left->op.typename.type == ValueTypeType_Basic) {
+                
+                if (!container_type_exists_in_namespace(parser, left->op.typename.op.basic.nmspc, left->op.typename.full_type, parser->scope_depth)) {
+                    report_error(parser, str_lit("%.*s Is not a namespace or enum.\n"));
+                    return nullptr;
+                }
+                
+                P_Consume(parser, TokenType_Identifier, str_lit("Expected Member name after .\n"));
+                string reqd = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+                P_Container* type = type_array_get_in_namespace(parser, left->op.typename.op.basic.nmspc, left->op.typename.full_type, parser->scope_depth);
+                
+                if (!member_exists(type, reqd)) {
+                    report_error(parser, str_lit("No member %.*s in enum %.*s\n"), str_expand(reqd), str_expand(left->op.typename.full_type));
+                }
+                
+                // NOTE(voxel): This is always ValueType_Integer for now.
+                // NOTE(voxel): But if I wanna support enums of different types, this will be different
+                P_ValueType member_type = member_type_get(type, reqd);
+                return P_MakeEnumDotNode(parser, member_type, type->mangled_name, reqd);
+            } else {
+                report_error(parser, str_lit("Cannot apply . operator to function pointer type\n"));
             }
-            
-            P_Consume(parser, TokenType_Identifier, str_lit("Expected Member name after .\n"));
-            string reqd = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
-            P_Container* type = type_array_get(parser, left->op.typename.full_type, parser->scope_depth);
-            
-            if (!member_exists(type, reqd)) {
-                report_error(parser, str_lit("No member %.*s in enum %.*s\n"), str_expand(reqd), str_expand(left->op.typename.full_type));
-            }
-            
-            // NOTE(voxel): This is always ValueType_Integer for now.
-            // NOTE(voxel): But if I wanna support enums of different types, this will be different
-            P_ValueType member_type = member_type_get(type, reqd);
-            return P_MakeEnumDotNode(parser, member_type, type->mangled_name, reqd);
-            
+        } else if (left->type == ExprType_Namespacename) {
+            P_Namespace* curr = left->op.namespace;
+            P_Consume(parser, TokenType_Identifier, str_lit("Expected identifier after namespace name\n"));
+            P_Expr* xpr = P_ExprVar_NamespaceOverride(parser, curr);
+            return xpr;
         } else {
             P_ValueType valtype = left->ret_type;
             
-            if (!container_type_exists(parser, valtype.full_type, parser->scope_depth)) {
-                report_error(parser, str_lit("Cannot apply . operator\n"));
-                return nullptr;
+            if (valtype.type == ValueTypeType_Basic) {
+                P_Namespace* checked_nmspc = valtype.op.basic.nmspc;
+                
+                if (checked_nmspc != nullptr) {
+                    if (!container_type_exists_in_namespace(parser, checked_nmspc, valtype.full_type, parser->scope_depth)) {
+                        report_error(parser, str_lit("Cannot apply . operator\n"));
+                        return nullptr;
+                    }
+                    
+                    P_Consume(parser, TokenType_Identifier, str_lit("Expected Member name after .\n"));
+                    string reqd = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+                    P_Container* type = type_array_get_in_namespace(parser, valtype.op.basic.nmspc, valtype.full_type, parser->scope_depth);
+                    if (!member_exists(type, reqd)) {
+                        report_error(parser, str_lit("No member %.*s in struct %.*s\n"), str_expand(reqd), str_expand(valtype.full_type));
+                    }
+                    P_ValueType member_type;
+                    if (type->is_native) member_type = ValueType_Any;
+                    else member_type = member_type_get(type, reqd);
+                    return P_MakeDotNode(parser, member_type, left, reqd);
+                    
+                } else {
+                    report_error(parser, str_lit("Cannot apply . operator to non-struct\n"));
+                }
+                
+            } else {
+                report_error(parser, str_lit("Cannot apply . operator to function pointer type\n"));
             }
-            
-            P_Consume(parser, TokenType_Identifier, str_lit("Expected Member name after .\n"));
-            string reqd = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
-            P_Container* type = type_array_get(parser, valtype.full_type, parser->scope_depth);
-            if (!member_exists(type, reqd)) {
-                report_error(parser, str_lit("No member %.*s in struct %.*s\n"), str_expand(reqd), str_expand(valtype.full_type));
-            }
-            P_ValueType member_type;
-            if (type->is_native) member_type = ValueType_Any;
-            else member_type = member_type_get(type, reqd);
-            return P_MakeDotNode(parser, member_type, left, reqd);
         }
     }
     
@@ -2188,25 +2379,21 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8
         if (type.type == ValueTypeType_FuncPointer) {
             if (value->type == ExprType_Funcname) {
                 
-                string start_name = value->op.funcname;
+                string start_name = value->op.funcname.name;
                 // Differentiate the Funcname based on what params we need
-                func_entry_key key = { .name = value->op.funcname, .depth = parser->scope_depth };
+                func_entry_key key = { .name = value->op.funcname.name, .depth = parser->scope_depth };
                 func_entry_val* val = nullptr;
                 u32 subset;
                 while (key.depth != -1) {
-                    // @namespaced
-                    for (i32 u = parser->usings.tos - 1; u >= 0; u--) {
-                        P_Namespace* curr = parser->usings.stack[u];
-                        if (func_hash_table_get(&curr->functions, key, type.op.func_ptr.func_param_types, &val, &subset, true)) {
-                            // Fix the value
-                            value->ret_type.op.func_ptr.func_param_types = &val->param_types;
-                            value->ret_type.op.func_ptr.ret_type = type.op.func_ptr.ret_type;
-                            value->ret_type.full_type = type.full_type;
-                            value->op.funcname = val->mangled_name;
-                            
-                            P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
-                            return P_MakeVarDeclAssignStmtNode(parser, type, new_name, value);
-                        }
+                    if (func_hash_table_get(&value->op.funcname.namespace->functions, key, type.op.func_ptr.func_param_types, &val, &subset, true)) {
+                        // Fix the value
+                        value->ret_type.op.func_ptr.func_param_types = &val->param_types;
+                        value->ret_type.op.func_ptr.ret_type = type.op.func_ptr.ret_type;
+                        value->ret_type.full_type = type.full_type;
+                        value->op.funcname.name = val->mangled_name;
+                        
+                        P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
+                        return P_MakeVarDeclAssignStmtNode(parser, type, new_name, value);
                     }
                     
                     key.depth--;
@@ -2242,88 +2429,88 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8
 
 static P_Stmt* P_StmtStructureDecl(P_Parser* parser, b8 native, b8 has_all_tags) {
     P_Consume(parser, TokenType_Identifier, str_lit("Expected Struct name after keyword 'struct'\n"));
-    string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    /*string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     P_NamespaceCheckRedefinition(parser, name, false, false);
-    string actual = str_cat(&parser->arena, parser->current_namespace->flatname, name);
+    string actual = str_cat(&parser->arena, parser->current_namespace->flatname, name);*/
     if (native) {
-        P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after native struct name\n"));
-        if (has_all_tags)
-            type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Struct, .name = name, .mangled_name = actual, .depth = parser->scope_depth, .is_native = true });
-        
-        return P_MakeNothingNode(parser);
+        if (P_Match(parser, TokenType_Semicolon)) {
+            /*if (has_all_tags)
+                type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Struct, .name = name, .mangled_name = actual, .depth = parser->scope_depth, .is_native = true });*/
+            return P_MakeNothingNode(parser);
+        }
     }
     
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Struct Name\n"));
     
-    u64 idx = parser->current_namespace->types.count;
+    /*u64 idx = parser->current_namespace->types.count;
     if (has_all_tags)
         type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Struct, .name = name, .mangled_name = actual, .depth = parser->scope_depth });
     u32 tmp_member_count = 0;
     string_list member_names = {0};
-    value_type_list member_types = {0};
+    value_type_list member_types = {0};*/
     
     // Parse Members
     while (!P_Match(parser, TokenType_CloseBrace)) {
-        P_ValueType type = P_ConsumeType(parser, str_lit("Expected Type or }\n"));
-        if (str_eq(type.full_type, name))
+        P_ConsumeType(parser, str_lit("Expected Type or }\n"));
+        /*if (str_eq(type.full_type, name))
             report_error(parser, str_lit("Recursive Definition of structures disallowed. You should store a pointer instead\n"));
-        value_type_list_push(&parser->arena, &member_types, type);
+        value_type_list_push(&parser->arena, &member_types, type);*/
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
-        string_list_push(&parser->arena, &member_names, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
+        //string_list_push(&parser->arena, &member_names, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
         
         P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after name\n"));
-        tmp_member_count++;
+        //tmp_member_count++;
         
         if (parser->current.type == TokenType_EOF)
             report_error(parser, str_lit("Unterminated block for structure definition\n"));
     }
     
-    if (has_all_tags) {
+    /*if (has_all_tags) {
         parser->current_namespace->types.elements[idx].member_count = tmp_member_count;
         parser->current_namespace->types.elements[idx].member_types = member_types;
         parser->current_namespace->types.elements[idx].member_names = member_names;
-    }
+    }*/
     
-    return P_MakeStructDeclStmtNode(parser, actual, tmp_member_count, member_types, member_names);
+    return P_MakeNothingNode(parser);
 }
 
 static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser, b8 has_all_tags) {
     P_Consume(parser, TokenType_Identifier, str_lit("Expected Enum name after keyword 'enum'\n"));
-    string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    /*string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     P_NamespaceCheckRedefinition(parser, name, false, false);
-    string actual = str_cat(&parser->arena, parser->current_namespace->flatname, name);
+    string actual = str_cat(&parser->arena, parser->current_namespace->flatname, name);*/
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Enum Name\n"));
     
-    u64 idx = parser->current_namespace->types.count;
+    /*u64 idx = parser->current_namespace->types.count;
     if (has_all_tags)
-        type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Enum, .name = name, .mangled_name = actual, .depth = parser->scope_depth });
+        type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Enum, .name = name, .mangled_name = actual, .depth = parser->scope_depth });*/
     
-    u32 member_count = 0;
+    /*u32 member_count = 0;
     string_list member_names = {0};
-    value_type_list member_types = {0};
+    value_type_list member_types = {0};*/
     
     // Parse Members
     while (!P_Match(parser, TokenType_CloseBrace)) {
-        value_type_list_push(&parser->arena, &member_types, ValueType_Integer);
+        //value_type_list_push(&parser->arena, &member_types, ValueType_Integer);
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
-        string_list_push(&parser->arena, &member_names, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
+        //string_list_push(&parser->arena, &member_names, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
         
-        member_count++;
+        //member_count++;
         if (P_Match(parser, TokenType_CloseBrace)) break;
         P_Consume(parser, TokenType_Comma, str_lit("Expected comma before next member"));
         if (parser->current.type == TokenType_EOF)
             report_error(parser, str_lit("Unterminated block for enum definition\n"));
     }
     
-    if (has_all_tags) {
+    /*if (has_all_tags) {
         parser->current_namespace->types.elements[idx].member_count = member_count;
         parser->current_namespace->types.elements[idx].member_types = member_types;
         parser->current_namespace->types.elements[idx].member_names = member_names;
-    }
+    }*/
     
-    return P_MakeEnumDeclStmtNode(parser, actual, member_count, member_names);
+    return P_MakeNothingNode(parser);
 }
 
 static P_Stmt* P_StmtNamespaceDecl(P_Parser* parser, b8 has_all_tags) {
@@ -2464,23 +2651,19 @@ static P_Stmt* P_StmtReturn(P_Parser* parser) {
     
     if (parser->function_body_ret.type == ValueTypeType_FuncPointer) {
         if (val->type == ExprType_Funcname) {
-            string start_name = val->op.funcname;
+            string start_name = val->op.funcname.name;
             // Differentiate the Funcname based on what params we need
-            func_entry_key key = { .name = val->op.funcname, .depth = parser->scope_depth };
+            func_entry_key key = { .name = val->op.funcname.name, .depth = parser->scope_depth };
             func_entry_val* ret_val = nullptr;
             u32 subset;
             while (key.depth != -1) {
-                // @namespaced
-                for (i32 u = parser->usings.tos - 1; u >= 0; u--) {
-                    P_Namespace* curr = parser->usings.stack[u];
-                    if (func_hash_table_get(&curr->functions, key, parser->function_body_ret.op.func_ptr.func_param_types, &ret_val, &subset, true)) {
-                        // Fix the val
-                        val->ret_type.op.func_ptr.func_param_types = &ret_val->param_types;
-                        val->ret_type.op.func_ptr.ret_type = parser->function_body_ret.op.func_ptr.ret_type;
-                        val->ret_type.full_type = parser->function_body_ret.full_type;
-                        val->op.funcname = ret_val->mangled_name;
-                        break;
-                    }
+                if (func_hash_table_get(&val->op.funcname.namespace->functions, key, parser->function_body_ret.op.func_ptr.func_param_types, &ret_val, &subset, true)) {
+                    // Fix the val
+                    val->ret_type.op.func_ptr.func_param_types = &ret_val->param_types;
+                    val->ret_type.op.func_ptr.ret_type = parser->function_body_ret.op.func_ptr.ret_type;
+                    val->ret_type.full_type = parser->function_body_ret.full_type;
+                    val->op.funcname.name = ret_val->mangled_name;
+                    break;
                 }
                 key.depth--;
             }
@@ -3033,6 +3216,120 @@ static P_PreStmt* P_PreNamespace(P_Parser* parser) {
     return P_MakePreNothingNode(parser);
 }
 
+static P_PreStmt* P_PreStmtStructureDecl(P_Parser* parser, b8 native, b8 has_all_tags) {
+    P_Consume(parser, TokenType_Identifier, str_lit("Expected Struct name after keyword 'struct'\n"));
+    string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    P_NamespaceCheckRedefinition(parser, name, false, false);
+    string actual = str_cat(&parser->arena, parser->current_namespace->flatname, name);
+    
+    if (native) {
+        if (P_Match(parser, TokenType_Semicolon)) {
+            if (has_all_tags)
+                type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Struct, .name = name, .mangled_name = actual, .depth = parser->scope_depth, .is_native = true });
+            return P_MakePreNothingNode(parser);
+        }
+    }
+    
+    P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Struct Name\n"));
+    
+    u64 idx = parser->current_namespace->types.count;
+    if (has_all_tags)
+        type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Struct, .name = name, .mangled_name = actual, .depth = parser->scope_depth });
+    u32 tmp_member_count = 0;
+    string_list member_names = {0};
+    value_type_list member_types = {0};
+    
+    // Parse Members
+    while (!P_Match(parser, TokenType_CloseBrace)) {
+        P_ValueType type = ValueType_Invalid;
+        if (P_IsTypeToken(parser))
+            type = P_ConsumeType(parser, str_lit("Expected type\n"));
+        else
+            report_error(parser, str_lit("Expected type\n"));
+        
+        if (str_eq(type.full_type, name))
+            report_error(parser, str_lit("Recursive Definition of structures disallowed. You should store a pointer instead\n"));
+        value_type_list_push(&parser->arena, &member_types, type);
+        
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
+        string_list_push(&parser->arena, &member_names, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
+        
+        P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after name\n"));
+        tmp_member_count++;
+        
+        if (parser->current.type == TokenType_EOF)
+            report_error(parser, str_lit("Unterminated block for structure definition\n"));
+    }
+    
+    if (has_all_tags) {
+        parser->current_namespace->types.elements[idx].member_count = tmp_member_count;
+        parser->current_namespace->types.elements[idx].member_types = member_types;
+        parser->current_namespace->types.elements[idx].member_names = member_names;
+    }
+    
+    
+    if (native) return P_MakePreNothingNode(parser);
+    
+    P_Stmt* curr = P_MakeStructDeclStmtNode(parser, actual, tmp_member_count, member_types, member_names);
+    if (parser->end != nullptr) {
+        parser->end->next = curr;
+        parser->end = curr;
+    } else {
+        parser->root = curr;
+        parser->end = curr;
+    }
+    
+    return P_MakePreStructDeclStmtNode(parser, actual);
+}
+
+static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 has_all_tags) {
+    P_Consume(parser, TokenType_Identifier, str_lit("Expected Enum name after keyword 'enum'\n"));
+    string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    P_NamespaceCheckRedefinition(parser, name, false, false);
+    string actual = str_cat(&parser->arena, parser->current_namespace->flatname, name);
+    P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Enum Name\n"));
+    
+    u64 idx = parser->current_namespace->types.count;
+    if (has_all_tags)
+        type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Enum, .name = name, .mangled_name = actual, .depth = parser->scope_depth });
+    
+    u32 member_count = 0;
+    string_list member_names = {0};
+    value_type_list member_types = {0};
+    
+    // Parse Members
+    while (!P_Match(parser, TokenType_CloseBrace)) {
+        value_type_list_push(&parser->arena, &member_types, ValueType_Integer);
+        
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
+        string_list_push(&parser->arena, &member_names, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
+        
+        member_count++;
+        if (P_Match(parser, TokenType_CloseBrace)) break;
+        P_Consume(parser, TokenType_Comma, str_lit("Expected comma before next member"));
+        if (parser->current.type == TokenType_EOF)
+            report_error(parser, str_lit("Unterminated block for enum definition\n"));
+    }
+    
+    if (has_all_tags) {
+        parser->current_namespace->types.elements[idx].member_count = member_count;
+        parser->current_namespace->types.elements[idx].member_types = member_types;
+        parser->current_namespace->types.elements[idx].member_names = member_names;
+    }
+    
+    P_Stmt* curr = P_MakeEnumDeclStmtNode(parser, actual, member_count, member_names);
+    if (parser->end != nullptr) {
+        parser->end->next = curr;
+        parser->end = curr;
+    } else {
+        parser->root = curr;
+        parser->end = curr;
+    }
+    
+    return P_MakePreEnumDeclStmtNode(parser, actual);
+}
+
+
 static P_PreStmt* P_PreStmtImport(P_Parser* parser) {
     P_Consume(parser, TokenType_StringLit, str_lit("Expected string after 'import'\n"));
     
@@ -3106,7 +3403,7 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
                 P_Advance(parser);
             }
         } else if (P_Match(parser, TokenType_Struct))
-            s = nullptr;
+            s = P_PreStmtStructureDecl(parser, true, has_all_tags);
     } else if (P_IsTypeToken(parser)) {
         P_ValueType type = P_ConsumeType(parser, str_lit("This is an error in the Parser. (P_PreDeclaration)\n"));
         
@@ -3121,7 +3418,10 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
         
     } else if (P_Match(parser, TokenType_Namespace)) {
         s = P_PreNamespace(parser);
-        
+    } else if (P_Match(parser, TokenType_Struct)) {
+        s = P_PreStmtStructureDecl(parser, false, has_all_tags);
+    } else if (P_Match(parser, TokenType_Enum)) {
+        s = P_PreStmtEnumerationDecl(parser, has_all_tags);
     } else if (P_Match(parser, TokenType_Import)) {
         s = P_PreStmtImport(parser);
     }
@@ -3257,7 +3557,6 @@ void P_Initialize(P_Parser* parser, string source, string filename, b8 is_root) 
     parser->block_stmt_should_begin_scope = true;
     parser->is_in_private_scope = false;
     using_stack_push(&parser->arena, &parser->usings, &global_namespace);
-    
     if (!parser->initialized) {
         parser->parent = nullptr;
         parser->sub = nullptr;
@@ -3348,7 +3647,7 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
         } break;
         
         case ExprType_Funcname: {
-            printf("%.*s [Funcname]\n", str_expand(expr->op.funcname));
+            printf("%.*s [Funcname]\n", str_expand(expr->op.funcname.name));
         } break;
         
         case ExprType_Lambda: {
