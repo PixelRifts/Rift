@@ -374,7 +374,11 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
         } break;
         
         case ExprType_EnumDot: {
-            E_WriteF(emitter, "_enum_%.*s_%.*s", str_expand(expr->op.enum_dot.left), str_expand(expr->op.enum_dot.right));
+            if (expr->op.enum_dot.native) {
+                E_WriteF(emitter, "%.*s", str_expand(expr->op.enum_dot.right));
+            } else {
+                E_WriteF(emitter, "_enum_%.*s_%.*s", str_expand(expr->op.enum_dot.left), str_expand(expr->op.enum_dot.right));
+            }
         } break;
         
         case ExprType_Sizeof: {

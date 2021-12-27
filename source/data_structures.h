@@ -92,6 +92,7 @@ typedef struct P_Container {
     value_type_list member_types;
     string_list member_names;
     b8 is_native;
+    b8 allows_any;
 } P_Container;
 
 typedef struct type_array {

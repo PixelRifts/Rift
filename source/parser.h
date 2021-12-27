@@ -82,7 +82,7 @@ struct P_Expr {
         struct { P_Expr* left; string right; } dot;
         struct { P_Expr* left; string right; } arrow;
         struct { P_Expr* operand; P_Expr* index; } index;
-        struct { string left; string right; } enum_dot;
+        struct { string left; string right; b8 native; } enum_dot;
         struct { P_Expr* name; P_Expr* value; } assignment;
         struct { string name; P_Expr** params; u32 call_arity; } func_call;
         struct { P_Expr* left; P_Expr** params; u32 call_arity; } call;

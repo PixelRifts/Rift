@@ -27,9 +27,13 @@ namespace GS {
     
 	// This is wack
 	int GS_KEYCODE_ESC = 51;
-	int GS_GRAPHICS_PRIMITIVE_LINES = 1;
-	int GS_GRAPHICS_PRIMITIVE_TRIANGLES = 2;
-	int GS_GRAPHICS_PRIMITIVE_QUADS = 3;
+    native enum GraphicsPrimitive {
+        _gs_gs_graphics_primitive_type_default,
+        GS_GRAPHICS_PRIMITIVE_LINES,
+        GS_GRAPHICS_PRIMITIVE_TRIANGLES,
+        GS_GRAPHICS_PRIMITIVE_QUADS,
+        _gs_gs_graphics_primitive_type_count,
+    }
     
 	native void gs_engine_create(gs_app_desc_t app);
 	native gs_app_desc_t* gs_engine_app();

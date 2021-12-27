@@ -124,7 +124,7 @@ static P_ValueType member_type_get(P_Container* structure, string reqd) {
 
 static b8 member_exists(P_Container* structure, string reqd) {
     // Can't check the struct
-    if (structure->is_native) return true;
+    if (structure->allows_any) return true;
     
     string_list_node* curr = structure->member_names.first;
     for (u32 i = 0; i < structure->member_count; i++) {
@@ -1066,7 +1066,7 @@ static P_Expr* P_MakeArrowNode(P_Parser* parser, P_ValueType type, P_Expr* left,
     return expr;
 }
 
-static P_Expr* P_MakeEnumDotNode(P_Parser* parser, P_ValueType type, string left, string right) {
+static P_Expr* P_MakeEnumDotNode(P_Parser* parser, P_ValueType type, string left, string right, b8 native) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_EnumDot;
     expr->ret_type = type;
@@ -1074,6 +1074,7 @@ static P_Expr* P_MakeEnumDotNode(P_Parser* parser, P_ValueType type, string left
     expr->is_constant = false;
     expr->op.enum_dot.left = left;
     expr->op.enum_dot.right = right;
+    expr->op.enum_dot.native = native;
     return expr;
 }
 
@@ -2059,7 +2060,7 @@ static P_Expr* P_ExprDot(P_Parser* parser, P_Expr* left) {
                 // NOTE(voxel): This is always ValueType_Integer for now.
                 // NOTE(voxel): But if I wanna support enums of different types, this will be different
                 P_ValueType member_type = member_type_get(type, reqd);
-                return P_MakeEnumDotNode(parser, member_type, type->mangled_name, reqd);
+                return P_MakeEnumDotNode(parser, member_type, type->mangled_name, reqd, type->is_native);
             } else {
                 report_error(parser, str_lit("Cannot apply . operator to function pointer type\n"));
             }
@@ -2087,7 +2088,7 @@ static P_Expr* P_ExprDot(P_Parser* parser, P_Expr* left) {
                         report_error(parser, str_lit("No member %.*s in struct %.*s\n"), str_expand(reqd), str_expand(valtype.full_type));
                     }
                     P_ValueType member_type;
-                    if (type->is_native) member_type = ValueType_Any;
+                    if (type->allows_any) member_type = ValueType_Any;
                     else member_type = member_type_get(type, reqd);
                     return P_MakeDotNode(parser, member_type, left, reqd);
                     
@@ -2124,7 +2125,7 @@ static P_Expr* P_ExprArrow(P_Parser* parser, P_Expr* left) {
                     report_error(parser, str_lit("No member %.*s in struct %.*s\n"), str_expand(reqd), str_expand(valtype.base_type));
                 }
                 P_ValueType member_type;
-                if (type->is_native) {
+                if (type->allows_any) {
                     member_type = ValueType_Any;
                 } else member_type = member_type_get(type, reqd);
                 return P_MakeArrowNode(parser, member_type, left, reqd);
@@ -2547,11 +2548,16 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser, b8 native, b8 has_all_tags)
     return P_MakeNothingNode(parser);
 }
 
-static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser, b8 has_all_tags) {
+static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_all_tags) {
     P_Consume(parser, TokenType_Identifier, str_lit("Expected Enum name after keyword 'enum'\n"));
     /*string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     P_NamespaceCheckRedefinition(parser, name, false, false);
     string actual = str_cat(&parser->arena, parser->current_namespace->flatname, name);*/
+    if (native) {
+        if (P_Match(parser, TokenType_Semicolon)) {
+            return P_MakeNothingNode(parser);
+        }
+    }
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Enum Name\n"));
     
     /*u64 idx = parser->current_namespace->types.count;
@@ -3100,7 +3106,7 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
     } else if (P_Match(parser, TokenType_Struct)) {
         s = P_StmtStructureDecl(parser, native, has_all_tags);
     } else if (P_Match(parser, TokenType_Enum)) {
-        s = P_StmtEnumerationDecl(parser, has_all_tags);
+        s = P_StmtEnumerationDecl(parser, native, has_all_tags);
     } else if (P_Match(parser, TokenType_Namespace)) {
         s = P_StmtNamespaceDecl(parser, has_all_tags);
     } else if (P_Match(parser, TokenType_Cinsert)) {
@@ -3313,12 +3319,12 @@ static P_PreStmt* P_PreStmtStructureDecl(P_Parser* parser, b8 native, b8 has_all
     P_Consume(parser, TokenType_Identifier, str_lit("Expected Struct name after keyword 'struct'\n"));
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     P_NamespaceCheckRedefinition(parser, name, false, false);
-    string actual = str_cat(&parser->arena, parser->current_namespace->flatname, name);
+    string actual = native ? name : str_cat(&parser->arena, parser->current_namespace->flatname, name);
     
     if (native) {
         if (P_Match(parser, TokenType_Semicolon)) {
             if (has_all_tags)
-                type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Struct, .name = name, .mangled_name = actual, .depth = parser->scope_depth, .is_native = true });
+                type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Struct, .name = name, .mangled_name = actual, .depth = parser->scope_depth, .is_native = true, .allows_any = true });
             return P_MakePreNothingNode(parser);
         }
     }
@@ -3327,7 +3333,7 @@ static P_PreStmt* P_PreStmtStructureDecl(P_Parser* parser, b8 native, b8 has_all
     
     u64 idx = parser->current_namespace->types.count;
     if (has_all_tags)
-        type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Struct, .name = name, .mangled_name = actual, .depth = parser->scope_depth, .is_native = false });
+        type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Struct, .name = name, .mangled_name = actual, .depth = parser->scope_depth, .is_native = native, .allows_any = false });
     u32 tmp_member_count = 0;
     string_list member_names = {0};
     value_type_list member_types = {0};
@@ -3370,16 +3376,25 @@ static P_PreStmt* P_PreStmtStructureDecl(P_Parser* parser, b8 native, b8 has_all
     return P_MakePreStructDeclStmtNode(parser, actual);
 }
 
-static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 has_all_tags) {
+static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_all_tags) {
     P_Consume(parser, TokenType_Identifier, str_lit("Expected Enum name after keyword 'enum'\n"));
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
     P_NamespaceCheckRedefinition(parser, name, false, false);
-    string actual = str_cat(&parser->arena, parser->current_namespace->flatname, name);
+    string actual = native ? name : str_cat(&parser->arena, parser->current_namespace->flatname, name);
+    
+    if (native) {
+        if (P_Match(parser, TokenType_Semicolon)) {
+            if (has_all_tags)
+                type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Struct, .name = name, .mangled_name = actual, .depth = parser->scope_depth, .is_native = true, .allows_any = true });
+            return P_MakePreNothingNode(parser);
+        }
+    }
+    
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Enum Name\n"));
     
     u64 idx = parser->current_namespace->types.count;
     if (has_all_tags)
-        type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Enum, .name = name, .mangled_name = actual, .depth = parser->scope_depth });
+        type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Enum, .name = name, .mangled_name = actual, .depth = parser->scope_depth, .is_native = native, .allows_any = false });
     
     u32 member_count = 0;
     string_list member_names = {0};
@@ -3404,6 +3419,7 @@ static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 has_all_tags) {
         parser->current_namespace->types.elements[idx].member_types = member_types;
         parser->current_namespace->types.elements[idx].member_names = member_names;
     }
+    if (native) return P_MakePreNothingNode(parser);
     
     P_Stmt* curr = P_MakeEnumDeclStmtNode(parser, actual, member_count, member_names);
     if (parser->end != nullptr) {
@@ -3506,8 +3522,10 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
                     s = nullptr;
                 P_Advance(parser);
             }
-        } else if (P_Match(parser, TokenType_Struct))
+        } else if (P_Match(parser, TokenType_Struct)) {
             s = P_PreStmtStructureDecl(parser, true, has_all_tags);
+        } else if (P_Match(parser, TokenType_Enum))
+            s = P_PreStmtEnumerationDecl(parser, true, has_all_tags);
     } else if (P_IsTypeToken(parser)) {
         P_ValueType type = P_ConsumeType(parser, str_lit("This is an error in the Parser. (P_PreDeclaration)\n"));
         
@@ -3525,7 +3543,7 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
     } else if (P_Match(parser, TokenType_Struct)) {
         s = P_PreStmtStructureDecl(parser, false, has_all_tags);
     } else if (P_Match(parser, TokenType_Enum)) {
-        s = P_PreStmtEnumerationDecl(parser, has_all_tags);
+        s = P_PreStmtEnumerationDecl(parser, false, has_all_tags);
     } else if (P_Match(parser, TokenType_Import)) {
         s = P_PreStmtImport(parser);
     } else if (P_Match(parser, TokenType_Cinclude)) {
