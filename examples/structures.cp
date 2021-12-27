@@ -1,4 +1,4 @@
-void native printf(string format, ... rest);
+native void printf(string format, ... rest);
 
 struct test_structure {
 	int some_member;

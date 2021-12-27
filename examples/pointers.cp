@@ -1,6 +1,6 @@
-void native printf(string format, ... rest);
-void* native calloc(int count, int elem_size);
-void native free(void* buffer);
+native void printf(string format, ... rest);
+native void* calloc(int count, int elem_size);
+native void free(void* buffer);
 
 int main() {
 	int* x = calloc(16, 4);

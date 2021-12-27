@@ -1,3 +1,4 @@
+
 import "standard.cp";
 
 namespace TEST {
@@ -48,3 +49,4 @@ int main() {
     
     return 0;
 }
+

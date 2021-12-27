@@ -113,11 +113,7 @@ static P_ValueType member_type_get(P_Container* structure, string reqd) {
         
         if (curr->size == reqd.size) {
             if (memcmp(curr->str, reqd.str, curr->size) == 0) {
-                return (P_ValueType) {
-                    .base_type = type->type.base_type,
-                    .full_type = type->type.full_type,
-                    .mods = nullptr
-                };
+                return type->type;
             }
         }
         curr = curr->next;
@@ -1056,6 +1052,17 @@ static P_Expr* P_MakeDotNode(P_Parser* parser, P_ValueType type, P_Expr* left, s
     expr->is_constant = false;
     expr->op.dot.left = left;
     expr->op.dot.right = right;
+    return expr;
+}
+
+static P_Expr* P_MakeArrowNode(P_Parser* parser, P_ValueType type, P_Expr* left, string right) {
+    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+    expr->type = ExprType_Arrow;
+    expr->ret_type = type;
+    expr->can_assign = true;
+    expr->is_constant = false;
+    expr->op.arrow.left = left;
+    expr->op.arrow.right = right;
     return expr;
 }
 
@@ -2098,6 +2105,38 @@ static P_Expr* P_ExprDot(P_Parser* parser, P_Expr* left) {
     return nullptr;
 }
 
+
+static P_Expr* P_ExprArrow(P_Parser* parser, P_Expr* left) {
+    if (left != nullptr) {
+        if (is_ptr(&left->ret_type)) {
+            
+            P_ValueType valtype = P_ReduceType(left->ret_type);
+            if (valtype.type == ValueTypeType_Basic) {
+                if (!container_type_exists_in_namespace(parser, valtype.op.basic.nmspc, valtype.op.basic.no_nmspc_name, parser->scope_depth)) {
+                    report_error(parser, str_lit("Cannot apply -> operator\n"));
+                    return nullptr;
+                }
+                
+                P_Consume(parser, TokenType_Identifier, str_lit("Expected Member name after .\n"));
+                string reqd = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+                P_Container* type = type_array_get_in_namespace(parser, valtype.op.basic.nmspc, valtype.op.basic.no_nmspc_name, parser->scope_depth);
+                if (!member_exists(type, reqd)) {
+                    report_error(parser, str_lit("No member %.*s in struct %.*s\n"), str_expand(reqd), str_expand(valtype.base_type));
+                }
+                P_ValueType member_type;
+                if (type->is_native) {
+                    member_type = ValueType_Any;
+                } else member_type = member_type_get(type, reqd);
+                return P_MakeArrowNode(parser, member_type, left, reqd);
+            }
+            
+        } else {
+            report_error(parser, str_lit("Cannot use -> operator on non-pointer types\n"));
+        }
+    }
+    return nullptr;
+}
+
 static P_Expr* P_ExprSizeof(P_Parser* parser) {
     P_Consume(parser, TokenType_OpenParenthesis, str_lit("Expected ( after 'sizeof'\n"));
     P_Expr* expr = P_Expression(parser);
@@ -2178,6 +2217,7 @@ P_ParseRule parse_rules[] = {
     [TokenType_CloseParenthesis]   = { nullptr, nullptr,   Prec_None, Prec_None },
     [TokenType_CloseBracket]       = { nullptr, nullptr,   Prec_None, Prec_None },
     [TokenType_Dot]                = { nullptr, P_ExprDot, Prec_None, Prec_Call },
+    [TokenType_ThinArrow]          = { nullptr, P_ExprArrow, Prec_None, Prec_Call },
     [TokenType_Semicolon]          = { nullptr, nullptr, Prec_None, Prec_None },
     [TokenType_Colon]              = { nullptr, nullptr, Prec_None, Prec_None },
     [TokenType_Question]           = { nullptr, nullptr, Prec_None, Prec_None },
@@ -3287,18 +3327,14 @@ static P_PreStmt* P_PreStmtStructureDecl(P_Parser* parser, b8 native, b8 has_all
     
     u64 idx = parser->current_namespace->types.count;
     if (has_all_tags)
-        type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Struct, .name = name, .mangled_name = actual, .depth = parser->scope_depth });
+        type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Struct, .name = name, .mangled_name = actual, .depth = parser->scope_depth, .is_native = false });
     u32 tmp_member_count = 0;
     string_list member_names = {0};
     value_type_list member_types = {0};
     
     // Parse Members
     while (!P_Match(parser, TokenType_CloseBrace)) {
-        P_ValueType type = ValueType_Invalid;
-        if (P_IsTypeToken(parser))
-            type = P_ConsumeType(parser, str_lit("Expected type\n"));
-        else
-            report_error(parser, str_lit("Expected type\n"));
+        P_ValueType type = P_ConsumeType(parser, str_lit("Expected type\n"));
         
         if (str_eq(type.full_type, name))
             report_error(parser, str_lit("Recursive Definition of structures disallowed. You should store a pointer instead\n"));
@@ -3319,7 +3355,6 @@ static P_PreStmt* P_PreStmtStructureDecl(P_Parser* parser, b8 native, b8 has_all
         parser->current_namespace->types.elements[idx].member_types = member_types;
         parser->current_namespace->types.elements[idx].member_names = member_names;
     }
-    
     
     if (native) return P_MakePreNothingNode(parser);
     

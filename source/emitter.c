@@ -368,6 +368,11 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
             E_WriteF(emitter, ".%.*s", str_expand(expr->op.dot.right));
         } break;
         
+        case ExprType_Arrow: {
+            E_EmitExpression(emitter, expr->op.arrow.left);
+            E_WriteF(emitter, "->%.*s", str_expand(expr->op.arrow.right));
+        } break;
+        
         case ExprType_EnumDot: {
             E_WriteF(emitter, "_enum_%.*s_%.*s", str_expand(expr->op.enum_dot.left), str_expand(expr->op.enum_dot.right));
         } break;

@@ -1,4 +1,4 @@
-void native printf(string format, ... rest);
+native void printf(string format, ... rest);
 
 int main() {
 	foo(10.d);

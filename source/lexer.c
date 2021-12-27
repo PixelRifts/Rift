@@ -133,6 +133,13 @@ static L_Token L_TripleHandle(L_Lexer* lexer, i8 expected1, L_TokenType yes1, i8
     return L_MakeToken(lexer, no);
 }
 
+static L_Token L_QuadHandle(L_Lexer* lexer, i8 expected1, L_TokenType yes1, i8 expected2, L_TokenType yes2, i8 expected3, L_TokenType yes3, L_TokenType no) {
+    if (L_Match(lexer, expected1)) return L_MakeToken(lexer, yes1);
+    else if (L_Match(lexer, expected2)) return L_MakeToken(lexer, yes2);
+    else if (L_Match(lexer, expected3)) return L_MakeToken(lexer, yes3);
+    return L_MakeToken(lexer, no);
+}
+
 static i8 L_Advance(L_Lexer* lexer) {
     lexer->current++;
     return lexer->current[-1];
@@ -355,7 +362,7 @@ L_Token L_LexToken(L_Lexer* lexer) {
         case '^':  return L_DoubleHandle(lexer, '=', TokenType_HatEqual, TokenType_Hat);
         case '&':  return L_TripleHandle(lexer, '=', TokenType_AmpersandEqual, '&', TokenType_AmpersandAmpersand, TokenType_Ampersand);
         case '+': return L_TripleHandle(lexer, '=', TokenType_PlusEqual, '+', TokenType_PlusPlus, TokenType_Plus);
-        case '-': return L_TripleHandle(lexer, '=', TokenType_MinusEqual, '-', TokenType_MinusMinus, TokenType_Minus);
+        case '-': return L_QuadHandle(lexer, '=', TokenType_MinusEqual, '-', TokenType_MinusMinus, '>', TokenType_ThinArrow, TokenType_Minus);
         case '*':  return L_DoubleHandle(lexer, '=', TokenType_StarEqual, TokenType_Star);
         case '%':  return L_DoubleHandle(lexer, '=', TokenType_PercentEqual, TokenType_Percent);
         case '<':  return L_DoubleHandle(lexer, '=', TokenType_LessEqual, TokenType_Less);

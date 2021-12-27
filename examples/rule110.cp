@@ -1,9 +1,9 @@
-void native printf(string format, ... rest);
-void* native malloc(int size);
-void* native memset(void* block, int ch, int size);
-void* native calloc(int count, int elem_size);
-void native memcpy(void* to, void* from, int size);
-void native free(void* buffer);
+native void printf(string format, ... rest);
+native void* malloc(int size);
+native void* memset(void* block, int ch, int size);
+native void* calloc(int count, int elem_size);
+native void memcpy(void* to, void* from, int size);
+native void free(void* buffer);
 
 int main() {
 	// Size of buffer is 50
@@ -18,7 +18,7 @@ int main() {
 			int left;
 			int right;
 			int mid = prev[k];
-
+            
 			if (k != 0) left = prev[k - 1];
 			else left = 0;
 			if (k != 49) right = prev[k + 1];
@@ -58,7 +58,7 @@ int main() {
 		print_buffer(buffer);
 		i = i + 1;
 	}
-
+    
 	free(prev);
 	free(buffer);
 	return 0;
