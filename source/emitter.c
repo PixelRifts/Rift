@@ -606,6 +606,14 @@ static void E_EmitPreStatement(E_Emitter* emitter, P_PreStmt* stmt, u32 indent) 
             E_WriteLineF(emitter, "typedef struct %.*s %.*s;", str_expand(stmt->op.struct_fd), str_expand(stmt->op.struct_fd));
             E_WriteLineF(emitter, "struct %.*s;", str_expand(stmt->op.struct_fd));
         } break;
+        
+        case PreStmtType_CInclude: {
+            E_WriteLineF(emitter, "#include \"%.*s\"", str_expand(stmt->op.cinclude));
+        } break;
+        
+        case PreStmtType_CInsert: {
+            E_WriteLineF(emitter, "%.*s", str_expand(stmt->op.cinsert));
+        } break;
     }
 }
 

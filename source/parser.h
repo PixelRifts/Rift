@@ -134,6 +134,8 @@ enum {
     PreStmtType_ForwardDecl,
     PreStmtType_StructForwardDecl,
     PreStmtType_EnumForwardDecl,
+    PreStmtType_CInclude,
+    PreStmtType_CInsert,
 };
 
 typedef struct P_PreStmt P_PreStmt;
@@ -142,6 +144,8 @@ struct P_PreStmt {
     P_PreStmt* next;
     union {
         struct { string name; u32 arity; value_type_list param_types; string_list param_names; P_ValueType type; } forward_decl;
+        string cinclude;
+        string cinsert;
         string struct_fd;
         string enum_fd;
     } op;

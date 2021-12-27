@@ -43,7 +43,8 @@ enum {
     TokenType_Int, TokenType_String, TokenType_Float, TokenType_Bool,
     TokenType_Double, TokenType_Char, TokenType_Long, TokenType_Void,
     
-    TokenType_Tag, TokenType_Sizeof, TokenType_Offsetof,
+    TokenType_Tag, TokenType_Sizeof, TokenType_Offsetof, TokenType_Cinclude,
+    TokenType_Cinsert,
     
     TokenType_TokenTypeCount
 };

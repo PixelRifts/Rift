@@ -85,6 +85,8 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_Native: return str_lit("Native");
         case TokenType_Namespace: return str_lit("Namespace");
         case TokenType_Using: return str_lit("Using");
+        case TokenType_Cinclude: return str_lit("Cinclude");
+        case TokenType_Cinsert: return str_lit("Cinsert");
     }
     return str_lit("unreachable");
 }
@@ -231,6 +233,11 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                 case 'h': return L_MatchType(lexer, 2, str_lit("ar"), TokenType_Char);
                 case 'o': return L_MatchType(lexer, 2, str_lit("ntinue"), TokenType_Continue);
                 case 'a': return L_MatchType(lexer, 2, str_lit("se"), TokenType_Case);
+                case 'i': {
+                    if (L_MatchType(lexer, 2, str_lit("nclude"), TokenType_Cinclude) == TokenType_Cinclude) {
+                        return TokenType_Cinclude;
+                    } else return L_MatchType(lexer, 2, str_lit("nsert"), TokenType_Cinsert);
+                }
             }
         }
         

@@ -17,24 +17,34 @@ namespace TEST {
         nein
     }
     
-    void proc() {
+    namespace Inner {
         
+        struct jay {
+            int k;
+            bool l;
+            char m;
+            long n;
+        }
+        
+    }
+    
+    void proc() {
+        //meh m;
+        //assign_ten(m);
+        printf("Yeet\n");
     }
 }
 
-struct binomial {
-    int k;
-}
-
-void assign_ten(TEST.meh& mu_ref) {
+void assign_ten(TEST.Inner.jay& mu_ref) {
     mu_ref.k = 10;
 }
 
 int main() {
-    TEST.meh yes;
-    TEST.proc();
-    int kek = TEST.yesnt.ja;
-    //assign_ten(yes);
+    using TEST;
+    Inner.jay yee;
+    proc();
+    int kek = yesnt.ja;
+    assign_ten(yee);
     
     return 0;
 }

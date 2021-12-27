@@ -338,7 +338,7 @@ static b8 P_MatchType(P_Parser* parser, P_ValueType* rettype, string* custom_err
         parser->current.type == TokenType_Void || parser->current.type == TokenType_String ||
         parser->current.type == TokenType_Identifier) {
         string with_nmspc = {0};
-        P_Namespace* nmspc = &global_namespace;
+        P_Namespace* nmspc = nullptr;
         if (parser->current.type == TokenType_Identifier) {
             // Namespaced Types
             P_ParserSnap snap = P_TakeSnapshot(parser);
@@ -389,6 +389,10 @@ static b8 P_MatchType(P_Parser* parser, P_ValueType* rettype, string* custom_err
             }
         } else {
             P_Advance(parser);
+        }
+        
+        if (nmspc == nullptr) {
+            nmspc = &global_namespace;
         }
         
         string base_type = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
@@ -1360,6 +1364,22 @@ static P_Stmt* P_MakeFuncStmtNode(P_Parser* parser, P_ValueType type, string nam
     return stmt;
 }
 
+static P_PreStmt* P_MakePreCincludeStmtNode(P_Parser* parser, string name) {
+    P_PreStmt* stmt = arena_alloc(&parser->arena, sizeof(P_PreStmt));
+    stmt->type = PreStmtType_CInclude;
+    stmt->next = nullptr;
+    stmt->op.cinclude = name;
+    return stmt;
+}
+
+static P_PreStmt* P_MakePreCinsertStmtNode(P_Parser* parser, string code) {
+    P_PreStmt* stmt = arena_alloc(&parser->arena, sizeof(P_PreStmt));
+    stmt->type = PreStmtType_CInsert;
+    stmt->next = nullptr;
+    stmt->op.cinsert = code;
+    return stmt;
+}
+
 static P_PreStmt* P_MakePreFuncStmtNode(P_Parser* parser, P_ValueType type, string name, u32 arity, value_type_list param_types, string_list param_names) {
     P_PreStmt* stmt = arena_alloc(&parser->arena, sizeof(P_PreStmt));
     stmt->type = PreStmtType_ForwardDecl;
@@ -1516,12 +1536,18 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
         return P_MakeVariableNode(parser, value.mangled_name, value.type);
     }
     
-    P_Container* type = type_array_get(parser, name, parser->scope_depth);
-    if (type != nullptr) {
-        type_mod_array mods = {0};
-        P_ConsumeTypeMods(parser, &mods);
-        u64 complete_length = ((u64)parser->previous.start + (u64)parser->previous.length) - (u64)name.str;
-        return P_MakeTypenameNode(parser, (P_ValueType) { .base_type = name, .full_type = (string) { .str = name.str, .size = complete_length }, .mods = mods.elements, .mod_ct = mods.count });
+    for (i32 u = parser->usings.tos - 1; u >= 0; u--) {
+        P_Namespace* curr = parser->usings.stack[u];
+        
+        P_Container* type = type_array_get_in_namespace(parser, curr, name, parser->scope_depth);
+        if (type != nullptr) {
+            type_mod_array mods = {0};
+            P_ConsumeTypeMods(parser, &mods);
+            //u64 complete_length = ((u64)parser->previous.start + (u64)parser->previous.length) - (u64)name.str;
+            string actual = str_cat(&parser->arena, curr->flatname, name);
+            return P_MakeTypenameNode(parser, (P_ValueType) { .base_type = actual, .full_type = name, .mods = mods.elements, .mod_ct = mods.count, .op.basic.nmspc = curr, .op.basic.no_nmspc_name = name });
+        }
+        
     }
     
     // @namespaced
@@ -1692,49 +1718,55 @@ static P_Expr* P_ExprCall(P_Parser* parser, P_Expr* left) {
         }
     }
     
-    // Check required params against what we got
-    // If it wants more parameters than currently provided, just dont check anything. parameters are wrong
-    if (left->ret_type.op.func_ptr.func_param_types->node_count - 1 <= param_types.node_count) {
-        
-        // Check string_list equals. (can be a subset, so not using string_list_equals)
-        value_type_list_node* curr_test = left->ret_type.op.func_ptr.func_param_types->first;
-        value_type_list_node* curr = param_types.first;
-        while (!(curr_test == nullptr || curr == nullptr)) {
-            if (!str_eq(str_lit("..."), curr_test->type.full_type)) {
-                if (!type_check(curr->type, curr_test->type)) break;
-                curr_test = curr_test->next;
-                curr = curr->next;
-            } else {
-                curr = curr->next;
+    if (left->ret_type.op.func_ptr.func_param_types != nullptr) {
+        // Check required params against what we got
+        // If it wants more parameters than currently provided, just dont check anything. parameters are wrong
+        if (left->ret_type.op.func_ptr.func_param_types->node_count - 1 <= param_types.node_count) {
+            
+            // Check string_list equals. (can be a subset, so not using string_list_equals)
+            value_type_list_node* curr_test = left->ret_type.op.func_ptr.func_param_types->first;
+            value_type_list_node* curr = param_types.first;
+            while (!(curr_test == nullptr || curr == nullptr)) {
+                if (!str_eq(str_lit("..."), curr_test->type.full_type)) {
+                    if (!type_check(curr->type, curr_test->type)) break;
+                    curr_test = curr_test->next;
+                    curr = curr->next;
+                }
+                else {
+                    curr = curr->next;
+                }
+            }
+            
+            // If the while loop exited normally, we found a type match
+            if (!(curr_test == nullptr || curr == nullptr)) {
+                report_error(parser, str_lit("Wrong Parameters passed to function\n"));
+                return nullptr;
             }
         }
-        
-        // If the while loop exited normally, we found a type match
-        if (!(curr_test == nullptr || curr == nullptr)) {
+        else {
             report_error(parser, str_lit("Wrong Parameters passed to function\n"));
             return nullptr;
         }
-    } else {
-        report_error(parser, str_lit("Wrong Parameters passed to function\n"));
-        return nullptr;
-    }
-    
-    value_type_list_node* curr = left->ret_type.op.func_ptr.func_param_types->first;
-    u32 i = 0;
-    while (curr != nullptr) {
-        if (is_ref(&curr->type)) {
-            P_Expr* e = param_buffer[i];
-            if (!e->can_assign)
-                report_error(parser, str_lit("Cannot pass non assignable value to reference parameter\n"));
-            P_Expr* a = P_MakeAddrNode(parser, curr->type, e);
-            param_buffer[i] = a;
+        
+        value_type_list_node* curr = left->ret_type.op.func_ptr.func_param_types->first;
+        u32 i = 0;
+        while (curr != nullptr) {
+            if (is_ref(&curr->type)) {
+                P_Expr* e = param_buffer[i];
+                if (!e->can_assign)
+                    report_error(parser, str_lit("Cannot pass non assignable value to reference parameter\n"));
+                P_Expr* a = P_MakeAddrNode(parser, curr->type, e);
+                param_buffer[i] = a;
+            }
+            curr = curr->next;
+            i++;
         }
-        curr = curr->next;
-        i++;
+        
+        // Checks passed, Create the call node.
+        return P_MakeCallNode(parser, left, *left->ret_type.op.func_ptr.ret_type, param_buffer, call_arity);
     }
-    
-    // Checks passed, Create the call node.
-    return P_MakeCallNode(parser, left, *left->ret_type.op.func_ptr.ret_type, param_buffer, call_arity);
+    report_error(parser, str_lit("No Function Overload of %.*s with given parameters found\n"), str_expand(left->op.funcname.name));
+    return nullptr;
 }
 
 static P_Expr* P_ExprPrimitiveTypename(P_Parser* parser) {
@@ -2574,6 +2606,18 @@ static P_Stmt* P_StmtUsing(P_Parser* parser) {
     return P_MakeNothingNode(parser);
 }
 
+static P_Stmt* P_StmtCinclude(P_Parser* parser, b8 has_all_tags) {
+    P_Consume(parser, TokenType_StringLit, str_lit("Expected Filename after 'cinclude'\n"));
+    P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after filename\n"));
+    return P_MakeNothingNode(parser);
+}
+
+static P_Stmt* P_StmtCinsert(P_Parser* parser, b8 has_all_tags) {
+    P_Consume(parser, TokenType_StringLit, str_lit("Expected Some code after 'cinsert'\n"));
+    P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after filename\n"));
+    return P_MakeNothingNode(parser);
+}
+
 static P_Stmt* P_StmtImport(P_Parser* parser, b8 has_all_tags) {
     P_Consume(parser, TokenType_StringLit, str_lit("Expected Filename after 'import'\n"));
     
@@ -3019,6 +3063,15 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
         s = P_StmtEnumerationDecl(parser, has_all_tags);
     } else if (P_Match(parser, TokenType_Namespace)) {
         s = P_StmtNamespaceDecl(parser, has_all_tags);
+    } else if (P_Match(parser, TokenType_Cinsert)) {
+        s = P_StmtCinsert(parser, has_all_tags);
+    } else if (P_Match(parser, TokenType_Cinclude)) {
+        if (parser->scope_depth == 0)
+            s = P_StmtCinclude(parser, has_all_tags);
+        else {
+            report_error(parser, str_lit("Cannot have an import statement in another declaration\n"));
+            s = nullptr;
+        }
     } else if (P_Match(parser, TokenType_Import)) {
         if (parser->scope_depth == 0)
             s = P_StmtImport(parser, has_all_tags);
@@ -3329,6 +3382,22 @@ static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 has_all_tags) {
     return P_MakePreEnumDeclStmtNode(parser, actual);
 }
 
+static P_PreStmt* P_PreStmtCinclude(P_Parser* parser, b8 has_all_tags) {
+    P_Consume(parser, TokenType_StringLit, str_lit("Expected Filename after 'cinclude'\n"));
+    string name = { .str = (u8*)parser->previous.start + 1, .size = parser->previous.length - 2 };
+    name = str_replace_all(&parser->arena, name, str_lit("\\"), str_lit("/"));
+    P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after filename\n"));
+    if (!has_all_tags) return P_MakePreNothingNode(parser);
+    return P_MakePreCincludeStmtNode(parser, name);
+}
+
+static P_PreStmt* P_PreStmtCinsert(P_Parser* parser, b8 has_all_tags) {
+    P_Consume(parser, TokenType_StringLit, str_lit("Expected Code in quotes after 'cinsert'\n"));
+    string code = { .str = (u8*)parser->previous.start + 1, .size = parser->previous.length - 2 };
+    P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after filename\n"));
+    if (!has_all_tags) return P_MakePreNothingNode(parser);
+    return P_MakePreCinsertStmtNode(parser, code);
+}
 
 static P_PreStmt* P_PreStmtImport(P_Parser* parser) {
     P_Consume(parser, TokenType_StringLit, str_lit("Expected string after 'import'\n"));
@@ -3424,6 +3493,10 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
         s = P_PreStmtEnumerationDecl(parser, has_all_tags);
     } else if (P_Match(parser, TokenType_Import)) {
         s = P_PreStmtImport(parser);
+    } else if (P_Match(parser, TokenType_Cinclude)) {
+        s = P_PreStmtCinclude(parser, has_all_tags);
+    } else if (P_Match(parser, TokenType_Cinsert)) {
+        s = P_PreStmtCinsert(parser, has_all_tags);
     }
     
     if (!has_all_tags) s = P_MakePreNothingNode(parser);
