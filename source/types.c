@@ -1,6 +1,6 @@
 #include "types.h"
 
-const P_ValueType ValueType_Invalid = { .base_type = str_lit("INVALID"), .mods = nullptr };
+const P_ValueType ValueType_Invalid = { .base_type = str_lit("INVALID"), .full_type = str_lit("INVALID"), .mods = nullptr };
 
 const P_ValueType ValueType_Any = value_type_abs_nc("any");
 const P_ValueType ValueType_Integer = value_type_abs_nc("int");

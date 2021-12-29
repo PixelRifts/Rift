@@ -87,6 +87,7 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_Using: return str_lit("Using");
         case TokenType_Cinclude: return str_lit("Cinclude");
         case TokenType_Cinsert: return str_lit("Cinsert");
+        case TokenType_Operator: return str_lit("Operator");
     }
     return str_lit("unreachable");
 }
@@ -226,7 +227,12 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
         case 'l': return L_MatchType(lexer, 1, str_lit("ong"), TokenType_Long);
         case 'v': return L_MatchType(lexer, 1, str_lit("oid"), TokenType_Void);
         case 't': return L_MatchType(lexer, 1, str_lit("rue"), TokenType_True);
-        case 'o': return L_MatchType(lexer, 1, str_lit("ffsetof"), TokenType_Offsetof);
+        case 'o': {
+            switch (lexer->start[1]) {
+                case 'f': return L_MatchType(lexer, 2, str_lit("fsetof"), TokenType_Offsetof);
+                case 'p': return L_MatchType(lexer, 2, str_lit("erator"), TokenType_Operator);
+            }
+        }
         
         case 'b': {
             switch (lexer->start[1]) {

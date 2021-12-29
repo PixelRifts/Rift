@@ -20,6 +20,7 @@
 //~ Globals
 static M_Arena global_arena;
 static P_Namespace global_namespace;
+static opoverload_hash_table op_overloads;
 static string_list imports;
 static string_list imports_parsing;
 static string_list active_tags;
@@ -742,7 +743,7 @@ static void P_BindDouble(P_Parser* parser, P_Expr* left, P_Expr* right, P_Binary
             return;
         }
     }
-    report_error(parser, error_msg, left->ret_type.full_type, right->ret_type.full_type);
+    report_error(parser, error_msg, str_expand(left->ret_type.full_type), str_expand(right->ret_type.full_type));
 }
 
 static P_ValueType P_GetNumberBinaryValType(P_Expr* a, P_Expr* b) {
@@ -1954,89 +1955,104 @@ static P_Expr* P_ExprBinary(P_Parser* parser, P_Expr* left) {
     L_TokenType op_type = parser->previous.type;
     P_ParseRule* rule = P_GetRule(op_type);
     P_Expr* right = P_ExprPrecedence(parser, (P_Precedence)(rule->infix_precedence + 1));
-    P_ValueType ret_type;
-    switch (op_type) {
-        case TokenType_Plus: {
-            P_BindDouble(parser, left, right, pairs_operator_arithmetic_term, sizeof(pairs_operator_arithmetic_term), str_lit("Cannot apply binary operator + to %s and %s\n"));
-            ret_type = P_GetNumberBinaryValType(left, right);
-        } break;
+    P_Expr* ret;
+    
+    opoverload_entry_key key = {
+        .type = left->ret_type
+    };
+    opoverload_entry_val* val;
+    
+    if (opoverload_hash_table_get(&op_overloads, key, op_type, right->ret_type, &val)) {
         
-        case TokenType_Minus: {
-            P_BindDouble(parser, left, right, pairs_operator_arithmetic_term, sizeof(pairs_operator_arithmetic_term), str_lit("Cannot apply binary operator - to %s and %s\n"));
-            ret_type = P_GetNumberBinaryValType(left, right);
-        } break;
+        P_Expr** packed = arena_alloc(&parser->arena, sizeof(P_Expr*) * 2);;
+        packed[0] = left;
+        packed[1] = right;
+        ret = P_MakeFuncCallNode(parser, val->mangled_name, val->ret_type, packed, 2);
         
-        case TokenType_Star: {
-            P_BindDouble(parser, left, right, pairs_operator_arithmetic_factor, sizeof(pairs_operator_arithmetic_factor), str_lit("Cannot apply binary operator * to %s and %s\n"));
-            ret_type = P_GetNumberBinaryValType(left, right);
-        } break;
-        
-        case TokenType_Slash: {
-            P_BindDouble(parser, left, right, pairs_operator_arithmetic_factor, sizeof(pairs_operator_arithmetic_factor), str_lit("Cannot apply binary operator / to %s and %s\n"));
-            ret_type = P_GetNumberBinaryValType(left, right);
-        } break;
-        
-        case TokenType_Percent: {
-            P_BindDouble(parser, left, right, pairs_operator_arithmetic_factor, sizeof(pairs_operator_arithmetic_factor), str_lit("Cannot apply binary operator % to %s and %s\n"));
-            ret_type = P_GetNumberBinaryValType(left, right);
-        } break;
-        
-        case TokenType_Hat: {
-            P_BindDouble(parser, left, right, pairs_operator_bin, sizeof(pairs_operator_bin), str_lit("Cannot apply binary operator ^ to %s and %s\n"));
-            ret_type = P_GetNumberBinaryValType(left, right);
-        } break;
-        
-        case TokenType_Ampersand: {
-            P_BindDouble(parser, left, right, pairs_operator_bin, sizeof(pairs_operator_bin), str_lit("Cannot apply binary operator & to %s and %s\n"));
-            ret_type = P_GetNumberBinaryValType(left, right);
-        } break;
-        
-        case TokenType_Pipe: {
-            P_BindDouble(parser, left, right, pairs_operator_bin, sizeof(pairs_operator_bin), str_lit("Cannot apply binary operator | to %s and %s\n"));
-            ret_type = P_GetNumberBinaryValType(left, right);
-        } break;
-        
-        case TokenType_AmpersandAmpersand: {
-            P_BindDouble(parser, left, right, pairs_operator_logical, sizeof(pairs_operator_logical), str_lit("Cannot apply binary operator && to %s and %s\n"));
-            ret_type = ValueType_Bool;
-        } break;
-        
-        case TokenType_PipePipe: {
-            P_BindDouble(parser, left, right, pairs_operator_logical, sizeof(pairs_operator_logical), str_lit("Cannot apply binary operator || to %s and %s\n"));
-            ret_type = ValueType_Bool;
-        } break;
-        
-        case TokenType_EqualEqual: {
-            P_BindDouble(parser, left, right, pairs_operator_equality, sizeof(pairs_operator_equality), str_lit("Cannot apply binary operator == to %s and %s\n"));
-            ret_type = ValueType_Bool;
-        } break;
-        
-        case TokenType_BangEqual: {
-            P_BindDouble(parser, left, right, pairs_operator_equality, sizeof(pairs_operator_equality), str_lit("Cannot apply binary operator != to %s and %s\n"));
-            ret_type = ValueType_Bool;
-        } break;
-        
-        case TokenType_Less: {
-            P_BindDouble(parser, left, right, pairs_operator_cmp, sizeof(pairs_operator_cmp), str_lit("Cannot apply binary operator < to %s and %s\n"));
-            ret_type = ValueType_Bool;
-        } break;
-        
-        case TokenType_Greater: {
-            P_BindDouble(parser, left, right, pairs_operator_cmp, sizeof(pairs_operator_cmp), str_lit("Cannot apply binary operator > to %s and %s\n"));
-            ret_type = ValueType_Bool;
-        } break;
-        
-        case TokenType_LessEqual: {
-            P_BindDouble(parser, left, right, pairs_operator_cmp, sizeof(pairs_operator_cmp), str_lit("Cannot apply binary operator <= to %s and %s\n"));
-            ret_type = ValueType_Bool;
-        } break;
-        
-        case TokenType_GreaterEqual: {
-            P_BindDouble(parser, left, right, pairs_operator_cmp, sizeof(pairs_operator_cmp), str_lit("Cannot apply binary operator >= to %s and %s\n"));
-            ret_type = ValueType_Bool;
-        } break;
+    } else {
+        switch (op_type) {
+            case TokenType_Plus: {
+                P_BindDouble(parser, left, right, pairs_operator_arithmetic_term, sizeof(pairs_operator_arithmetic_term), str_lit("Cannot apply binary operator + to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
+            } break;
+            
+            case TokenType_Minus: {
+                P_BindDouble(parser, left, right, pairs_operator_arithmetic_term, sizeof(pairs_operator_arithmetic_term), str_lit("Cannot apply binary operator - to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
+            } break;
+            
+            case TokenType_Star: {
+                P_BindDouble(parser, left, right, pairs_operator_arithmetic_factor, sizeof(pairs_operator_arithmetic_factor), str_lit("Cannot apply binary operator * to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
+            } break;
+            
+            case TokenType_Slash: {
+                P_BindDouble(parser, left, right, pairs_operator_arithmetic_factor, sizeof(pairs_operator_arithmetic_factor), str_lit("Cannot apply binary operator / to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
+            } break;
+            
+            case TokenType_Percent: {
+                P_BindDouble(parser, left, right, pairs_operator_arithmetic_factor, sizeof(pairs_operator_arithmetic_factor), str_lit("Cannot apply binary operator % to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
+            } break;
+            
+            case TokenType_Hat: {
+                P_BindDouble(parser, left, right, pairs_operator_bin, sizeof(pairs_operator_bin), str_lit("Cannot apply binary operator ^ to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
+            } break;
+            
+            case TokenType_Ampersand: {
+                P_BindDouble(parser, left, right, pairs_operator_bin, sizeof(pairs_operator_bin), str_lit("Cannot apply binary operator & to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
+            } break;
+            
+            case TokenType_Pipe: {
+                P_BindDouble(parser, left, right, pairs_operator_bin, sizeof(pairs_operator_bin), str_lit("Cannot apply binary operator | to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
+            } break;
+            
+            case TokenType_AmpersandAmpersand: {
+                P_BindDouble(parser, left, right, pairs_operator_logical, sizeof(pairs_operator_logical), str_lit("Cannot apply binary operator && to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, ValueType_Bool);
+            } break;
+            
+            case TokenType_PipePipe: {
+                P_BindDouble(parser, left, right, pairs_operator_logical, sizeof(pairs_operator_logical), str_lit("Cannot apply binary operator || to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, ValueType_Bool);
+            } break;
+            
+            case TokenType_EqualEqual: {
+                P_BindDouble(parser, left, right, pairs_operator_equality, sizeof(pairs_operator_equality), str_lit("Cannot apply binary operator == to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, ValueType_Bool);
+            } break;
+            
+            case TokenType_BangEqual: {
+                P_BindDouble(parser, left, right, pairs_operator_equality, sizeof(pairs_operator_equality), str_lit("Cannot apply binary operator != to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, ValueType_Bool);
+            } break;
+            
+            case TokenType_Less: {
+                P_BindDouble(parser, left, right, pairs_operator_cmp, sizeof(pairs_operator_cmp), str_lit("Cannot apply binary operator < to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, ValueType_Bool);
+            } break;
+            
+            case TokenType_Greater: {
+                P_BindDouble(parser, left, right, pairs_operator_cmp, sizeof(pairs_operator_cmp), str_lit("Cannot apply binary operator > to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, ValueType_Bool);
+            } break;
+            
+            case TokenType_LessEqual: {
+                P_BindDouble(parser, left, right, pairs_operator_cmp, sizeof(pairs_operator_cmp), str_lit("Cannot apply binary operator <= to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, ValueType_Bool);
+            } break;
+            
+            case TokenType_GreaterEqual: {
+                P_BindDouble(parser, left, right, pairs_operator_cmp, sizeof(pairs_operator_cmp), str_lit("Cannot apply binary operator >= to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, ValueType_Bool);
+            } break;
+        }
     }
-    return P_MakeBinaryNode(parser, op_type, left, right, ret_type);
+    return ret;
 }
 
 static P_Expr* P_ExprDot(P_Parser* parser, P_Expr* left) {
@@ -2421,6 +2437,135 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     
     return func;
 }
+
+//- Op Overloading subsection 
+static P_ScopeContext* P_OpOverloadBeginScope(P_Parser* parser, P_ValueType type) {
+    // Inner scope functions are basically lambdas
+    P_ScopeContext* scope_context = P_BeginScope(parser, ScopeType_None);
+    parser->all_code_paths_return = type_check(type, ValueType_Void);
+    parser->encountered_return = false;
+    parser->function_body_ret = type;
+    parser->is_directly_in_func_body = true;
+    
+    return scope_context;
+}
+
+static void P_OpOverloadEndScope(P_Parser* parser, P_ScopeContext* scope_context) {
+    if (!parser->all_code_paths_return) report_error(parser, str_lit("Not all code paths return a value\n"));
+    P_EndScope(parser, scope_context);
+}
+
+static void P_FuncDeclTwoParams(P_Parser* parser, P_ValueType* left, P_ValueType* right, string_list* param_names) {
+    P_Consume(parser, TokenType_OpenParenthesis, str_lit("Expected ( after operator\n"));
+    
+    {
+        P_ValueType param_type = P_ConsumeType(parser, str_lit("This Operator Overload Expects 2 parameters\n"));
+        if (is_array(&param_type))
+            report_error(parser, str_lit("Cannot Pass Array type as parameter\n"));
+        *left = param_type;
+        
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected Identifier after type\n"));
+        string left_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        string_list_push(&parser->arena, param_names, left_name);
+        
+        var_entry_key key = (var_entry_key) { .name = left_name, .depth = parser->scope_depth };
+        var_entry_val test;
+        var_entry_val set = (var_entry_val) { .mangled_name = str_cat(&parser->arena, parser->current_namespace->flatname, left_name), .type = param_type };
+        
+        
+        if (!var_hash_table_get(&parser->current_namespace->variables, key, &test))
+            var_hash_table_set(&parser->current_namespace->variables, key, set);
+        else report_error(parser, str_lit("Multiple Parameters with the same name\n"));
+    }
+    
+    
+    P_Consume(parser, TokenType_Comma, str_lit("Expected , after param\n"));
+    
+    
+    {
+        P_ValueType param_type = P_ConsumeType(parser, str_lit("This Operator Overload Expects 2 parameters\n"));
+        if (is_array(&param_type))
+            report_error(parser, str_lit("Cannot Pass Array type as parameter\n"));
+        *right = param_type;
+        
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected Identifier after type\n"));
+        string right_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        string_list_push(&parser->arena, param_names, right_name);
+        
+        var_entry_key key = (var_entry_key) { .name = right_name, .depth = parser->scope_depth };
+        var_entry_val test;
+        var_entry_val set = (var_entry_val) { .mangled_name = str_cat(&parser->arena, parser->current_namespace->flatname, right_name), .type = param_type };
+        
+        if (!var_hash_table_get(&parser->current_namespace->variables, key, &test))
+            var_hash_table_set(&parser->current_namespace->variables, key, set);
+        else report_error(parser, str_lit("Multiple Parameters with the same name\n"));
+    }
+    
+    
+    P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after second parameter\n"));
+}
+
+static void P_ParseFunctionBody(P_Parser* parser, P_Stmt* func, string mangled) {
+    P_Consume(parser, TokenType_OpenBrace, str_lit("Expected {\n"));
+    
+    string outer_function = parser->current_function;
+    parser->current_function = mangled;
+    
+    P_Stmt* curr = nullptr;
+    while (!P_Match(parser, TokenType_CloseBrace)) {
+        P_Stmt* stmt = P_Declaration(parser);
+        
+        if (curr == nullptr) func->op.func_decl.block = stmt;
+        else curr->next = stmt;
+        
+        curr = stmt;
+        if (parser->current.type == TokenType_EOF)
+            report_error(parser, str_lit("Unterminated Function Block. Expected }\n"));
+    }
+    
+    parser->current_function = outer_function;
+}
+
+static P_Stmt* P_StmtOpOverloadBinaryArithmetic(P_Parser* parser, P_ValueType type, b8 has_all_tags, string name) {
+    P_ScopeContext* scope_context = P_OpOverloadBeginScope(parser, type);
+    
+    P_ValueType left, right;
+    value_type_list params = {0};
+    string_list param_names = {0};
+    
+    P_FuncDeclTwoParams(parser, &left, &right, &param_names);
+    value_type_list_push(&parser->arena, &params, left);
+    value_type_list_push(&parser->arena, &params, right);
+    string mangled = P_FuncNameMangle(parser, name, 2, params, str_lit("overload"));
+    
+    P_Stmt* func = P_MakeFuncStmtNode(parser, type, mangled, 2, params, param_names, false);
+    P_ParseFunctionBody(parser, func, mangled);
+    P_OpOverloadEndScope(parser, scope_context);
+    
+    return func;
+}
+
+static P_Stmt* P_StmtOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has_all_tags) {
+    P_Advance(parser);
+    
+    if (parser->scope_depth != 0) {
+        report_error(parser, str_lit("Cannot Overload Operators using inner scoped functions\n"));
+    } else {
+        switch (parser->previous.type) {
+            case TokenType_Plus: return P_StmtOpOverloadBinaryArithmetic(parser, type, has_all_tags, str_lit("_opplus"));
+            case TokenType_Minus: return P_StmtOpOverloadBinaryArithmetic(parser, type, has_all_tags, str_lit("_opminus"));
+            case TokenType_Star: return P_StmtOpOverloadBinaryArithmetic(parser, type, has_all_tags, str_lit("_opstar"));
+            case TokenType_Slash: return P_StmtOpOverloadBinaryArithmetic(parser, type, has_all_tags, str_lit("_opslash"));
+            
+            default: {
+                report_error(parser, str_lit("Cannot overload operator %.*s\n"), L__get_string_from_type__(parser->previous.type));
+            }
+        }
+    }
+    
+    return nullptr;
+}
+//- Op Overloading subsection end 
 
 static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8 has_all_tags) {
     P_NamespaceCheckRedefinition(parser, name, false, false);
@@ -3095,14 +3240,19 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
     if (P_IsTypeToken(parser)) {
         P_ValueType type = P_ConsumeType(parser, str_lit("There's an error in the parser. (P_Declaration)\n"));
         
-        P_Consume(parser, TokenType_Identifier, str_lit("Expected Identifier after variable type\n"));
-        
-        string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
-        if (P_Match(parser, TokenType_OpenParenthesis)) {
-            s = P_StmtFuncDecl(parser, type, name, native, has_all_tags);
+        if (P_Match(parser, TokenType_Operator)) {
+            s = P_StmtOpOverloadDecl(parser, type, has_all_tags);
         } else {
-            s = P_StmtVarDecl(parser, type, name, has_all_tags);
+            P_Consume(parser, TokenType_Identifier, str_lit("Expected Identifier after variable type\n"));
+            
+            string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+            if (P_Match(parser, TokenType_OpenParenthesis)) {
+                s = P_StmtFuncDecl(parser, type, name, native, has_all_tags);
+            } else {
+                s = P_StmtVarDecl(parser, type, name, has_all_tags);
+            }
         }
+        
     } else if (P_Match(parser, TokenType_Struct)) {
         s = P_StmtStructureDecl(parser, native, has_all_tags);
     } else if (P_Match(parser, TokenType_Enum)) {
@@ -3224,10 +3374,110 @@ static P_PreStmt* P_PreFuncDecl(P_Parser* parser, P_ValueType type, string name,
         P_Advance(parser);
         if (P_Match(parser, TokenType_EOF)) {
             report_error(parser, str_lit("Unterminated function block\n"));
+            break;
         }
     }
     
     return func;
+}
+
+
+static void P_PreFuncDeclTwoParams(P_Parser* parser, P_ValueType* left, P_ValueType* right, string_list* param_names) {
+    P_Consume(parser, TokenType_OpenParenthesis, str_lit("Expected ( after operator\n"));
+    
+    {
+        P_ValueType param_type = P_ConsumeType(parser, str_lit("This Operator Overload Expects 2 parameters\n"));
+        if (is_array(&param_type))
+            report_error(parser, str_lit("Cannot Pass Array type as parameter\n"));
+        *left = param_type;
+        
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected Identifier after type\n"));
+        string left_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        string_list_push(&parser->arena, param_names, left_name);
+    }
+    
+    P_Consume(parser, TokenType_Comma, str_lit("Expected , after param\n"));
+    
+    
+    {
+        P_ValueType param_type = P_ConsumeType(parser, str_lit("This Operator Overload Expects 2 parameters\n"));
+        if (is_array(&param_type))
+            report_error(parser, str_lit("Cannot Pass Array type as parameter\n"));
+        *right = param_type;
+        
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected Identifier after type\n"));
+        string right_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        string_list_push(&parser->arena, param_names, right_name);
+    }
+    
+    
+    P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after second parameter\n"));
+}
+
+
+static void P_PreParseFunctionBody(P_Parser* parser) {
+    u32 init = parser->scope_depth;
+    
+    // Consume the function body :^)
+    while (true) {
+        if (P_Match(parser, TokenType_OpenBrace)) {
+            parser->scope_depth++;
+            continue;
+        } else if (P_Match(parser, TokenType_CloseBrace)) {
+            parser->scope_depth--;
+            if (parser->scope_depth == init)
+                break;
+            continue;
+        }
+        
+        P_Advance(parser);
+        if (P_Match(parser, TokenType_EOF)) {
+            report_error(parser, str_lit("Unterminated function block\n"));
+            break;
+        }
+    }
+}
+
+static P_PreStmt* P_PreStmtOpOverloadBinaryArithmetic(P_Parser* parser, P_ValueType type, b8 has_all_tags, string name, L_TokenType tokentype) {
+    P_ValueType left, right;
+    value_type_list params = {0};
+    string_list param_names = {0};
+    
+    P_PreFuncDeclTwoParams(parser, &left, &right, &param_names);
+    value_type_list_push(&parser->arena, &params, left);
+    value_type_list_push(&parser->arena, &params, right);
+    string mangled = P_FuncNameMangle(parser, name, 2, params, str_lit("overload"));
+    
+    opoverload_entry_key key = { .type = left };
+    opoverload_entry_val* val = arena_alloc(&parser->arena, sizeof(opoverload_entry_val));
+    val->operator = tokentype;
+    val->right = right;
+    val->ret_type = type;
+    val->mangled_name = mangled;
+    opoverload_entry_val* test;
+    if (!opoverload_hash_table_get(&op_overloads, key, tokentype, right, &test)) {
+        opoverload_hash_table_set(&op_overloads, key, val);
+    } else report_error(parser, str_lit("Operator + already overloaded for types %.*s and %.*s\n"), left.full_type, right.full_type);
+    
+    P_PreStmt* func = P_MakePreFuncStmtNode(parser, type, mangled, 2, params, param_names);
+    P_PreParseFunctionBody(parser);
+    
+    return func;
+}
+
+static P_PreStmt* P_PreOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has_all_tags) {
+    P_Advance(parser);
+    switch (parser->previous.type) {
+        case TokenType_Plus: return P_PreStmtOpOverloadBinaryArithmetic(parser, type, has_all_tags, str_lit("_opplus"), TokenType_Plus);
+        case TokenType_Minus: return P_PreStmtOpOverloadBinaryArithmetic(parser, type, has_all_tags, str_lit("_opminus"), TokenType_Minus);
+        case TokenType_Star: return P_PreStmtOpOverloadBinaryArithmetic(parser, type, has_all_tags, str_lit("_opstar"), TokenType_Star);
+        case TokenType_Slash: return P_PreStmtOpOverloadBinaryArithmetic(parser, type, has_all_tags, str_lit("_opslash"), TokenType_Slash);
+        
+        default: {
+            report_error(parser, str_lit("Cannot overload operator %.*s\n"), L__get_string_from_type__(parser->previous.type));
+        }
+    }
+    return P_MakePreNothingNode(parser);
 }
 
 static string read_file(M_Arena* arena, const char* path, b8* file_exists) {
@@ -3518,8 +3768,10 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
         
         if (P_IsTypeToken(parser)) {
             while (!P_Match(parser, TokenType_CloseParenthesis)) {
-                if (P_Match(parser, TokenType_EOF))
+                if (P_Match(parser, TokenType_EOF)) {
                     s = nullptr;
+                    break;
+                }
                 P_Advance(parser);
             }
         } else if (P_Match(parser, TokenType_Struct)) {
@@ -3529,9 +3781,11 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
     } else if (P_IsTypeToken(parser)) {
         P_ValueType type = P_ConsumeType(parser, str_lit("This is an error in the Parser. (P_PreDeclaration)\n"));
         
-        if (!P_Match(parser, TokenType_Identifier))
-            s = nullptr;
-        else {
+        if (!P_Match(parser, TokenType_Identifier)) {
+            if (P_Match(parser, TokenType_Operator)) {
+                s = P_PreOpOverloadDecl(parser, type, has_all_tags);
+            }
+        } else {
             string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
             if (P_Match(parser, TokenType_OpenParenthesis)) {
                 s = P_PreFuncDecl(parser, type, name, has_all_tags);
@@ -3639,6 +3893,7 @@ void P_GlobalInit(string_list tags) {
     func_hash_table_init(&global_namespace.functions);
     types_init(&global_arena);
     type_array_init(&global_namespace.types);
+    opoverload_hash_table_init(&op_overloads);
     active_tags = tags;
     imports = (string_list){0};
     imports_parsing = (string_list){0};
@@ -3710,6 +3965,7 @@ static void free_namespace(P_Namespace* n) {
 
 void P_GlobalFree() {
     free_namespace(&global_namespace);
+    opoverload_hash_table_free(&op_overloads);
     arena_free(&global_arena);
 }
 
@@ -3730,7 +3986,6 @@ static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
             printf("%I64lld [Long]\n", expr->op.long_lit);
 #  endif
 #endif
-            
         } break;
         
         case ExprType_FloatLit: {

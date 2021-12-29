@@ -1,47 +1,57 @@
 import "standard.cp";
-import "gs.cp";
 
-GS.gs_command_buffer_t cb;
-GS.gs_immediate_draw_t imm;
-
-
-namespace Yeet {
-    enum test_enum {
-        blah
-    }
-    
-    struct heyo {
-        int a;
-    }
+struct vec2 {
+    float x;
+    float y;
 }
 
-void init() {
-	using GS;
-	cb = gs_command_buffer_new();
-	imm = gs_immediate_draw_new();
+vec2 operator+(vec2 a, vec2 b) {
+    vec2 r;
+    r.x = a.x + b.x;
+    r.y = a.y + b.y;
+    return r;
 }
 
-void update() {
-	using GS;
-	
-    if (gs_platform_key_pressed(GS_KEYCODE_ESC)) gs_engine_quit();
-    
-	gsi_camera2D(&imm);
-	gsi_rectv(&imm, gs_v2(50.f, 50.f), gs_v2(150.f, 150.f), gs_color(255 * 0.8f, 255 * 0.2f, 255 * 0.3f, 255 * 1.0f), GraphicsPrimitive.GS_GRAPHICS_PRIMITIVE_TRIANGLES);
-	gsi_render_pass_submit(&imm, &cb, gs_color(10, 10, 10, 255));
-    
-	gs_graphics_submit_command_buffer(&cb);
+vec2 operator-(vec2 a, vec2 b) {
+    vec2 r;
+    r.x = a.x - b.x;
+    r.y = a.y - b.y;
+    return r;
+}
+
+vec2 operator*(vec2 a, float s) {
+    vec2 r;
+    r.x = a.x * s;
+    r.y = a.y * s;
+    return r;
+}
+
+vec2 operator/(vec2 a, float s) {
+    vec2 r;
+    r.x = a.x / s;
+    r.y = a.y / s;
+    return r;
 }
 
 int main() {
-	using GS;
-	gs_app_desc_t app; // Fill this with whatever your app needs
-	app.init = init;
-	app.update = update;
+    vec2 a;
+    a.x = 20;
+    a.y = 20;
     
-    gs_engine_create(app); // Create instance of engine for framework and run
-	while (gs_engine_app()->is_running) {
-	    gs_engine_frame();
-	}
-	return 0;
+    vec2 b;
+    b.x = 30;
+    b.y = 30;
+    
+    vec2 sum  = a + b;
+    vec2 diff = a - b;
+    vec2 atimes2 = a * 2;
+    vec2 adiv2 = a / 2;
+    
+    printf("a = (%f, %f)\n", a.x, a.y);
+    printf("b = (%f, %f)\n", b.x, b.y);
+    printf("a + b = (%f, %f)\n", sum.x, sum.y);
+    printf("a - b = (%f, %f)\n", diff.x, diff.y);
+    printf("a * 2 = (%f, %f)\n", atimes2.x, atimes2.y);
+    printf("a / 2 = (%f, %f)\n", adiv2.x, adiv2.y);
+    return 0;
 }

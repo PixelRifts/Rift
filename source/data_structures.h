@@ -77,6 +77,41 @@ b8   func_hash_table_del(func_hash_table* table, func_entry_key key, string mang
 b8   func_hash_table_del_full(func_hash_table* table, func_entry_key key);
 void func_hash_table_add_all(func_hash_table* from, func_hash_table* to);
 
+typedef u32 L_TokenType;
+
+typedef struct opoverload_entry_key {
+    P_ValueType type;
+} opoverload_entry_key;
+
+// Values are in a linked list. this feels evil
+typedef struct opoverload_entry_val {
+    L_TokenType operator;
+    P_ValueType right;
+    P_ValueType ret_type;
+    string mangled_name;
+    
+    struct opoverload_entry_val* next;
+} opoverload_entry_val;
+
+typedef struct opoverload_table_entry {
+    opoverload_entry_key  key;
+    opoverload_entry_val* value;
+} opoverload_table_entry;
+
+typedef struct opoverload_hash_table {
+    u32 count;
+    u32 capacity;
+    opoverload_table_entry* entries;
+} opoverload_hash_table;
+
+void opoverload_hash_table_init(opoverload_hash_table* table);
+void opoverload_hash_table_free(opoverload_hash_table* table);
+b8   opoverload_hash_table_get(opoverload_hash_table* table, opoverload_entry_key key, L_TokenType operator, P_ValueType right, opoverload_entry_val** value);
+b8   opoverload_hash_table_set(opoverload_hash_table* table, opoverload_entry_key key, opoverload_entry_val* value);
+b8   opoverload_hash_table_del(opoverload_hash_table* table, opoverload_entry_key key, string mangled_needle);
+b8   opoverload_hash_table_del_full(opoverload_hash_table* table, opoverload_entry_key key);
+void opoverload_hash_table_add_all(opoverload_hash_table* from, opoverload_hash_table* to);
+
 
 typedef u32 P_ContainerType;
 enum {

@@ -16,6 +16,15 @@ static const var_entry_val tombstone_var = {
     }
 };
 
+static const opoverload_entry_val tombstone_opoverload = {
+    .operator = 0,
+    .right = {
+        .base_type = str_lit("tombstone"),
+        .mods = nullptr
+    },
+    .mangled_name = { .str = nullptr, .size = 0 }
+};
+
 //~ Variable Hashtable
 static u32 hash_var_key(var_entry_key k) {
     u32 hash = 2166136261u;
@@ -318,6 +327,162 @@ void func_hash_table_add_all(func_hash_table* from, func_hash_table* to) {
         func_table_entry* entry = &from->entries[i];
         if (entry->key.name.size != 0) {
             func_hash_table_set(to, entry->key, entry->value);
+        }
+    }
+}
+
+//~ Op-Overload
+static u32 hash_opoverload_key(opoverload_entry_key k) {
+    u32 hash = 2166136261u;
+    for (u32 i = 0; i < k.type.base_type.size; i++) {
+        hash ^= k.type.base_type.str[i];
+        hash *= 16777619;
+    }
+    for (u32 i = 0; i < k.type.full_type.size; i++) {
+        hash ^= k.type.full_type.str[i];
+        hash *= 16777619;
+    }
+    return hash;
+}
+
+static opoverload_table_entry* find_opoverload_entry(opoverload_table_entry* entries, i32 cap, opoverload_entry_key key) {
+    u32 idx = hash_opoverload_key(key) % cap;
+    opoverload_table_entry* tombstone_e = nullptr;
+    
+    while (true) {
+        opoverload_table_entry* entry = &entries[idx];
+        if (entry->key.type.full_type.size == 0) {
+            if (entry->value == nullptr)
+                return tombstone_e != nullptr ? tombstone_e : entry;
+            else
+                if (tombstone_e == nullptr) tombstone_e = entry;
+        } else if (str_eq(entry->key.type.base_type, key.type.base_type) && str_eq(entry->key.type.full_type, key.type.full_type))
+            return entry;
+        idx = (idx + 1) % cap;
+    }
+}
+
+static void opoverload_table_adjust_cap(opoverload_hash_table* table, i32 cap) {
+    opoverload_table_entry* entries = malloc(sizeof(opoverload_table_entry) * cap);
+    memset(entries, 0, sizeof(opoverload_table_entry) * cap);
+    
+    table->count = 0;
+    for (u32 i = 0; i < table->capacity; i++) {
+        opoverload_table_entry* entry = &table->entries[i];
+        if (entry->key.type.full_type.size == 0) continue;
+        
+        opoverload_table_entry* dest = find_opoverload_entry(entries, cap, entry->key);
+        dest->key = entry->key;
+        dest->value = entry->value;
+        table->count++;
+    }
+    
+    free(table->entries);
+    table->entries = entries;
+    table->capacity = cap;
+}
+
+void opoverload_hash_table_init(opoverload_hash_table* table) {
+    table->count = 0;
+    table->capacity = 0;
+    table->entries = nullptr;
+}
+
+void opoverload_hash_table_free(opoverload_hash_table* table) {
+    free(table->entries);
+    table->count = 0;
+    table->capacity = 0;
+    table->entries = nullptr;
+}
+
+b8 opoverload_hash_table_get(opoverload_hash_table* table, opoverload_entry_key key, L_TokenType operator, P_ValueType right, opoverload_entry_val** value) {
+    if (table->count == 0) return false;
+    opoverload_table_entry* entry = find_opoverload_entry(table->entries, table->capacity, key);
+    if (entry->key.type.full_type.size == 0) return false;
+    
+    opoverload_entry_val* curr = entry->value;
+    
+    b8 found = false;
+    while (curr != nullptr) {
+        if (curr->operator == operator && type_check(right, curr->right)) {
+            found = true;
+            break;
+        }
+        
+        curr = curr->next;
+    }
+    
+    if (found) *value = curr;
+    return found;
+}
+
+b8 opoverload_hash_table_has_name(opoverload_hash_table* table, opoverload_entry_key key) {
+    if (table->count == 0) return false;
+    opoverload_table_entry* entry = find_opoverload_entry(table->entries, table->capacity, key);
+    return entry->key.type.full_type.size != 0;
+}
+
+b8 opoverload_hash_table_set(opoverload_hash_table* table, opoverload_entry_key key, opoverload_entry_val* value) {
+    if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
+        i32 cap = GROW_CAPACITY(table->capacity);
+        opoverload_table_adjust_cap(table, cap);
+    }
+    
+    opoverload_table_entry* entry = find_opoverload_entry(table->entries, table->capacity, key);
+    b8 is_new_key = entry->key.type.full_type.size == 0;
+    if (is_new_key && entry->value == nullptr) {
+        entry->key = key;
+        entry->value = value;
+        table->count++;
+    } else {
+        opoverload_entry_val* c = entry->value;
+        b8 found = false;
+        while (true) {
+            if (value->operator == c->operator && type_check(value->right, c->right)) {
+                found = true;
+                break;
+            }
+            
+            if (c->next == nullptr) break;
+            c = c->next;
+        }
+        if (found) c = value;
+        else c->next = value;
+    }
+    
+    return is_new_key;
+}
+
+b8 opoverload_hash_table_del(opoverload_hash_table* table, opoverload_entry_key key, string mangled_needle) {
+    if (table->count == 0) return false;
+    opoverload_table_entry* entry = find_opoverload_entry(table->entries, table->capacity, key);
+    if (entry->key.type.full_type.size == 0) return false;
+    
+    opoverload_entry_val* curr = entry->value;
+    opoverload_entry_val* prev = curr;
+    while (curr != nullptr) {
+        if (str_eq(curr->mangled_name, mangled_needle)) {
+            if (curr == prev) {
+                entry->key = (opoverload_entry_key) {0};
+                entry->value = &tombstone_opoverload;
+            }
+            
+            prev->next = curr->next;
+            break;
+        }
+        
+        prev = curr;
+        curr = curr->next;
+    }
+    
+    return true;
+}
+
+void opoverload_hash_table_add_all(opoverload_hash_table* from, opoverload_hash_table* to) {
+    for (u32 i = 0; i < from->capacity; i++) {
+        opoverload_table_entry* entry = &from->entries[i];
+        if (entry->key.type.full_type.size != 0) {
+            opoverload_hash_table_set(to, entry->key, entry->value);
         }
     }
 }
