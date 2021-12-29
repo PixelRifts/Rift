@@ -1896,16 +1896,30 @@ static P_Expr* P_ExprGroup(P_Parser* parser) {
 }
 
 static P_Expr* P_ExprIndex(P_Parser* parser, P_Expr* left) {
-    if (!(is_ptr(&left->ret_type) || is_array(&left->ret_type)))
-        report_error(parser, str_lit("Cannot Apply [] operator to expression of type %.*s\n"), left->ret_type.full_type);
-    
-    P_Expr* e = P_Expression(parser);
-    if (!type_check(e->ret_type, ValueType_Integer))
-        report_error(parser, str_lit("The [] Operator expects an Integer. Got %.*s\n"), str_expand(e->ret_type.full_type));
-    
+    P_Expr* right = P_Expression(parser);
     P_Consume(parser, TokenType_CloseBracket, str_lit("Unclosed [\n"));
-    P_ValueType ret = P_ReduceType(left->ret_type);
-    return P_MakeIndexNode(parser, ret, left, e);
+    
+    opoverload_entry_key key = {
+        .type = left->ret_type
+    };
+    opoverload_entry_val* val;
+    
+    if (opoverload_hash_table_get(&op_overloads, key, TokenType_OpenBracket, right->ret_type, &val)) {
+        P_Expr** packed = arena_alloc(&parser->arena, sizeof(P_Expr*) * 2);;
+        packed[0] = left;
+        packed[1] = right;
+        return P_MakeFuncCallNode(parser, val->mangled_name, val->ret_type, packed, 2);
+    } else {
+        if (!(is_ptr(&left->ret_type) || is_array(&left->ret_type)))
+            report_error(parser, str_lit("Cannot Apply [] operator to expression of type %.*s\n"), left->ret_type.full_type);
+        
+        if (!type_check(right->ret_type, ValueType_Integer))
+            report_error(parser, str_lit("The [] Operator expects an Integer. Got %.*s\n"), str_expand(right->ret_type.full_type));
+        
+        P_ValueType ret = P_ReduceType(left->ret_type);
+        return P_MakeIndexNode(parser, ret, left, right);
+    }
+    return nullptr;
 }
 
 static P_Expr* P_ExprAddr(P_Parser* parser) {
@@ -2526,7 +2540,7 @@ static void P_ParseFunctionBody(P_Parser* parser, P_Stmt* func, string mangled) 
     parser->current_function = outer_function;
 }
 
-static P_Stmt* P_StmtOpOverloadBinaryArithmetic(P_Parser* parser, P_ValueType type, b8 has_all_tags, string name) {
+static P_Stmt* P_StmtOpOverloadBinary(P_Parser* parser, P_ValueType type, b8 has_all_tags, string name) {
     P_ScopeContext* scope_context = P_OpOverloadBeginScope(parser, type);
     
     P_ValueType left, right;
@@ -2552,10 +2566,14 @@ static P_Stmt* P_StmtOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has_a
         report_error(parser, str_lit("Cannot Overload Operators using inner scoped functions\n"));
     } else {
         switch (parser->previous.type) {
-            case TokenType_Plus: return P_StmtOpOverloadBinaryArithmetic(parser, type, has_all_tags, str_lit("_opplus"));
-            case TokenType_Minus: return P_StmtOpOverloadBinaryArithmetic(parser, type, has_all_tags, str_lit("_opminus"));
-            case TokenType_Star: return P_StmtOpOverloadBinaryArithmetic(parser, type, has_all_tags, str_lit("_opstar"));
-            case TokenType_Slash: return P_StmtOpOverloadBinaryArithmetic(parser, type, has_all_tags, str_lit("_opslash"));
+            case TokenType_Plus: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opplus"));
+            case TokenType_Minus: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opminus"));
+            case TokenType_Star: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opstar"));
+            case TokenType_Slash: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opslash"));
+            case TokenType_OpenBracket: {
+                P_Consume(parser, TokenType_CloseBracket, str_lit("Expected ] after [\n"));
+                return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opindex"));
+            }
             
             default: {
                 report_error(parser, str_lit("Cannot overload operator %.*s\n"), L__get_string_from_type__(parser->previous.type));
@@ -3438,7 +3456,7 @@ static void P_PreParseFunctionBody(P_Parser* parser) {
     }
 }
 
-static P_PreStmt* P_PreStmtOpOverloadBinaryArithmetic(P_Parser* parser, P_ValueType type, b8 has_all_tags, string name, L_TokenType tokentype) {
+static P_PreStmt* P_PreStmtOpOverloadBinary(P_Parser* parser, P_ValueType type, b8 has_all_tags, string op, string name, L_TokenType tokentype) {
     P_ValueType left, right;
     value_type_list params = {0};
     string_list param_names = {0};
@@ -3457,7 +3475,7 @@ static P_PreStmt* P_PreStmtOpOverloadBinaryArithmetic(P_Parser* parser, P_ValueT
     opoverload_entry_val* test;
     if (!opoverload_hash_table_get(&op_overloads, key, tokentype, right, &test)) {
         opoverload_hash_table_set(&op_overloads, key, val);
-    } else report_error(parser, str_lit("Operator + already overloaded for types %.*s and %.*s\n"), left.full_type, right.full_type);
+    } else report_error(parser, str_lit("Operator %.*s already overloaded for types %.*s and %.*s\n"), str_expand(op), left.full_type, right.full_type);
     
     P_PreStmt* func = P_MakePreFuncStmtNode(parser, type, mangled, 2, params, param_names);
     P_PreParseFunctionBody(parser);
@@ -3468,10 +3486,14 @@ static P_PreStmt* P_PreStmtOpOverloadBinaryArithmetic(P_Parser* parser, P_ValueT
 static P_PreStmt* P_PreOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has_all_tags) {
     P_Advance(parser);
     switch (parser->previous.type) {
-        case TokenType_Plus: return P_PreStmtOpOverloadBinaryArithmetic(parser, type, has_all_tags, str_lit("_opplus"), TokenType_Plus);
-        case TokenType_Minus: return P_PreStmtOpOverloadBinaryArithmetic(parser, type, has_all_tags, str_lit("_opminus"), TokenType_Minus);
-        case TokenType_Star: return P_PreStmtOpOverloadBinaryArithmetic(parser, type, has_all_tags, str_lit("_opstar"), TokenType_Star);
-        case TokenType_Slash: return P_PreStmtOpOverloadBinaryArithmetic(parser, type, has_all_tags, str_lit("_opslash"), TokenType_Slash);
+        case TokenType_Plus: return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("+"), str_lit("_opplus"), TokenType_Plus);
+        case TokenType_Minus: return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("-"), str_lit("_opminus"), TokenType_Minus);
+        case TokenType_Star: return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("*"), str_lit("_opstar"), TokenType_Star);
+        case TokenType_Slash: return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("/"), str_lit("_opslash"), TokenType_Slash);
+        case TokenType_OpenBracket: {
+            P_Consume(parser, TokenType_CloseBracket, str_lit("Expected ] after [\n"));
+            return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("[]"), str_lit("_opindex"), TokenType_OpenBracket);
+        }
         
         default: {
             report_error(parser, str_lit("Cannot overload operator %.*s\n"), L__get_string_from_type__(parser->previous.type));
