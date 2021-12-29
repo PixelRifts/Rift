@@ -1634,7 +1634,7 @@ static P_Expr* P_ExprLambda(P_Parser* parser) {
         
         var_entry_key key = (var_entry_key) { .name = param_name, .depth = parser->scope_depth };
         var_entry_val test;
-        var_entry_val set = (var_entry_val) { .mangled_name = str_cat(&parser->arena, parser->current_namespace->flatname, param_name), .type = param_type };
+        var_entry_val set = (var_entry_val) { .mangled_name = param_name, .type = param_type };
         if (!var_hash_table_get(&parser->current_namespace->variables, key, &test))
             var_hash_table_set(&parser->current_namespace->variables, key, set);
         else
@@ -1911,7 +1911,7 @@ static P_Expr* P_ExprIndex(P_Parser* parser, P_Expr* left) {
         return P_MakeFuncCallNode(parser, val->mangled_name, val->ret_type, packed, 2);
     } else {
         if (!(is_ptr(&left->ret_type) || is_array(&left->ret_type)))
-            report_error(parser, str_lit("Cannot Apply [] operator to expression of type %.*s\n"), left->ret_type.full_type);
+            report_error(parser, str_lit("Cannot Apply [] operator to expression of type %.*s\n"), str_expand(left->ret_type.full_type));
         
         if (!type_check(right->ret_type, ValueType_Integer))
             report_error(parser, str_lit("The [] Operator expects an Integer. Got %.*s\n"), str_expand(right->ret_type.full_type));
@@ -2356,7 +2356,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
         if (!native) {
             var_entry_key key = (var_entry_key) { .name = param_name, .depth = parser->scope_depth };
             var_entry_val test;
-            var_entry_val set = (var_entry_val) { .mangled_name = str_cat(&parser->arena, parser->current_namespace->flatname, param_name), .type = param_type };
+            var_entry_val set = (var_entry_val) { .mangled_name = param_name, .type = param_type };
             if (!var_hash_table_get(&parser->current_namespace->variables, key, &test))
                 var_hash_table_set(&parser->current_namespace->variables, key, set);
             else
@@ -2484,7 +2484,7 @@ static void P_FuncDeclTwoParams(P_Parser* parser, P_ValueType* left, P_ValueType
         
         var_entry_key key = (var_entry_key) { .name = left_name, .depth = parser->scope_depth };
         var_entry_val test;
-        var_entry_val set = (var_entry_val) { .mangled_name = str_cat(&parser->arena, parser->current_namespace->flatname, left_name), .type = param_type };
+        var_entry_val set = (var_entry_val) { .mangled_name = left_name, .type = param_type };
         
         
         if (!var_hash_table_get(&parser->current_namespace->variables, key, &test))
@@ -2508,7 +2508,7 @@ static void P_FuncDeclTwoParams(P_Parser* parser, P_ValueType* left, P_ValueType
         
         var_entry_key key = (var_entry_key) { .name = right_name, .depth = parser->scope_depth };
         var_entry_val test;
-        var_entry_val set = (var_entry_val) { .mangled_name = str_cat(&parser->arena, parser->current_namespace->flatname, right_name), .type = param_type };
+        var_entry_val set = (var_entry_val) { .mangled_name = right_name, .type = param_type };
         
         if (!var_hash_table_get(&parser->current_namespace->variables, key, &test))
             var_hash_table_set(&parser->current_namespace->variables, key, set);
@@ -2588,7 +2588,7 @@ static P_Stmt* P_StmtOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has_a
 static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8 has_all_tags) {
     P_NamespaceCheckRedefinition(parser, name, false, false);
     
-    string new_name = str_cat(&parser->arena, parser->current_namespace->flatname, name);
+    string new_name = parser->scope_depth == 0 ? str_cat(&parser->arena, parser->current_namespace->flatname, name) : name;
     var_entry_key key = { .name = name, .depth = parser->scope_depth };
     var_entry_val set = (var_entry_val) { .mangled_name = new_name, .type = type };
     var_hash_table_set(&parser->current_namespace->variables, key, set);
@@ -3547,6 +3547,7 @@ static P_PreStmt* P_PreNamespace(P_Parser* parser) {
         parser->current_namespace = new_namespace;
     }
     
+    using_stack_push(&parser->arena, &parser->usings, parser->current_namespace);
     
     u32 counter = parser->scope_depth + 1;
     u32 init = parser->scope_depth;
@@ -3583,6 +3584,7 @@ static P_PreStmt* P_PreNamespace(P_Parser* parser) {
     }
     
     parser->current_namespace = old;
+    using_stack_pop(&parser->usings, &old);
     
     return P_MakePreNothingNode(parser);
 }
@@ -3766,6 +3768,21 @@ static P_PreStmt* P_PreStmtImport(P_Parser* parser) {
             parser->pre_end = curr;
         }
         curr = curr->next;
+    }
+    
+    P_Stmt* stmt_list = child->root;
+    P_Stmt* curr_s = stmt_list;
+    while (curr_s != nullptr) {
+        // TODO(voxel): Make Macro SLL Push
+        if (parser->end != nullptr) {
+            parser->end->next = curr_s;
+            parser->end = curr_s;
+        }
+        else {
+            parser->root = curr_s;
+            parser->end = curr_s;
+        }
+        curr_s = curr_s->next;
     }
     
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after string\n"));
