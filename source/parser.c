@@ -3526,18 +3526,18 @@ static P_PreStmt* P_PreNamespace(P_Parser* parser) {
     }
     
     
+    u32 counter = parser->scope_depth + 1;
     u32 init = parser->scope_depth;
     
     while (true) {
         if (parser->current.type == TokenType_OpenBrace) {
-            parser->scope_depth++;
+            counter++;
             P_Advance(parser);
             continue;
         } else if (parser->current.type == TokenType_CloseBrace) {
-            parser->scope_depth--;
+            counter--;
             P_Advance(parser);
-            if (parser->scope_depth == init - 1) {
-                parser->scope_depth = init;
+            if (counter == init) {
                 break;
             }
             continue;
