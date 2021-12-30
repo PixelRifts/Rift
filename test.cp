@@ -10,11 +10,10 @@ int main() {
     b.y = 10;
     Math.vec2 c = a + b;
     
-    float c0 = c[0];
-    
     printf("a = (%.3f, %.3f)\n", a.x, a.y);
     printf("b = (%.3f, %.3f)\n", b.x, b.y);
     printf("c = (%.3f, %.3f)\n", c.x, c.y);
+    printf("c = (%d)\n", a < b);
     
     return 0;
 }

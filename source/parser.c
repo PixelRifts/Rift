@@ -473,7 +473,7 @@ static P_ValueType type_heirarchy[] = {
 u32 type_heirarchy_length = 5;
 
 b8 type_check(P_ValueType a, P_ValueType expected) {
-    if (str_eq(a.full_type, expected.full_type)) return true;
+    if (str_eq(a.full_type, expected.full_type) && str_eq(a.base_type, expected.base_type)) return true;
     
     if ((a.type == ValueTypeType_FuncPointer) && (expected.type == ValueTypeType_FuncPointer)) {
         if (!type_check(*a.op.func_ptr.ret_type, *expected.op.func_ptr.ret_type))
@@ -2570,6 +2570,21 @@ static P_Stmt* P_StmtOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has_a
             case TokenType_Minus: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opminus"));
             case TokenType_Star: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opstar"));
             case TokenType_Slash: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opslash"));
+            case TokenType_Percent: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opprecent"));
+            case TokenType_Hat: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_ophat"));
+            case TokenType_Ampersand: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opampersand"));
+            case TokenType_Pipe: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_oppipe"));
+            case TokenType_EqualEqual:
+            return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opeqeq"));
+            case TokenType_BangEqual:
+            return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opnoteq"));
+            case TokenType_Less: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opless"));
+            case TokenType_Greater: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opgreater"));
+            case TokenType_LessEqual:
+            return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opleq"));
+            case TokenType_GreaterEqual:
+            return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opgreq"));
+            
             case TokenType_OpenBracket: {
                 P_Consume(parser, TokenType_CloseBracket, str_lit("Expected ] after [\n"));
                 return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opindex"));
@@ -3490,6 +3505,22 @@ static P_PreStmt* P_PreOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has
         case TokenType_Minus: return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("-"), str_lit("_opminus"), TokenType_Minus);
         case TokenType_Star: return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("*"), str_lit("_opstar"), TokenType_Star);
         case TokenType_Slash: return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("/"), str_lit("_opslash"), TokenType_Slash);
+        case TokenType_Percent: return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("%"), str_lit("_opprecent"), TokenType_Percent);
+        case TokenType_Hat: return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("^"), str_lit("_ophat"), TokenType_Hat);
+        case TokenType_Ampersand: return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("&"), str_lit("_opampersand"), TokenType_Ampersand);
+        case TokenType_Pipe: return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("|"), str_lit("_oppipe"), TokenType_Pipe);
+        case TokenType_EqualEqual:
+        return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("=="), str_lit("_opeqeq"), TokenType_EqualEqual);
+        case TokenType_BangEqual:
+        return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("!="), str_lit("_opnoteq"), TokenType_BangEqual);
+        case TokenType_Less:
+        return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("<"), str_lit("_opless"), TokenType_Less);
+        case TokenType_Greater:
+        return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit(">"), str_lit("_opgreater"), TokenType_Greater);
+        case TokenType_LessEqual:
+        return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("<="), str_lit("_opleq"), TokenType_LessEqual);
+        case TokenType_GreaterEqual:
+        return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit(">="), str_lit("_opgreq"), TokenType_GreaterEqual);
         case TokenType_OpenBracket: {
             P_Consume(parser, TokenType_CloseBracket, str_lit("Expected ] after [\n"));
             return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("[]"), str_lit("_opindex"), TokenType_OpenBracket);

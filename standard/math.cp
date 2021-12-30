@@ -3,6 +3,8 @@ namespace Math {
     struct vec3 { float x; float y; float z; }
     struct vec4 { float x; float y; float z; float w; }
     
+    bool operator==(vec2 a, vec2 b) { return a.x == b.x && a.y == b.y; }
+    
     vec2 operator+(vec2 a, vec2 b) {
         vec2 r;
         r.x = a.x + b.x;
@@ -36,6 +38,8 @@ namespace Math {
         if (index == 1) return a.y;
         return 0;
     }
+    
+    bool operator==(vec3 a, vec3 b) { return a.x == b.x && a.y == b.y && a.z == b.z; }
     
     vec3 operator+(vec3 a, vec3 b) {
         vec3 r;
@@ -75,6 +79,8 @@ namespace Math {
         if (index == 2) return a.z;
         return 0;
     }
+    
+    bool operator==(vec4 a, vec4 b) { return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w; }
     
     vec4 operator+(vec4 a, vec4 b) {
         vec4 r;
