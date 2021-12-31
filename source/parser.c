@@ -3853,8 +3853,11 @@ static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_a
         value_type_list_push(&parser->arena, &member_types, ValueType_Integer);
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
-        string_list_push(&parser->arena, &member_names, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
+        string member_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        if (str_eq(member_name, str_lit("count")))
+            report_error(parser, str_lit("Cannot have enum member with name 'count'. It is reserved\n"));
         
+        string_list_push(&parser->arena, &member_names, member_name);
         member_count++;
         if (P_Match(parser, TokenType_CloseBrace)) break;
         P_Consume(parser, TokenType_Comma, str_lit("Expected comma before next member"));
@@ -3863,6 +3866,10 @@ static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_a
             break;
         }
     }
+    
+    value_type_list_push(&parser->arena, &member_types, ValueType_Integer);
+    string_list_push(&parser->arena, &member_names, str_lit("count"));
+    member_count++;
     
     if (has_all_tags) {
         parser->current_namespace->types.elements[idx].member_count = member_count;
