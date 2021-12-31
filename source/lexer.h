@@ -33,8 +33,8 @@ enum {
     TokenType_Comma, TokenType_Dot, TokenType_Semicolon, TokenType_Colon,
     TokenType_Question, TokenType_Arrow, TokenType_ThinArrow,
     
-    TokenType_Return, TokenType_Struct, TokenType_Enum, TokenType_Union,
-    TokenType_Break, TokenType_Continue, TokenType_Import,
+    TokenType_Struct, TokenType_Enum, TokenType_Union, TokenType_FlagEnum,
+    TokenType_Return, TokenType_Break, TokenType_Continue, TokenType_Import,
     TokenType_Null, TokenType_Nullptr,
     TokenType_If, TokenType_Else, TokenType_Do, TokenType_For, TokenType_While,
     TokenType_Switch, TokenType_Match, TokenType_Case, TokenType_Default,

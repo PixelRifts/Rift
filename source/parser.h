@@ -94,7 +94,7 @@ enum {
     StmtType_Nothing, // Used Successful parsing but no code emission e.g. Inner scope functions
     StmtType_Expression, StmtType_Block, StmtType_Return, StmtType_If,
     StmtType_IfElse, StmtType_While, StmtType_DoWhile, 
-    StmtType_VarDecl, StmtType_VarDeclAssign,
+    StmtType_VarDecl, StmtType_VarDeclAssign, StmtType_FlagEnumDecl,
     StmtType_FuncDecl, StmtType_StructDecl, StmtType_UnionDecl,
     StmtType_EnumDecl, StmtType_For, StmtType_Break, StmtType_Continue,
     StmtType_Switch, StmtType_Match, StmtType_Case, StmtType_MatchCase,
@@ -115,7 +115,8 @@ struct P_Stmt {
         struct { string name; u32 arity; value_type_list param_types; string_list param_names; P_ValueType type; P_Stmt* block; b8 varargs; } func_decl;
         struct { string name; u32 member_count; value_type_list member_types; string_list member_names; } struct_decl;
         struct { string name; u32 member_count; value_type_list member_types; string_list member_names; } union_decl;
-        struct { string name; u32 member_count; string_list member_names; } enum_decl;
+        struct { string name; u32 member_count; string_list member_names; P_Expr** member_values; } enum_decl;
+        struct { string name; u32 member_count; string_list member_names; P_Expr** member_values; } flagenum_decl;
         
         struct { P_Expr* switched;  P_Stmt* then; } switch_s;
         struct { P_Expr* matched;   P_Stmt* then; } match_s;
@@ -138,6 +139,7 @@ enum {
     PreStmtType_StructForwardDecl,
     PreStmtType_UnionForwardDecl,
     PreStmtType_EnumForwardDecl,
+    PreStmtType_FlagEnumForwardDecl,
     PreStmtType_CInclude,
     PreStmtType_CInsert,
 };
@@ -153,6 +155,7 @@ struct P_PreStmt {
         string struct_fd;
         string union_fd;
         string enum_fd;
+        string flagenum_fd;
     } op;
 };
 
@@ -181,6 +184,7 @@ enum {
     ScopeType_Match,
     ScopeType_Case,
     ScopeType_Default,
+    ScopeType_Enum,
 };
 
 typedef struct P_ScopeContext {

@@ -501,15 +501,50 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
         
         case StmtType_EnumDecl: {
             E_WriteLineF(emitter, "typedef int %.*s;", str_expand(stmt->op.enum_decl.name));
+            
             E_WriteLineF(emitter, "enum %.*s {", str_expand(stmt->op.enum_decl.name));
+            
             string_list_node* curr_name = stmt->op.enum_decl.member_names.first;
             for (u32 i = 0; i < stmt->op.enum_decl.member_count; i++) {
                 for (u32 idt = 0; idt < indent + 1; idt++)
                     E_Write(emitter, "\t");
-                E_WriteLineF(emitter, "_enum_%.*s_%.*s,", str_expand(stmt->op.enum_decl.name), str_node_expand(curr_name));
+                E_WriteF(emitter, "_enum_%.*s_%.*s", str_expand(stmt->op.enum_decl.name), str_node_expand(curr_name));
+                
+                if (stmt->op.enum_decl.member_values[i] != nullptr) {
+                    E_Write(emitter, " = ");
+                    E_EmitExpression(emitter, stmt->op.enum_decl.member_values[i]);
+                }
+                
+                E_WriteLine(emitter, ",");
+                
                 curr_name = curr_name->next;
             }
+            
             E_WriteLineF(emitter, "};", str_expand(stmt->op.enum_decl.name));
+        } break;
+        
+        case StmtType_FlagEnumDecl: {
+            E_WriteLineF(emitter, "typedef int %.*s;", str_expand(stmt->op.flagenum_decl.name));
+            
+            E_WriteLineF(emitter, "enum %.*s {", str_expand(stmt->op.flagenum_decl.name));
+            
+            string_list_node* curr_name = stmt->op.flagenum_decl.member_names.first;
+            for (u32 i = 0; i < stmt->op.flagenum_decl.member_count; i++) {
+                for (u32 idt = 0; idt < indent + 1; idt++)
+                    E_Write(emitter, "\t");
+                E_WriteF(emitter, "_flagenum_%.*s_%.*s", str_expand(stmt->op.flagenum_decl.name), str_node_expand(curr_name));
+                
+                if (stmt->op.flagenum_decl.member_values[i] != nullptr) {
+                    E_Write(emitter, " = ");
+                    E_EmitExpression(emitter, stmt->op.flagenum_decl.member_values[i]);
+                }
+                
+                E_WriteLine(emitter, ",");
+                
+                curr_name = curr_name->next;
+            }
+            
+            E_WriteLineF(emitter, "};", str_expand(stmt->op.flagenum_decl.name));
         } break;
         
         case StmtType_If: {

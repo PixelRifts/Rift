@@ -1338,13 +1338,25 @@ static P_Stmt* P_MakeVarDeclAssignStmtNode(P_Parser* parser, P_ValueType type, s
     return stmt;
 }
 
-static P_Stmt* P_MakeEnumDeclStmtNode(P_Parser* parser, string name, u32 count, string_list names) {
+static P_Stmt* P_MakeEnumDeclStmtNode(P_Parser* parser, string name, u32 count, string_list names, P_Expr** vals) {
     P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
     stmt->type = StmtType_EnumDecl;
     stmt->next = nullptr;
     stmt->op.enum_decl.name = name;
     stmt->op.enum_decl.member_count = count;
+    stmt->op.enum_decl.member_values = vals;
     stmt->op.enum_decl.member_names = names;
+    return stmt;
+}
+
+static P_Stmt* P_MakeFlagEnumDeclStmtNode(P_Parser* parser, string name, u32 count, string_list names, P_Expr** vals) {
+    P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
+    stmt->type = StmtType_FlagEnumDecl;
+    stmt->next = nullptr;
+    stmt->op.flagenum_decl.name = name;
+    stmt->op.flagenum_decl.member_count = count;
+    stmt->op.flagenum_decl.member_values = vals;
+    stmt->op.flagenum_decl.member_names = names;
     return stmt;
 }
 
@@ -1431,6 +1443,14 @@ static P_PreStmt* P_MakePreUnionDeclStmtNode(P_Parser* parser, string name) {
 static P_PreStmt* P_MakePreEnumDeclStmtNode(P_Parser* parser, string name) {
     P_PreStmt* stmt = arena_alloc(&parser->arena, sizeof(P_PreStmt));
     stmt->type = PreStmtType_EnumForwardDecl;
+    stmt->next = nullptr;
+    stmt->op.enum_fd = name;
+    return stmt;
+}
+
+static P_PreStmt* P_MakePreFlagEnumDeclStmtNode(P_Parser* parser, string name) {
+    P_PreStmt* stmt = arena_alloc(&parser->arena, sizeof(P_PreStmt));
+    stmt->type = PreStmtType_FlagEnumForwardDecl;
     stmt->next = nullptr;
     stmt->op.enum_fd = name;
     return stmt;
@@ -2799,9 +2819,8 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser, b8 native, b8 has_all_tags)
 
 static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_all_tags) {
     P_Consume(parser, TokenType_Identifier, str_lit("Expected Enum name after keyword 'enum'\n"));
-    /*string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
-    P_NamespaceCheckRedefinition(parser, name, false, false);
-    string actual = str_cat(&parser->arena, parser->current_namespace->flatname, name);*/
+    string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    string actual = str_cat(&parser->arena, parser->current_namespace->flatname, name);
     if (native) {
         if (P_Match(parser, TokenType_Semicolon)) {
             return P_MakeNothingNode(parser);
@@ -2809,24 +2828,23 @@ static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_all_tag
     }
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Enum Name\n"));
     
-    /*u64 idx = parser->current_namespace->types.count;
-    if (has_all_tags)
-        type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Enum, .name = name, .mangled_name = actual, .depth = parser->scope_depth });*/
-    
-    /*u32 member_count = 0;
-    string_list member_names = {0};
-    value_type_list member_types = {0};*/
+    P_ScopeContext* scope = P_BeginScope(parser, ScopeType_Enum);
     
     // Parse Members
     while (!P_Match(parser, TokenType_CloseBrace)) {
-        //value_type_list_push(&parser->arena, &member_types, ValueType_Integer);
-        
         P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
-        //string_list_push(&parser->arena, &member_names, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
+        string member_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
         
-        //member_count++;
+        var_entry_key k = { .name = member_name, .depth = parser->scope_depth };
+        var_entry_val v = { .mangled_name = str_from_format(&parser->arena, "_enum_%.*s_%.*s", str_expand(actual), str_expand(member_name)), .type = ValueType_Integer };
+        var_hash_table_set(&parser->current_namespace->variables, k, v);
+        
+        if (P_Match(parser, TokenType_Equal)) {
+            P_Expression(parser);
+        }
+        
         if (P_Match(parser, TokenType_CloseBrace)) break;
-        P_Consume(parser, TokenType_Comma, str_lit("Expected comma before next member"));
+        P_Consume(parser, TokenType_Comma, str_lit("Expected comma before next member\n"));
         
         if (P_Match(parser, TokenType_EOF)) {
             report_error(parser, str_lit("Unterminated block for Enum definition\n"));
@@ -2834,11 +2852,47 @@ static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_all_tag
         }
     }
     
-    /*if (has_all_tags) {
-        parser->current_namespace->types.elements[idx].member_count = member_count;
-        parser->current_namespace->types.elements[idx].member_types = member_types;
-        parser->current_namespace->types.elements[idx].member_names = member_names;
-    }*/
+    P_EndScope(parser, scope);
+    
+    return P_MakeNothingNode(parser);
+}
+
+static P_Stmt* P_StmtFlagEnumerationDecl(P_Parser* parser, b8 native, b8 has_all_tags) {
+    P_Consume(parser, TokenType_Identifier, str_lit("Expected Enum name after keyword 'flagenum'\n"));
+    string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    string actual = str_cat(&parser->arena, parser->current_namespace->flatname, name);
+    if (native) {
+        if (P_Match(parser, TokenType_Semicolon)) {
+            return P_MakeNothingNode(parser);
+        }
+    }
+    P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Enum Name\n"));
+    
+    P_ScopeContext* scope = P_BeginScope(parser, ScopeType_Enum);
+    
+    // Parse Members
+    while (!P_Match(parser, TokenType_CloseBrace)) {
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
+        string member_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        
+        var_entry_key k = { .name = member_name, .depth = parser->scope_depth };
+        var_entry_val v = { .mangled_name = str_from_format(&parser->arena, "_flagenum_%.*s_%.*s", str_expand(actual), str_expand(member_name)), .type = ValueType_Integer };
+        var_hash_table_set(&parser->current_namespace->variables, k, v);
+        
+        if (P_Match(parser, TokenType_Equal)) {
+            P_Expression(parser);
+        }
+        
+        if (P_Match(parser, TokenType_CloseBrace)) break;
+        P_Consume(parser, TokenType_Comma, str_lit("Expected comma before next member\n"));
+        
+        if (P_Match(parser, TokenType_EOF)) {
+            report_error(parser, str_lit("Unterminated block for Enum definition\n"));
+            break;
+        }
+    }
+    
+    P_EndScope(parser, scope);
     
     return P_MakeNothingNode(parser);
 }
@@ -3322,6 +3376,7 @@ static P_Stmt* P_Statement(P_Parser* parser) {
     }
     
     report_error(parser, str_lit("Cannot Have Statements that exist outside of functions\n"));
+    P_Advance(parser);
     return nullptr;
 }
 
@@ -3366,6 +3421,8 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
         s = P_StmtUnionDecl(parser, native, has_all_tags);
     } else if (P_Match(parser, TokenType_Enum)) {
         s = P_StmtEnumerationDecl(parser, native, has_all_tags);
+    } else if (P_Match(parser, TokenType_FlagEnum)) {
+        s = P_StmtFlagEnumerationDecl(parser, native, has_all_tags);
     } else if (P_Match(parser, TokenType_Namespace)) {
         s = P_StmtNamespaceDecl(parser, has_all_tags);
     } else if (P_Match(parser, TokenType_Cinsert)) {
@@ -3848,6 +3905,8 @@ static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_a
     string_list member_names = {0};
     value_type_list member_types = {0};
     
+    expr_array exprs = {0};
+    
     // Parse Members
     while (!P_Match(parser, TokenType_CloseBrace)) {
         value_type_list_push(&parser->arena, &member_types, ValueType_Integer);
@@ -3859,6 +3918,20 @@ static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_a
         
         string_list_push(&parser->arena, &member_names, member_name);
         member_count++;
+        
+        var_entry_key k = { .name = member_name, .depth = parser->scope_depth };
+        var_entry_val v = { .mangled_name = str_from_format(&parser->arena, "_enum_%.*s_%.*s", str_expand(actual), str_expand(member_name)), .type = ValueType_Integer };
+        var_hash_table_set(&parser->current_namespace->variables, k, v);
+        
+        if (P_Match(parser, TokenType_Equal)) {
+            P_Expr* val = P_Expression(parser);
+            if (!type_check(val->ret_type, ValueType_Integer))
+                report_error(parser, str_lit("Expression can only return Integer Type\n"));
+            expr_array_add(&parser->arena, &exprs, val);
+        } else {
+            expr_array_add(&parser->arena, &exprs, nullptr);
+        }
+        
         if (P_Match(parser, TokenType_CloseBrace)) break;
         P_Consume(parser, TokenType_Comma, str_lit("Expected comma before next member"));
         if (P_Match(parser, TokenType_EOF)) {
@@ -3869,6 +3942,7 @@ static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_a
     
     value_type_list_push(&parser->arena, &member_types, ValueType_Integer);
     string_list_push(&parser->arena, &member_names, str_lit("count"));
+    expr_array_add(&parser->arena, &exprs, P_MakeIntNode(parser, (i32)member_count));
     member_count++;
     
     if (has_all_tags) {
@@ -3878,7 +3952,7 @@ static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_a
     }
     if (native) return P_MakePreNothingNode(parser);
     
-    P_Stmt* curr = P_MakeEnumDeclStmtNode(parser, actual, member_count, member_names);
+    P_Stmt* curr = P_MakeEnumDeclStmtNode(parser, actual, member_count, member_names, exprs.elements);
     if (parser->end != nullptr) {
         parser->end->next = curr;
         parser->end = curr;
@@ -3888,6 +3962,93 @@ static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_a
     }
     
     return P_MakePreEnumDeclStmtNode(parser, actual);
+}
+
+static P_PreStmt* P_PreStmtFlagEnumerationDecl(P_Parser* parser, b8 native, b8 has_all_tags) {
+    P_Consume(parser, TokenType_Identifier, str_lit("Expected Enum name after keyword 'flagenum'\n"));
+    string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    P_NamespaceCheckRedefinition(parser, name, false, false);
+    string actual = native ? name : str_cat(&parser->arena, parser->current_namespace->flatname, name);
+    
+    if (native) {
+        if (P_Match(parser, TokenType_Semicolon)) {
+            if (has_all_tags)
+                type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Enum, .name = name, .mangled_name = actual, .depth = parser->scope_depth, .is_native = true, .allows_any = true });
+            return P_MakePreNothingNode(parser);
+        }
+    }
+    
+    P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Enum Name\n"));
+    
+    u64 idx = parser->current_namespace->types.count;
+    if (has_all_tags)
+        type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Enum, .name = name, .mangled_name = actual, .depth = parser->scope_depth, .is_native = native, .allows_any = false });
+    
+    u32 member_count = 0;
+    string_list member_names = {0};
+    value_type_list member_types = {0};
+    
+    expr_array exprs = {0};
+    
+    i32 value = 1;
+    
+    // Parse Members
+    while (!P_Match(parser, TokenType_CloseBrace)) {
+        value_type_list_push(&parser->arena, &member_types, ValueType_Integer);
+        
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
+        string member_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        if (str_eq(member_name, str_lit("count")))
+            report_error(parser, str_lit("Cannot have enum member with name 'count'. It is reserved\n"));
+        
+        string_list_push(&parser->arena, &member_names, member_name);
+        member_count++;
+        
+        var_entry_key k = { .name = member_name, .depth = parser->scope_depth };
+        var_entry_val v = { .mangled_name = str_from_format(&parser->arena, "_flagenum_%.*s_%.*s", str_expand(actual), str_expand(member_name)), .type = ValueType_Integer };
+        var_hash_table_set(&parser->current_namespace->variables, k, v);
+        
+        if (P_Match(parser, TokenType_Equal)) {
+            P_Expr* val = P_Expression(parser);
+            if (!type_check(val->ret_type, ValueType_Integer))
+                report_error(parser, str_lit("Expression can only return Integer Type\n"));
+            expr_array_add(&parser->arena, &exprs, val);
+        } else {
+            expr_array_add(&parser->arena, &exprs, P_MakeIntNode(parser, value));
+            if (value & (1 << 31)) report_error(parser, str_lit("Integer Limit Exceeded in flag enum\n"));
+            value <<= 1;
+        }
+        
+        if (P_Match(parser, TokenType_CloseBrace)) break;
+        P_Consume(parser, TokenType_Comma, str_lit("Expected comma before next member\n"));
+        if (P_Match(parser, TokenType_EOF)) {
+            report_error(parser, str_lit("Unterminated block for Enum definition\n"));
+            break;
+        }
+    }
+    
+    value_type_list_push(&parser->arena, &member_types, ValueType_Integer);
+    string_list_push(&parser->arena, &member_names, str_lit("count"));
+    expr_array_add(&parser->arena, &exprs, P_MakeIntNode(parser, (i32)member_count));
+    member_count++;
+    
+    if (has_all_tags) {
+        parser->current_namespace->types.elements[idx].member_count = member_count;
+        parser->current_namespace->types.elements[idx].member_types = member_types;
+        parser->current_namespace->types.elements[idx].member_names = member_names;
+    }
+    if (native) return P_MakePreNothingNode(parser);
+    
+    P_Stmt* curr = P_MakeFlagEnumDeclStmtNode(parser, actual, member_count, member_names, exprs.elements);
+    if (parser->end != nullptr) {
+        parser->end->next = curr;
+        parser->end = curr;
+    } else {
+        parser->root = curr;
+        parser->end = curr;
+    }
+    
+    return P_MakePreFlagEnumDeclStmtNode(parser, actual);
 }
 
 static P_PreStmt* P_PreStmtCinclude(P_Parser* parser, b8 has_all_tags) {
@@ -4000,8 +4161,10 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
             s = P_PreStmtStructureDecl(parser, true, has_all_tags);
         } else if (P_Match(parser, TokenType_Union)) {
             s = P_PreStmtUnionDecl(parser, true, has_all_tags);
-        } else if (P_Match(parser, TokenType_Enum))
+        } else if (P_Match(parser, TokenType_Enum)) {
             s = P_PreStmtEnumerationDecl(parser, true, has_all_tags);
+        } else if (P_Match(parser, TokenType_FlagEnum))
+            s = P_PreStmtFlagEnumerationDecl(parser, true, has_all_tags);
     } else if (P_IsTypeToken(parser)) {
         P_ValueType type = P_ConsumeType(parser, str_lit("This is an error in the Parser. (P_PreDeclaration)\n"));
         
@@ -4024,6 +4187,8 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
         s = P_PreStmtUnionDecl(parser, false, has_all_tags);
     } else if (P_Match(parser, TokenType_Enum)) {
         s = P_PreStmtEnumerationDecl(parser, false, has_all_tags);
+    } else if (P_Match(parser, TokenType_FlagEnum)) {
+        s = P_PreStmtFlagEnumerationDecl(parser, false, has_all_tags);
     } else if (P_Match(parser, TokenType_Import)) {
         s = P_PreStmtImport(parser);
     } else if (P_Match(parser, TokenType_Cinclude)) {

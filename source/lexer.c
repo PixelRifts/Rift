@@ -61,6 +61,7 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_Struct: return str_lit("Struct");
         case TokenType_Union: return str_lit("Union");
         case TokenType_Enum: return str_lit("Enum");
+        case TokenType_FlagEnum: return str_lit("FlagEnum");
         case TokenType_Null: return str_lit("Null");
         case TokenType_Nullptr: return str_lit("Nullptr");
         case TokenType_Break: return str_lit("Break");
@@ -318,7 +319,12 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
         case 'f': {
             switch (lexer->start[1]) {
                 case 'o': return L_MatchType(lexer, 2, str_lit("r"), TokenType_For);
-                case 'l': return L_MatchType(lexer, 2, str_lit("oat"), TokenType_Float);
+                case 'l': {
+                    switch (lexer->start[2]) {
+                        case 'o': return L_MatchType(lexer, 3, str_lit("at"), TokenType_Float);
+                        case 'a': return L_MatchType(lexer, 3, str_lit("genum"), TokenType_FlagEnum);
+                    }
+                }
                 case 'a': return L_MatchType(lexer, 2, str_lit("lse"), TokenType_False);
             }
         }
