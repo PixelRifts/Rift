@@ -1359,6 +1359,17 @@ static P_Stmt* P_MakeStructDeclStmtNode(P_Parser* parser, string name, u32 count
     return stmt;
 }
 
+static P_Stmt* P_MakeUnionDeclStmtNode(P_Parser* parser, string name, u32 count, value_type_list types, string_list names) {
+    P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
+    stmt->type = StmtType_UnionDecl;
+    stmt->next = nullptr;
+    stmt->op.union_decl.name = name;
+    stmt->op.union_decl.member_count = count;
+    stmt->op.union_decl.member_types = types;
+    stmt->op.union_decl.member_names = names;
+    return stmt;
+}
+
 static P_Stmt* P_MakeFuncStmtNode(P_Parser* parser, P_ValueType type, string name, u32 arity, value_type_list param_types, string_list param_names, b8 varargs) {
     P_Stmt* stmt = arena_alloc(&parser->arena, sizeof(P_Stmt));
     stmt->type = StmtType_FuncDecl;
@@ -1406,6 +1417,14 @@ static P_PreStmt* P_MakePreStructDeclStmtNode(P_Parser* parser, string name) {
     stmt->type = PreStmtType_StructForwardDecl;
     stmt->next = nullptr;
     stmt->op.struct_fd = name;
+    return stmt;
+}
+
+static P_PreStmt* P_MakePreUnionDeclStmtNode(P_Parser* parser, string name) {
+    P_PreStmt* stmt = arena_alloc(&parser->arena, sizeof(P_PreStmt));
+    stmt->type = PreStmtType_UnionForwardDecl;
+    stmt->next = nullptr;
+    stmt->op.union_fd = name;
     return stmt;
 }
 
@@ -2678,6 +2697,56 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8
     return P_MakeVarDeclStmtNode(parser, type, new_name);
 }
 
+static P_Stmt* P_StmtUnionDecl(P_Parser* parser, b8 native, b8 has_all_tags) {
+    P_Consume(parser, TokenType_Identifier, str_lit("Expected Union name after keyword 'union'\n"));
+    /*string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    P_NamespaceCheckRedefinition(parser, name, false, false);
+    string actual = str_cat(&parser->arena, parser->current_namespace->flatname, name);*/
+    if (native) {
+        if (P_Match(parser, TokenType_Semicolon)) {
+            /*if (has_all_tags)
+                type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Union, .name = name, .mangled_name = actual, .depth = parser->scope_depth, .is_native = true });*/
+            return P_MakeNothingNode(parser);
+        }
+    }
+    
+    P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Union Name\n"));
+    
+    /*u64 idx = parser->current_namespace->types.count;
+    if (has_all_tags)
+        type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Union, .name = name, .mangled_name = actual, .depth = parser->scope_depth });
+    u32 tmp_member_count = 0;
+    string_list member_names = {0};
+    value_type_list member_types = {0};*/
+    
+    // Parse Members
+    while (!P_Match(parser, TokenType_CloseBrace)) {
+        P_ConsumeType(parser, str_lit("Expected Type or }\n"));
+        /*if (str_eq(type.full_type, name))
+            report_error(parser, str_lit("Recursive Definition of structures disallowed. You should store a pointer instead\n"));
+        value_type_list_push(&parser->arena, &member_types, type);*/
+        
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
+        //string_list_push(&parser->arena, &member_names, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
+        
+        P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after name\n"));
+        //tmp_member_count++;
+        
+        if (P_Match(parser, TokenType_EOF)) {
+            report_error(parser, str_lit("Unterminated block for Union definition\n"));
+            break;
+        }
+    }
+    
+    /*if (has_all_tags) {
+        parser->current_namespace->types.elements[idx].member_count = tmp_member_count;
+        parser->current_namespace->types.elements[idx].member_types = member_types;
+        parser->current_namespace->types.elements[idx].member_names = member_names;
+    }*/
+    
+    return P_MakeNothingNode(parser);
+}
+
 static P_Stmt* P_StmtStructureDecl(P_Parser* parser, b8 native, b8 has_all_tags) {
     P_Consume(parser, TokenType_Identifier, str_lit("Expected Struct name after keyword 'struct'\n"));
     /*string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
@@ -2713,8 +2782,10 @@ static P_Stmt* P_StmtStructureDecl(P_Parser* parser, b8 native, b8 has_all_tags)
         P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after name\n"));
         //tmp_member_count++;
         
-        if (parser->current.type == TokenType_EOF)
-            report_error(parser, str_lit("Unterminated block for structure definition\n"));
+        if (P_Match(parser, TokenType_EOF)) {
+            report_error(parser, str_lit("Unterminated block for Struct definition\n"));
+            break;
+        }
     }
     
     /*if (has_all_tags) {
@@ -2756,8 +2827,11 @@ static P_Stmt* P_StmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_all_tag
         //member_count++;
         if (P_Match(parser, TokenType_CloseBrace)) break;
         P_Consume(parser, TokenType_Comma, str_lit("Expected comma before next member"));
-        if (parser->current.type == TokenType_EOF)
-            report_error(parser, str_lit("Unterminated block for enum definition\n"));
+        
+        if (P_Match(parser, TokenType_EOF)) {
+            report_error(parser, str_lit("Unterminated block for Enum definition\n"));
+            break;
+        }
     }
     
     /*if (has_all_tags) {
@@ -3288,6 +3362,8 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
         
     } else if (P_Match(parser, TokenType_Struct)) {
         s = P_StmtStructureDecl(parser, native, has_all_tags);
+    } else if (P_Match(parser, TokenType_Union)) {
+        s = P_StmtUnionDecl(parser, native, has_all_tags);
     } else if (P_Match(parser, TokenType_Enum)) {
         s = P_StmtEnumerationDecl(parser, native, has_all_tags);
     } else if (P_Match(parser, TokenType_Namespace)) {
@@ -3521,6 +3597,7 @@ static P_PreStmt* P_PreOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has
         return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("<="), str_lit("_opleq"), TokenType_LessEqual);
         case TokenType_GreaterEqual:
         return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit(">="), str_lit("_opgreq"), TokenType_GreaterEqual);
+        
         case TokenType_OpenBracket: {
             P_Consume(parser, TokenType_CloseBracket, str_lit("Expected ] after [\n"));
             return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("[]"), str_lit("_opindex"), TokenType_OpenBracket);
@@ -3620,6 +3697,70 @@ static P_PreStmt* P_PreNamespace(P_Parser* parser) {
     return P_MakePreNothingNode(parser);
 }
 
+static P_PreStmt* P_PreStmtUnionDecl(P_Parser* parser, b8 native, b8 has_all_tags) {
+    P_Consume(parser, TokenType_Identifier, str_lit("Expected Union name after keyword 'union'\n"));
+    string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    P_NamespaceCheckRedefinition(parser, name, false, false);
+    string actual = native ? name : str_cat(&parser->arena, parser->current_namespace->flatname, name);
+    
+    if (native) {
+        if (P_Match(parser, TokenType_Semicolon)) {
+            if (has_all_tags)
+                type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Union, .name = name, .mangled_name = actual, .depth = parser->scope_depth, .is_native = true, .allows_any = true });
+            return P_MakePreNothingNode(parser);
+        }
+    }
+    
+    P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { after Union Name\n"));
+    
+    u64 idx = parser->current_namespace->types.count;
+    if (has_all_tags)
+        type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Union, .name = name, .mangled_name = actual, .depth = parser->scope_depth, .is_native = native, .allows_any = false });
+    u32 tmp_member_count = 0;
+    string_list member_names = {0};
+    value_type_list member_types = {0};
+    
+    // Parse Members
+    while (!P_Match(parser, TokenType_CloseBrace)) {
+        P_ValueType type = P_ConsumeType(parser, str_lit("Expected type\n"));
+        
+        if (str_eq(type.full_type, name))
+            report_error(parser, str_lit("Recursive Definition of unions disallowed. You should store a pointer instead\n"));
+        value_type_list_push(&parser->arena, &member_types, type);
+        
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
+        string_list_push(&parser->arena, &member_names, (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length });
+        
+        P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after name\n"));
+        tmp_member_count++;
+        
+        if (P_Match(parser, TokenType_EOF)) {
+            report_error(parser, str_lit("Unterminated block for Union definition\n"));
+            break;
+        }
+    }
+    
+    if (has_all_tags) {
+        parser->current_namespace->types.elements[idx].member_count = tmp_member_count;
+        parser->current_namespace->types.elements[idx].member_types = member_types;
+        parser->current_namespace->types.elements[idx].member_names = member_names;
+    }
+    
+    if (native) return P_MakePreNothingNode(parser);
+    
+    P_Stmt* curr = P_MakeUnionDeclStmtNode(parser, actual, tmp_member_count, member_types, member_names);
+    if (parser->end != nullptr) {
+        parser->end->next = curr;
+        parser->end = curr;
+    } else {
+        parser->root = curr;
+        parser->end = curr;
+    }
+    
+    return P_MakePreUnionDeclStmtNode(parser, actual);
+}
+
+
 static P_PreStmt* P_PreStmtStructureDecl(P_Parser* parser, b8 native, b8 has_all_tags) {
     P_Consume(parser, TokenType_Identifier, str_lit("Expected Struct name after keyword 'struct'\n"));
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
@@ -3657,8 +3798,10 @@ static P_PreStmt* P_PreStmtStructureDecl(P_Parser* parser, b8 native, b8 has_all
         P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after name\n"));
         tmp_member_count++;
         
-        if (parser->current.type == TokenType_EOF)
-            report_error(parser, str_lit("Unterminated block for structure definition\n"));
+        if (P_Match(parser, TokenType_EOF)) {
+            report_error(parser, str_lit("Unterminated block for Struct definition\n"));
+            break;
+        }
     }
     
     if (has_all_tags) {
@@ -3690,7 +3833,7 @@ static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_a
     if (native) {
         if (P_Match(parser, TokenType_Semicolon)) {
             if (has_all_tags)
-                type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Struct, .name = name, .mangled_name = actual, .depth = parser->scope_depth, .is_native = true, .allows_any = true });
+                type_array_add(&parser->current_namespace->types, (P_Container) { .type = ContainerType_Enum, .name = name, .mangled_name = actual, .depth = parser->scope_depth, .is_native = true, .allows_any = true });
             return P_MakePreNothingNode(parser);
         }
     }
@@ -3715,8 +3858,10 @@ static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_a
         member_count++;
         if (P_Match(parser, TokenType_CloseBrace)) break;
         P_Consume(parser, TokenType_Comma, str_lit("Expected comma before next member"));
-        if (parser->current.type == TokenType_EOF)
-            report_error(parser, str_lit("Unterminated block for enum definition\n"));
+        if (P_Match(parser, TokenType_EOF)) {
+            report_error(parser, str_lit("Unterminated block for Enum definition\n"));
+            break;
+        }
     }
     
     if (has_all_tags) {
@@ -3846,6 +3991,8 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
             }
         } else if (P_Match(parser, TokenType_Struct)) {
             s = P_PreStmtStructureDecl(parser, true, has_all_tags);
+        } else if (P_Match(parser, TokenType_Union)) {
+            s = P_PreStmtUnionDecl(parser, true, has_all_tags);
         } else if (P_Match(parser, TokenType_Enum))
             s = P_PreStmtEnumerationDecl(parser, true, has_all_tags);
     } else if (P_IsTypeToken(parser)) {
@@ -3866,6 +4013,8 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
         s = P_PreNamespace(parser);
     } else if (P_Match(parser, TokenType_Struct)) {
         s = P_PreStmtStructureDecl(parser, false, has_all_tags);
+    } else if (P_Match(parser, TokenType_Union)) {
+        s = P_PreStmtUnionDecl(parser, false, has_all_tags);
     } else if (P_Match(parser, TokenType_Enum)) {
         s = P_PreStmtEnumerationDecl(parser, false, has_all_tags);
     } else if (P_Match(parser, TokenType_Import)) {

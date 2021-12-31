@@ -1,6 +1,11 @@
 import "standard/io.cp";
 import "standard/math.cp";
 
+union Yee {
+    int k;
+    float j;
+}
+
 int main() {
     Math.vec2 a;
     a.x = 10;
@@ -13,7 +18,6 @@ int main() {
     printf("a = (%.3f, %.3f)\n", a.x, a.y);
     printf("b = (%.3f, %.3f)\n", b.x, b.y);
     printf("c = (%.3f, %.3f)\n", c.x, c.y);
-    printf("c = (%d)\n", a < b);
     
     return 0;
 }

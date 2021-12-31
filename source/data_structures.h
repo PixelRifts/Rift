@@ -115,7 +115,7 @@ void opoverload_hash_table_add_all(opoverload_hash_table* from, opoverload_hash_
 
 typedef u32 P_ContainerType;
 enum {
-    ContainerType_Enum, ContainerType_Struct,
+    ContainerType_Enum, ContainerType_Struct, ContainerType_Union,
 };
 
 typedef struct P_Container {

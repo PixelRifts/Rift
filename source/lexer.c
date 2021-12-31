@@ -59,6 +59,7 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_Return: return str_lit("Return");
         case TokenType_Import: return str_lit("Import");
         case TokenType_Struct: return str_lit("Struct");
+        case TokenType_Union: return str_lit("Union");
         case TokenType_Enum: return str_lit("Enum");
         case TokenType_Null: return str_lit("Null");
         case TokenType_Nullptr: return str_lit("Nullptr");
@@ -223,10 +224,17 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
         case 'r': return L_MatchType(lexer, 1, str_lit("eturn"), TokenType_Return);
         case 'm': return L_MatchType(lexer, 1, str_lit("atch"), TokenType_Match);
         case 'w': return L_MatchType(lexer, 1, str_lit("hile"), TokenType_While);
-        case 'u': return L_MatchType(lexer, 1, str_lit("sing"), TokenType_Using);
         case 'l': return L_MatchType(lexer, 1, str_lit("ong"), TokenType_Long);
         case 'v': return L_MatchType(lexer, 1, str_lit("oid"), TokenType_Void);
         case 't': return L_MatchType(lexer, 1, str_lit("rue"), TokenType_True);
+        
+        case 'u': {
+            switch (lexer->start[1]) {
+                case 's': return L_MatchType(lexer, 2, str_lit("ing"), TokenType_Using);
+                case 'n': return L_MatchType(lexer, 2, str_lit("ion"), TokenType_Union);
+            }
+        }
+        
         case 'o': {
             switch (lexer->start[1]) {
                 case 'f': return L_MatchType(lexer, 2, str_lit("fsetof"), TokenType_Offsetof);

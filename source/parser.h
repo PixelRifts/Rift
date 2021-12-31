@@ -93,8 +93,9 @@ typedef u32 P_StmtType;
 enum {
     StmtType_Nothing, // Used Successful parsing but no code emission e.g. Inner scope functions
     StmtType_Expression, StmtType_Block, StmtType_Return, StmtType_If,
-    StmtType_IfElse, StmtType_While, StmtType_DoWhile, StmtType_VarDecl,
-    StmtType_VarDeclAssign, StmtType_FuncDecl, StmtType_StructDecl,
+    StmtType_IfElse, StmtType_While, StmtType_DoWhile, 
+    StmtType_VarDecl, StmtType_VarDeclAssign,
+    StmtType_FuncDecl, StmtType_StructDecl, StmtType_UnionDecl,
     StmtType_EnumDecl, StmtType_For, StmtType_Break, StmtType_Continue,
     StmtType_Switch, StmtType_Match, StmtType_Case, StmtType_MatchCase,
     StmtType_Default, StmtType_MatchDefault
@@ -113,6 +114,7 @@ struct P_Stmt {
         struct { P_ValueType type; string name; P_Expr* val; } var_decl_assign;
         struct { string name; u32 arity; value_type_list param_types; string_list param_names; P_ValueType type; P_Stmt* block; b8 varargs; } func_decl;
         struct { string name; u32 member_count; value_type_list member_types; string_list member_names; } struct_decl;
+        struct { string name; u32 member_count; value_type_list member_types; string_list member_names; } union_decl;
         struct { string name; u32 member_count; string_list member_names; } enum_decl;
         
         struct { P_Expr* switched;  P_Stmt* then; } switch_s;
@@ -134,6 +136,7 @@ enum {
     PreStmtType_Nothing,
     PreStmtType_ForwardDecl,
     PreStmtType_StructForwardDecl,
+    PreStmtType_UnionForwardDecl,
     PreStmtType_EnumForwardDecl,
     PreStmtType_CInclude,
     PreStmtType_CInsert,
@@ -148,6 +151,7 @@ struct P_PreStmt {
         string cinclude;
         string cinsert;
         string struct_fd;
+        string union_fd;
         string enum_fd;
     } op;
 };

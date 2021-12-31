@@ -481,6 +481,24 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             E_WriteLine(emitter, "};");
         } break;
         
+        case StmtType_UnionDecl: {
+            E_WriteLineF(emitter, "typedef union %.*s %.*s;", str_expand(stmt->op.union_decl.name), str_expand(stmt->op.union_decl.name)); E_WriteLineF(emitter, "union %.*s {", str_expand(stmt->op.union_decl.name));
+            string_list_node* curr_name = stmt->op.union_decl.member_names.first;
+            value_type_list_node* curr_type = stmt->op.union_decl.member_types.first;
+            for (u32 i = 0; i < stmt->op.union_decl.member_count; i++) {
+                P_ValueType c_type = type_map(emitter, curr_type->type);
+                
+                for (u32 idt = 0; idt < indent + 1; idt++)
+                    E_Write(emitter, "\t");
+                E_EmitTypeAndName(emitter, &c_type, (string) { .str = curr_name->str, .size = curr_name->size }, false);
+                E_WriteLine(emitter, ";");
+                
+                curr_name = curr_name->next;
+                curr_type = curr_type->next;
+            }
+            E_WriteLine(emitter, "};");
+        } break;
+        
         case StmtType_EnumDecl: {
             E_WriteLineF(emitter, "typedef int %.*s;", str_expand(stmt->op.enum_decl.name));
             E_WriteLineF(emitter, "enum %.*s {", str_expand(stmt->op.enum_decl.name));
@@ -614,6 +632,11 @@ static void E_EmitPreStatement(E_Emitter* emitter, P_PreStmt* stmt, u32 indent) 
         case PreStmtType_StructForwardDecl: {
             E_WriteLineF(emitter, "typedef struct %.*s %.*s;", str_expand(stmt->op.struct_fd), str_expand(stmt->op.struct_fd));
             E_WriteLineF(emitter, "struct %.*s;", str_expand(stmt->op.struct_fd));
+        } break;
+        
+        case PreStmtType_UnionForwardDecl: {
+            E_WriteLineF(emitter, "typedef union %.*s %.*s;", str_expand(stmt->op.union_fd), str_expand(stmt->op.struct_fd));
+            E_WriteLineF(emitter, "union %.*s;", str_expand(stmt->op.union_fd));
         } break;
         
         case PreStmtType_CInclude: {
