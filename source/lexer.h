@@ -44,7 +44,7 @@ enum {
     TokenType_Double, TokenType_Char, TokenType_Long, TokenType_Void,
     
     TokenType_Tag, TokenType_Sizeof, TokenType_Offsetof, TokenType_Cinclude,
-    TokenType_Cinsert, TokenType_Operator,
+    TokenType_Cinsert, TokenType_Operator, TokenType_Typedef,
     
     TokenType_TokenTypeCount
 };

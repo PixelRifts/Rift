@@ -122,8 +122,8 @@ struct P_Stmt {
         struct { P_Expr* matched;   P_Stmt* then; } match_s;
         struct { P_Expr* value;     P_Stmt* then; } case_s;
         struct { P_Expr* value;     P_Stmt* then; } mcase_s;
-        struct { P_Stmt* then; } default_s;
-        struct { P_Stmt* then; } mdefault_s;
+        struct {                    P_Stmt* then; } default_s;
+        struct {                    P_Stmt* then; } mdefault_s;
         struct { P_Expr* condition; P_Stmt* then; } if_s;
         struct { P_Expr* condition; P_Stmt* then; P_Stmt* else_s; } if_else;
         struct { P_Expr* condition; P_Stmt* then; } while_s;

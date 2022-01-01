@@ -25,6 +25,13 @@ static const opoverload_entry_val tombstone_opoverload = {
     .mangled_name = { .str = nullptr, .size = 0 }
 };
 
+static const typedef_entry_val tombstone_typedef = {
+    .type = {
+        .base_type = str_lit("tombstone"),
+        .mods = nullptr
+    }
+};
+
 //~ Variable Hashtable
 static u32 hash_var_key(var_entry_key k) {
     u32 hash = 2166136261u;
@@ -487,6 +494,116 @@ void opoverload_hash_table_add_all(opoverload_hash_table* from, opoverload_hash_
     }
 }
 
+//~ Typedef Hash Table
+static u32 hash_typedef_key(typedef_entry_key k) {
+    u32 hash = 2166136261u;
+    for (u32 i = 0; i < k.name.size; i++) {
+        hash ^= k.name.str[i];
+        hash *= 16777619;
+    }
+    hash += k.depth;
+    return hash;
+}
+
+static typedef_table_entry* find_typedef_entry(typedef_table_entry* entries, i32 cap, typedef_entry_key key) {
+    u32 idx = hash_typedef_key(key) % cap;
+    typedef_table_entry* tombstone_e = nullptr;
+    
+    while (true) {
+        typedef_table_entry* entry = &entries[idx];
+        if (entry->key.name.size == 0) {
+            if (entry->value.type.base_type.size == 0)
+                return tombstone_e != nullptr ? tombstone_e : entry;
+            else
+                if (tombstone_e == nullptr) tombstone_e = entry;
+        } else if (str_eq(entry->key.name, key.name))
+            return entry;
+        idx = (idx + 1) % cap;
+    }
+}
+
+static void typedef_table_adjust_cap(typedef_hash_table* table, i32 cap) {
+    typedef_table_entry* entries = malloc(sizeof(typedef_table_entry) * cap);
+    memset(entries, 0, sizeof(typedef_table_entry) * cap);
+    
+    table->count = 0;
+    for (u32 i = 0; i < table->capacity; i++) {
+        typedef_table_entry* entry = &table->entries[i];
+        if (entry->key.name.size == 0) continue;
+        
+        typedef_table_entry* dest = find_typedef_entry(entries, cap, entry->key);
+        dest->key = entry->key;
+        dest->value = entry->value;
+        table->count++;
+    }
+    
+    free(table->entries);
+    table->entries = entries;
+    table->capacity = cap;
+}
+
+void typedef_hash_table_init(typedef_hash_table* table) {
+    table->count = 0;
+    table->capacity = 0;
+    table->entries = nullptr;
+}
+
+void typedef_hash_table_free(typedef_hash_table* table) {
+    free(table->entries);
+    table->count = 0;
+    table->capacity = 0;
+    table->entries = nullptr;
+}
+
+b8 typedef_hash_table_get(typedef_hash_table* table, typedef_entry_key key, typedef_entry_val* value) {
+    if (table->count == 0) return false;
+    typedef_table_entry* entry = find_typedef_entry(table->entries, table->capacity, key);
+    if (entry->key.name.size == 0) return false;
+    *value = entry->value;
+    return true;
+}
+
+b8 typedef_hash_table_has_name(typedef_hash_table* table, typedef_entry_key key) {
+    if (table->count == 0) return false;
+    typedef_table_entry* entry = find_typedef_entry(table->entries, table->capacity, key);
+    return entry->key.name.size != 0;
+}
+
+b8 typedef_hash_table_set(typedef_hash_table* table, typedef_entry_key key, typedef_entry_val value) {
+    if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
+        i32 cap = GROW_CAPACITY(table->capacity);
+        typedef_table_adjust_cap(table, cap);
+    }
+    
+    typedef_table_entry* entry = find_typedef_entry(table->entries, table->capacity, key);
+    b8 is_new_key = entry->key.name.size == 0;
+    if (is_new_key && entry->value.type.base_type.size == 0)
+        table->count++;
+    
+    entry->key = key;
+    entry->value = value;
+    return is_new_key;
+}
+
+b8 typedef_hash_table_del(typedef_hash_table* table, typedef_entry_key key) {
+    if (table->count == 0) return false;
+    typedef_table_entry* entry = find_typedef_entry(table->entries, table->capacity, key);
+    if (entry->key.name.size == 0) return false;
+    entry->key = (typedef_entry_key) {0};
+    entry->value = tombstone_typedef;
+    return true;
+}
+
+void typedef_hash_table_add_all(typedef_hash_table* from, typedef_hash_table* to) {
+    for (u32 i = 0; i < from->capacity; i++) {
+        typedef_table_entry* entry = &from->entries[i];
+        if (entry->key.name.size != 0) {
+            typedef_hash_table_set(to, entry->key, entry->value);
+        }
+    }
+}
+
+
 //~ Struct List
 void type_array_init(type_array* array) {
     array->elements = calloc(8, sizeof(P_Container));
@@ -522,6 +639,12 @@ void type_mod_array_add(M_Arena* arena, type_mod_array* array, P_ValueTypeMod mo
     }
     *(array->elements + array->count) = mod;
     array->count++;
+}
+
+void type_mod_array_concat(M_Arena* arena, type_mod_array* array, type_mod_array* right) {
+    for (u32 i = 0; i < right->count; i++) {
+        type_mod_array_add(arena, array, right->elements[i]);
+    }
 }
 
 //~ Expressions

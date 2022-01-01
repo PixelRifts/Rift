@@ -21,6 +21,7 @@
 static M_Arena global_arena;
 static P_Namespace global_namespace;
 static opoverload_hash_table op_overloads;
+static typedef_hash_table typedefs;
 static string_list imports;
 static string_list imports_parsing;
 static string_list active_tags;
@@ -193,8 +194,18 @@ static b8 P_IsTypeToken(P_Parser* parser) {
     }
     
     if (parser->current.type == TokenType_Identifier) {
-        if (container_type_exists(parser, (string) { .str = parser->current.start, .size = parser->current.length }, parser->scope_depth)) {
+        string name = (string) { .str = parser->current.start, .size = parser->current.length };
+        if (container_type_exists(parser, name, parser->scope_depth)) {
             return true;
+        }
+        
+        typedef_entry_key tk = { .name = name, .depth = parser->scope_depth };
+        typedef_entry_val tv;
+        while (tk.depth != -1) {
+            if (typedef_hash_table_get(&typedefs, tk, &tv)) {
+                return true;
+            }
+            tk.depth--;
         }
         
         P_ParserSnap snap = P_TakeSnapshot(parser);
@@ -202,7 +213,6 @@ static b8 P_IsTypeToken(P_Parser* parser) {
         
         // @namespaced
         b8 is_type = false;
-        string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
         for (i32 u = parser->usings.tos - 1; u >= 0; u--) {
             P_Namespace* using_c = parser->usings.stack[u];
             u32 idx;
@@ -337,13 +347,35 @@ static b8 P_MatchType(P_Parser* parser, P_ValueType* rettype, string* custom_err
         string with_nmspc = {0};
         P_Namespace* nmspc = nullptr;
         if (parser->current.type == TokenType_Identifier) {
+            string name = { .str = parser->current.start, .size = parser->current.length };
+            
+            typedef_entry_key tk = { .name = name, .depth = parser->scope_depth };
+            typedef_entry_val tv;
+            while (tk.depth != -1) {
+                if (typedef_hash_table_get(&typedefs, tk, &tv)) {
+                    P_Advance(parser);
+                    P_ValueType t = tv.type;
+                    
+                    type_mod_array a = { .elements = t.mods, .count = t.mod_ct };
+                    type_mod_array mods = {0};
+                    P_ConsumeTypeMods(parser, &mods);
+                    type_mod_array_concat(&parser->arena, &a, &mods);
+                    t.mods = a.elements;
+                    t.mod_ct = a.count;
+                    
+                    *rettype = t;
+                    return true;
+                }
+                tk.depth--;
+            }
+            
             // Namespaced Types
             P_ParserSnap snap = P_TakeSnapshot(parser);
             P_Advance(parser);
             b8 found = false;
             {
                 // @namespaced
-                string name = { .str = parser->previous.start, .size = parser->previous.length };
+                name = (string) { .str = parser->previous.start, .size = parser->previous.length };
                 
                 for (i32 u = parser->usings.tos - 1; u >= 0; u--) {
                     P_Namespace* using_c = parser->usings.stack[u];
@@ -381,6 +413,7 @@ static b8 P_MatchType(P_Parser* parser, P_ValueType* rettype, string* custom_err
             
             if (!found) {
                 P_ApplySnapshot(parser, snap);
+                *custom_err = str_lit("Cannot find Type\n");
                 *rettype = ValueType_Invalid;
                 return false;
             }
@@ -670,6 +703,15 @@ static void P_NamespaceCheckRedefinition(P_Parser* parser, string name, b8 is_fn
         if (container_type_exists(parser, name, parser->scope_depth))
             report_error(parser, str_lit("Symbol Redefinition: %.*s\n"), str_expand(name));
         
+    }
+    
+    typedef_entry_key tk = { .name = name, .depth = parser->scope_depth };
+    typedef_entry_val tv;
+    while (tk.depth != -1) {
+        if (typedef_hash_table_get(&typedefs, tk, &tv)) {
+            report_error(parser, str_lit("Symbol Redefinition: %.*s\n"), str_expand(name));
+        }
+        tk.depth--;
     }
 }
 
@@ -2966,7 +3008,14 @@ static P_Stmt* P_StmtCinclude(P_Parser* parser, b8 has_all_tags) {
 
 static P_Stmt* P_StmtCinsert(P_Parser* parser, b8 has_all_tags) {
     P_Consume(parser, TokenType_StringLit, str_lit("Expected Some code after 'cinsert'\n"));
-    P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after filename\n"));
+    P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after code\n"));
+    return P_MakeNothingNode(parser);
+}
+
+static P_Stmt* P_StmtTypedef(P_Parser* parser, b8 has_all_tags) {
+    P_ConsumeType(parser, str_lit("Expected Type after 'typedef'\n"));
+    P_Consume(parser, TokenType_Identifier, str_lit("Expected identifier after type\n"));
+    P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after Identifier\n"));
     return P_MakeNothingNode(parser);
 }
 
@@ -3427,6 +3476,8 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
         s = P_StmtNamespaceDecl(parser, has_all_tags);
     } else if (P_Match(parser, TokenType_Cinsert)) {
         s = P_StmtCinsert(parser, has_all_tags);
+    } else if (P_Match(parser, TokenType_Typedef)) {
+        s = P_StmtTypedef(parser, has_all_tags);
     } else if (P_Match(parser, TokenType_Cinclude)) {
         if (parser->scope_depth == 0)
             s = P_StmtCinclude(parser, has_all_tags);
@@ -3689,6 +3740,21 @@ static string read_file(M_Arena* arena, const char* path, b8* file_exists) {
 }
 
 static P_PreStmt* P_PreDeclaration(P_Parser* parser);
+
+static P_PreStmt* P_PreTypedef(P_Parser* parser) {
+    P_ValueType type = P_ConsumeType(parser, str_lit("Expected Type after identifier"));
+    P_Consume(parser, TokenType_Identifier, str_lit("Expected identifier after 'typedef'\n"));
+    string name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    
+    P_NamespaceCheckRedefinition(parser, name, false, false);
+    
+    typedef_entry_key tk = { .name = name, .depth = parser->scope_depth };
+    typedef_entry_val tv = { .type = type };
+    typedef_hash_table_set(&typedefs, tk, tv);
+    
+    P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after Identifier\n"));
+    return P_MakePreNothingNode(parser);
+}
 
 static P_PreStmt* P_PreNamespace(P_Parser* parser) {
     P_Consume(parser, TokenType_Identifier, str_lit("Expected name of namespace after 'namespace'\n"));
@@ -3989,7 +4055,6 @@ static P_PreStmt* P_PreStmtFlagEnumerationDecl(P_Parser* parser, b8 native, b8 h
     value_type_list member_types = {0};
     
     expr_array exprs = {0};
-    
     i32 value = 1;
     
     // Parse Members
@@ -4179,6 +4244,8 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
             }
         }
         
+    } else if (P_Match(parser, TokenType_Typedef)) {
+        s = P_PreTypedef(parser);
     } else if (P_Match(parser, TokenType_Namespace)) {
         s = P_PreNamespace(parser);
     } else if (P_Match(parser, TokenType_Struct)) {
@@ -4285,6 +4352,7 @@ void P_GlobalInit(string_list tags) {
     types_init(&global_arena);
     type_array_init(&global_namespace.types);
     opoverload_hash_table_init(&op_overloads);
+    typedef_hash_table_init(&typedefs);
     active_tags = tags;
     imports = (string_list){0};
     imports_parsing = (string_list){0};
@@ -4357,6 +4425,7 @@ static void free_namespace(P_Namespace* n) {
 void P_GlobalFree() {
     free_namespace(&global_namespace);
     opoverload_hash_table_free(&op_overloads);
+    typedef_hash_table_free(&typedefs);
     arena_free(&global_arena);
 }
 

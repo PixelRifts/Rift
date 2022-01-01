@@ -20,8 +20,11 @@ namespace Yesno {
     
 }
 
+typedef int* TEST;
+
 int main() {
     using Yesno;
+    TEST j;
     
     printf("a: %d\n", AnEnum.a);
     printf("b: %d\n", AnEnum.b);

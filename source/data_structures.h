@@ -113,6 +113,36 @@ b8   opoverload_hash_table_del_full(opoverload_hash_table* table, opoverload_ent
 void opoverload_hash_table_add_all(opoverload_hash_table* from, opoverload_hash_table* to);
 
 
+
+typedef struct typedef_entry_key {
+    string name;
+    i32 depth;
+} typedef_entry_key;
+
+typedef struct typedef_entry_val {
+    P_ValueType type;
+} typedef_entry_val;
+
+typedef struct typedef_table_entry {
+    typedef_entry_key key;
+    typedef_entry_val value;
+} typedef_table_entry;
+
+typedef struct typedef_hash_table {
+    u32 count;
+    u32 capacity;
+    typedef_table_entry* entries;
+} typedef_hash_table;
+
+void typedef_hash_table_init(typedef_hash_table* table);
+void typedef_hash_table_free(typedef_hash_table* table);
+b8   typedef_hash_table_get(typedef_hash_table* table, typedef_entry_key key, typedef_entry_val* value);
+b8   typedef_hash_table_set(typedef_hash_table* table, typedef_entry_key key, typedef_entry_val value);
+b8   typedef_hash_table_del(typedef_hash_table* table, typedef_entry_key key);
+void typedef_hash_table_add_all(typedef_hash_table* from, typedef_hash_table* to);
+
+
+
 typedef u32 P_ContainerType;
 enum {
     ContainerType_Enum, ContainerType_Struct, ContainerType_Union,
@@ -149,6 +179,7 @@ typedef struct type_mod_array {
 } type_mod_array;
 
 void type_mod_array_add(M_Arena* arena, type_mod_array* array, P_ValueTypeMod mod);
+void type_mod_array_concat(M_Arena* arena, type_mod_array* array, type_mod_array* right);
 
 
 
