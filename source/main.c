@@ -45,33 +45,10 @@ int main(int argc, char **argv) {
         string_list_push(&scratch, &tags, str_lit("linux"));
 #endif
         
-        
-#ifdef CPLEXER
-        L_Lexer lexer = {0};
-        L_Initialize(&lexer, (string) { .str = (u8*)source, .size = strlen(source) });
-        L_Token token;
-        while ((token = L_LexToken(&lexer)).type != TokenType_EOF)
-            L_PrintToken(token);
-        L_PrintToken(token);
-#endif
-        
-#ifdef CPPARSER
-        P_GlobalInit(tags);
-        P_Parser parser = {0};
-        P_Initialize(&parser, (string) { .str = (u8*)source, .size = strlen(source) }, filename, true);
-        P_Parse(&parser);
-        if (!parser.had_error)
-            P_PrintAST(parser.root);
-        P_Free(&parser);
-        P_GlobalFree();
-#endif
-        
-#ifdef CPLATEST
         E_Emitter emitter = {0};
         E_Initialize(&emitter, (string) { .str = (u8*)source, .size = strlen(source) }, filename, tags);
         E_Emit(&emitter);
         E_Free(&emitter);
-#endif
         
         arena_free(&scratch);
         free(source);

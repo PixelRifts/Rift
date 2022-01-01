@@ -5,7 +5,7 @@ project_name = "Rift Transpiler";
 patterns =
 {
 	"*.c",
-	"*.cp",
+	"*.rf",
 	"*.cpp",
 	"*.mdesk",
 	"*.h",
@@ -49,29 +49,7 @@ command_list =
 		.cursor_at_end = false,
 		.cmd =
 		{
-			{ "del /f ./generated.c & bin\cpcom.exe ./test.cp @test_tag", .os = "win" },
-		},
-	},
-	{
-		.name = "lexeronly",
-		.out = "*compilation*",
-		.footer_panel = true,
-		.save_dirty_files = true,
-		.cursor_at_end = false,
-		.cmd =
-		{
-			{ "lexeronly.bat", .os = "win" },
-		},
-	},
-	{
-		.name = "parseronly",
-		.out = "*compilation*",
-		.footer_panel = true,
-		.save_dirty_files = true,
-		.cursor_at_end = false,
-		.cmd =
-		{
-			{ "parseronly.bat", .os = "win" },
+			{ "del /f ./generated.c & bin\rift.exe ./test.rf @test_tag", .os = "win" },
 		},
 	},
 	{
@@ -89,6 +67,4 @@ command_list =
 
 fkey_command[1] = "build";
 fkey_command[2] = "run";
-fkey_command[3] = "lexeronly";
-fkey_command[4] = "parseronly";
 fkey_command[5] = "generated";

@@ -1,4 +1,4 @@
-import "standard/io.cp";
+import "standard/io.rf";
 
 namespace Yesno {
     
@@ -20,12 +20,16 @@ namespace Yesno {
     
 }
 
+void proc (int* y) {
+    
+}
+
 typedef int* TEST;
 
 int main() {
     using Yesno;
     TEST j;
-    
+    proc(j);
     printf("a: %d\n", AnEnum.a);
     printf("b: %d\n", AnEnum.b);
     printf("c: %d\n", AnEnum.c);
