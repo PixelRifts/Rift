@@ -13,7 +13,9 @@ namespace Yesno {
         bit1,
         bit2,
         bit3,
-        bit4 = bit1 | bit2
+        bit1and2 = bit1 | bit2,
+        bit4,
+        bit5,
     }
     
 }
