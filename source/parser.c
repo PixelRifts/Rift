@@ -256,7 +256,7 @@ static P_ValueType P_ReduceType(P_ValueType in) {
         } break;
         
         case ValueTypeModType_Array: {
-            in.full_type.size -= str_find_last(in.full_type, str_lit("["), 0)-1;
+            in.full_type.size = str_find_last(in.full_type, str_lit("["), 0)-1;
         } break;
         
         case ValueTypeModType_Reference: {
@@ -314,6 +314,7 @@ static P_ValueType P_CreateFnpointerType(P_Parser* parser, P_ValueType* return_t
 
 // Just for mod consumption
 static P_Expr* P_Expression(P_Parser* parser);
+static P_Expr* P_MakeNullptrNode(P_Parser* parser);
 
 static b8 P_ConsumeTypeMods(P_Parser* parser, type_mod_array* mods) {
     if (P_Match(parser, TokenType_Star)) {
@@ -321,12 +322,20 @@ static b8 P_ConsumeTypeMods(P_Parser* parser, type_mod_array* mods) {
         P_ConsumeTypeMods(parser, mods);
         return true;
     } else if (P_Match(parser, TokenType_OpenBracket)) {
-        P_Expr* e = P_Expression(parser);
+        if (P_Match(parser, TokenType_CloseBracket)) {
+            type_mod_array_add(&parser->arena, mods, (P_ValueTypeMod) { .type = ValueTypeModType_Array, .op.array_expr = P_MakeNullptrNode(parser) }); // Nullptr node signifies no size specified
+            P_ConsumeTypeMods(parser, mods);
+            return true;
+        } else {
+            P_Expr* e = P_Expression(parser);
+            if (!type_check(e->ret_type, ValueType_Integer))
+                report_error(parser, str_lit("Expression within [] should return Integer type\n"));
+            P_Consume(parser, TokenType_CloseBracket, str_lit("Required ] after expression in type declaration\n"));
+            type_mod_array_add(&parser->arena, mods, (P_ValueTypeMod) { .type = ValueTypeModType_Array, .op.array_expr = e });
+            P_ConsumeTypeMods(parser, mods);
+            return true;
+        }
         
-        P_Consume(parser, TokenType_CloseBracket, str_lit("Required ] after expression in type declaration\n"));
-        type_mod_array_add(&parser->arena, mods, (P_ValueTypeMod) { .type = ValueTypeModType_Array, .op.array_expr = e });
-        P_ConsumeTypeMods(parser, mods);
-        return true;
     } else if (P_Match(parser, TokenType_Ampersand)) {
         type_mod_array_add(&parser->arena, mods, (P_ValueTypeMod) { .type = ValueTypeModType_Reference });
         P_ConsumeTypeMods(parser, mods);
@@ -556,6 +565,18 @@ b8 type_check(P_ValueType a, P_ValueType expected) {
         P_ValueType o = P_ReduceType(expected);
         return type_check(a, o);
     }
+    
+    // Array testing [ any[expr] -> any[] ]
+    if (is_array(&expected) && is_array(&a)) {
+        P_ValueType o = P_ReduceType(expected);
+        P_ValueType k = P_ReduceType(a);
+        if (type_check(k, o)) {
+            if (expected.mods[expected.mod_ct - 1].op.array_expr->type == ExprType_Nullptr) {
+                return true;
+            }
+        }
+    }
+    
     
     // Array testing [ any[] -> any* ]
     if (is_array(&a)) {
@@ -2746,6 +2767,15 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8
         } else {
             if (!type_check(value->ret_type, type))
                 report_error(parser, str_lit("Cannot Assign Value of Type %.*s to variable of type %.*s\n"), str_expand(value->ret_type.full_type), str_expand(type.full_type));
+            
+            if (is_array(&type)) {
+                if (is_array(&value->ret_type)) {
+                    if (type.mods[type.mod_ct - 1].op.array_expr->type == ExprType_Nullptr) {
+                        type = value->ret_type;
+                    }
+                }
+            }
+            
             P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
             return P_MakeVarDeclAssignStmtNode(parser, type, new_name, value);
         }
@@ -2753,6 +2783,11 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8
     
     if (is_ref(&type)) {
         report_error(parser, str_lit("Uninitialized Reference Type\n"));
+    }
+    
+    if (is_array(&type)) {
+        if (type.mods[type.mod_ct - 1].op.array_expr->type == ExprType_Nullptr)
+            report_error(parser, str_lit("Uninitialized Array with unspecified size\n"));
     }
     
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));

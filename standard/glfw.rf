@@ -1,0 +1,18 @@
+// Is this good?
+cinclude "GLFW/glfw3.h";
+
+namespace GLFW {
+    native struct GLFWwindow;
+    native struct GLFWmonitor;
+    
+    native bool glfwInit();
+    native void glfwTerminate();
+    native void glfwInitHint(int hint, int value);
+    native void glfwGetVersion(int* major, int* minor, int* rev);
+    
+    native GLFWwindow* glfwCreateWindow(int width, int height, string name, GLFWmonitor* moniotr, GLFWwindow* share);
+    native bool glfwWindowShouldClose(GLFWwindow* window);
+    native void glfwSwapBuffers(GLFWwindow* window);
+    native void glfwPollEvents();
+    native void glfwDestroyWindow(GLFWwindow* window);
+}

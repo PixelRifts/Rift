@@ -49,7 +49,7 @@ command_list =
 		.cursor_at_end = false,
 		.cmd =
 		{
-			{ "del /f ./generated.c & bin\rift.exe ./test.rf @test_tag", .os = "win" },
+			{ "del /f ./generated.c & bin\rift.exe ./test.rf", .os = "win" },
 		},
 	},
 	{

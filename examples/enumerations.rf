@@ -9,5 +9,6 @@ int main() {
 	int s = test_enum.second;
 	int t = test_enum.third;
 	printf("test_enum: (%d, %d, %d)", f, s, t);
+	printf("test_enum count: %d", test_enum.count);
 	return 0;
 }
