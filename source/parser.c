@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "bytecode.h"
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -2397,6 +2398,8 @@ static P_Expr* P_ExprPrecedence(P_Parser* parser, P_Precedence precedence) {
         P_InfixParseFn infix = P_GetRule(parser->previous.type)->infix;
         e = infix(parser, e);
     }
+    
+    if (e->is_constant) e = B_EvaluateExpr(parser, e);
     return e;
 }
 

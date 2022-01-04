@@ -1,4 +1,4 @@
-import "standard/glfw.rf";
+//import "standard/glfw.rf";
 
 /*
 glfwInit();
@@ -16,11 +16,7 @@ glfwInit();
 */
 
 int main() {
-    int[][] blah = {
-        { 10, 20, 30 },
-        { 10, 20, 30 },
-        { 10, 20, 30 }
-    };
+    int i = 10 / 20 * 40 + 80;
     
     return 0;
 }

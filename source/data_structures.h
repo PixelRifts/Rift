@@ -4,8 +4,11 @@
 #define DATA_STRUCTURES_H
 
 #define TABLE_MAX_LOAD 0.75
+
+#ifndef GROW_CAPACITY
 #define GROW_CAPACITY(capacity) ((capacity) < 8 ? 8 : (capacity) * 2)
 #define GROW_CAPACITY_BIGGER(capacity) ((capacity) < 32 ? 32 : (capacity) * 2)
+#endif
 
 #include "defines.h"
 #include "str.h"
