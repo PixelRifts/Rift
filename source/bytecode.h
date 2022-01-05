@@ -11,7 +11,28 @@
 #define GROW_CAPACITY_BIGGER(capacity) ((capacity) < 32 ? 32 : (capacity) * 2)
 #endif
 
-typedef int B_Value;
+typedef u32 B_ValueKind;
+enum {
+    ValueKind_Char,
+    ValueKind_Integer,
+    ValueKind_Long,
+    ValueKind_Float,
+    ValueKind_Double,
+    ValueKind_Bool,
+};
+
+typedef struct B_Value {
+    B_ValueKind type;
+    union {
+        i8  char_val;
+        i32 int_val;
+        i64 long_val;
+        f32 float_val;
+        f64 double_val;
+        b8  bool_val;
+    };
+} B_Value;
+
 typedef struct B_ValueArray {
     u32 count;
     u32 capacity;

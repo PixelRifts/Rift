@@ -2399,7 +2399,14 @@ static P_Expr* P_ExprPrecedence(P_Parser* parser, P_Precedence precedence) {
         e = infix(parser, e);
     }
     
-    if (e->is_constant) e = B_EvaluateExpr(parser, e);
+    if (e->is_constant && 
+        (e->type != ExprType_CharLit
+         && e->type != ExprType_IntLit
+         && e->type != ExprType_LongLit
+         && e->type != ExprType_FloatLit
+         && e->type != ExprType_DoubleLit
+         && e->type != ExprType_StringLit
+         && e->type != ExprType_BoolLit)) e = B_EvaluateExpr(parser, e);
     return e;
 }
 

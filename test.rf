@@ -16,7 +16,7 @@ glfwInit();
 */
 
 int main() {
-    int i = 10 / 20 * 40 + 80;
+    float i = 10 / 20.f * 40;
     
     return 0;
 }
