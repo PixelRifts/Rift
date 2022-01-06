@@ -124,27 +124,32 @@ static void B_WriteExprToChunk(B_Chunk* chunk, P_Expr* expr) {
     switch (expr->type) {
         case ExprType_CharLit: {
             B_WriteChunk(chunk, Opcode_Push);
-            u8 loc = B_AddConstant(chunk, (B_Value) { .type = ValueKind_Char, .char_val = (i8)expr->op.char_lit.str[1] });
+            u8 loc = B_AddConstant(chunk, CHAR_VAL((i8)expr->op.char_lit.str[1]));
             B_WriteChunk(chunk, loc);
         } break;
         case ExprType_IntLit: {
             B_WriteChunk(chunk, Opcode_Push);
-            u8 loc = B_AddConstant(chunk, (B_Value) { .type = ValueKind_Integer, .int_val = expr->op.integer_lit });
+            u8 loc = B_AddConstant(chunk, INT_VAL(expr->op.integer_lit));
             B_WriteChunk(chunk, loc);
         } break;
         case ExprType_LongLit: {
             B_WriteChunk(chunk, Opcode_Push);
-            u8 loc = B_AddConstant(chunk, (B_Value) { .type = ValueKind_Long, .long_val = expr->op.long_lit });
+            u8 loc = B_AddConstant(chunk, LONG_VAL(expr->op.long_lit));
             B_WriteChunk(chunk, loc);
         } break;
         case ExprType_FloatLit: {
             B_WriteChunk(chunk, Opcode_Push);
-            u8 loc = B_AddConstant(chunk, (B_Value) { .type = ValueKind_Float, .float_val = expr->op.float_lit });
+            u8 loc = B_AddConstant(chunk, FLOAT_VAL(expr->op.float_lit));
             B_WriteChunk(chunk, loc);
         } break;
         case ExprType_DoubleLit: {
             B_WriteChunk(chunk, Opcode_Push);
-            u8 loc = B_AddConstant(chunk, (B_Value) { .type = ValueKind_Double, .double_val = expr->op.double_lit });
+            u8 loc = B_AddConstant(chunk, DOUBLE_VAL(expr->op.double_lit));
+            B_WriteChunk(chunk, loc);
+        } break;
+        case ExprType_BoolLit: {
+            B_WriteChunk(chunk, Opcode_Push);
+            u8 loc = B_AddConstant(chunk, BOOL_VAL(expr->op.bool_lit));
             B_WriteChunk(chunk, loc);
         } break;
         
@@ -166,59 +171,100 @@ static void B_ReadConstant(B_Chunk* chunk, B_ValueArray* stack, u32 i) {
     B_WriteValueArray(stack, chunk->constants.values[loc]);
 }
 
-//#define max(a, b) ((a) > (b)) ? a : b
-
+#define B_ValueUnaryOp_NoFloat(a, op) \
+do {\
+switch (a.type) {\
+case ValueKind_Char: stack.values[stack.count++] = CHAR_VAL(op a.char_val); break;\
+case ValueKind_Integer: stack.values[stack.count++] = INT_VAL(op a.int_val); break;\
+case ValueKind_Long: stack.values[stack.count++] = LONG_VAL(op a.long_val); break;\
+}\
+} while (0)
+#define B_ValueUnaryOp(a, op) \
+do {\
+switch (a.type) {\
+case ValueKind_Char: stack.values[stack.count++] = CHAR_VAL(op a.char_val); break;\
+case ValueKind_Integer: stack.values[stack.count++] = INT_VAL(op a.int_val); break;\
+case ValueKind_Long: stack.values[stack.count++] = LONG_VAL(op a.long_val); break;\
+case ValueKind_Float: stack.values[stack.count++] = FLOAT_VAL(op a.float_val); break;\
+case ValueKind_Double: stack.values[stack.count++] = DOUBLE_VAL(op a.double_val); break;\
+}\
+} while (0)
 #define B_ValueBinaryOp(a, b, op) \
 do {\
-B_ValueKind kind = max(a.type, b.type);\
 switch(a.type) {\
 case ValueKind_Char: {\
 switch(b.type) {\
-case ValueKind_Char: stack.values[stack.count++] = (B_Value) {.type = kind, .char_val = a.char_val op b.char_val}; break;\
-case ValueKind_Integer: stack.values[stack.count++] = (B_Value) {.type = kind, .int_val = a.char_val op b.int_val}; break;\
-case ValueKind_Long: stack.values[stack.count++] = (B_Value) {.type = kind, .long_val = a.char_val op b.long_val}; break;\
-case ValueKind_Float: stack.values[stack.count++] = (B_Value) {.type = kind, .float_val = a.char_val op b.float_val}; break;\
-case ValueKind_Double: stack.values[stack.count++] = (B_Value) {.type = kind, .double_val = a.char_val op b.double_val}; break;\
+case ValueKind_Char: stack.values[stack.count++] = CHAR_VAL(a.char_val op b.char_val); break;\
+case ValueKind_Integer: stack.values[stack.count++] = INT_VAL(a.char_val op b.int_val); break;\
+case ValueKind_Long: stack.values[stack.count++] = LONG_VAL(a.char_val op b.long_val); break;\
+case ValueKind_Float: stack.values[stack.count++] = FLOAT_VAL(a.char_val op b.float_val); break;\
+case ValueKind_Double: stack.values[stack.count++] = DOUBLE_VAL(a.char_val op b.double_val); break;\
 }\
 } break;\
 case ValueKind_Integer: {\
 switch(b.type) {\
-case ValueKind_Char: stack.values[stack.count++] = (B_Value) {.type = kind, .int_val = a.int_val op b.char_val}; break;\
-case ValueKind_Integer: stack.values[stack.count++] = (B_Value) {.type = kind, .int_val = a.int_val op b.int_val}; break;\
-case ValueKind_Long: stack.values[stack.count++] = (B_Value) {.type = kind, .long_val = a.int_val op b.long_val}; break;\
-case ValueKind_Float: stack.values[stack.count++] = (B_Value) {.type = kind, .float_val = a.int_val op b.float_val}; break;\
-case ValueKind_Double: stack.values[stack.count++] = (B_Value) {.type = kind, .double_val = a.int_val op b.double_val}; break;\
+case ValueKind_Char: stack.values[stack.count++] = INT_VAL(a.int_val op b.char_val); break;\
+case ValueKind_Integer: stack.values[stack.count++] = INT_VAL(a.int_val op b.int_val); break;\
+case ValueKind_Long: stack.values[stack.count++] = LONG_VAL(a.int_val op b.long_val); break;\
+case ValueKind_Float: stack.values[stack.count++] = FLOAT_VAL(a.int_val op b.float_val); break;\
+case ValueKind_Double: stack.values[stack.count++] = DOUBLE_VAL(a.int_val op b.double_val); break;\
 }\
 } break;\
 case ValueKind_Long: {\
 switch(b.type) {\
-case ValueKind_Char: stack.values[stack.count++] = (B_Value) {.type = kind, .long_val = a.long_val op b.char_val}; break;\
-case ValueKind_Integer: stack.values[stack.count++] = (B_Value) {.type = kind, .long_val = a.long_val op b.int_val}; break;\
-case ValueKind_Long: stack.values[stack.count++] = (B_Value) {.type = kind, .long_val = a.long_val op b.long_val}; break;\
-case ValueKind_Float: stack.values[stack.count++] = (B_Value) {.type = kind, .float_val = a.long_val op b.float_val}; break;\
-case ValueKind_Double: stack.values[stack.count++] = (B_Value) {.type = kind, .double_val = a.long_val op b.double_val}; break;\
+case ValueKind_Char: stack.values[stack.count++] = LONG_VAL(a.long_val op b.char_val); break;\
+case ValueKind_Integer: stack.values[stack.count++] = LONG_VAL(a.long_val op b.int_val); break;\
+case ValueKind_Long: stack.values[stack.count++] = LONG_VAL(a.long_val op b.long_val); break;\
+case ValueKind_Float: stack.values[stack.count++] = FLOAT_VAL(a.long_val op b.float_val); break;\
+case ValueKind_Double: stack.values[stack.count++] = DOUBLE_VAL(a.long_val op b.double_val); break;\
 }\
 } break;\
 case ValueKind_Float: {\
 switch(b.type) {\
-case ValueKind_Char: stack.values[stack.count++] = (B_Value) {.type = kind, .float_val = a.float_val op b.char_val}; break;\
-case ValueKind_Integer: stack.values[stack.count++] = (B_Value) {.type = kind, .float_val = a.float_val op b.int_val}; break;\
-case ValueKind_Long: stack.values[stack.count++] = (B_Value) {.type = kind, .float_val = a.float_val op b.long_val}; break;\
-case ValueKind_Float: stack.values[stack.count++] = (B_Value) {.type = kind, .float_val = a.float_val op b.float_val}; break;\
-case ValueKind_Double: stack.values[stack.count++] = (B_Value) {.type = kind, .double_val = a.float_val op b.double_val}; break;\
+case ValueKind_Char: stack.values[stack.count++] = FLOAT_VAL(a.float_val op b.char_val); break;\
+case ValueKind_Integer: stack.values[stack.count++] = FLOAT_VAL(a.float_val op b.int_val); break;\
+case ValueKind_Long: stack.values[stack.count++] = FLOAT_VAL(a.float_val op b.long_val); break;\
+case ValueKind_Float: stack.values[stack.count++] = FLOAT_VAL(a.float_val op b.float_val); break;\
+case ValueKind_Double: stack.values[stack.count++] = DOUBLE_VAL(a.float_val op b.double_val); break;\
 }\
 } break;\
 case ValueKind_Double: {\
 switch(b.type) {\
-case ValueKind_Char: stack.values[stack.count++] = (B_Value) {.type = kind, .double_val = a.double_val op b.char_val}; break;\
-case ValueKind_Integer: stack.values[stack.count++] = (B_Value) {.type = kind, .double_val = a.double_val op b.int_val}; break;\
-case ValueKind_Long: stack.values[stack.count++] = (B_Value) {.type = kind, .double_val = a.double_val op b.long_val}; break;\
-case ValueKind_Float: stack.values[stack.count++] = (B_Value) {.type = kind, .double_val = a.double_val op b.float_val}; break;\
-case ValueKind_Double: stack.values[stack.count++] = (B_Value) {.type = kind, .double_val = a.double_val op b.double_val}; break;\
+case ValueKind_Char: stack.values[stack.count++] = DOUBLE_VAL(a.double_val op b.char_val); break;\
+case ValueKind_Integer: stack.values[stack.count++] = DOUBLE_VAL(a.double_val op b.int_val); break;\
+case ValueKind_Long: stack.values[stack.count++] = DOUBLE_VAL(a.double_val op b.long_val); break;\
+case ValueKind_Float: stack.values[stack.count++] = DOUBLE_VAL(a.double_val op b.float_val); break;\
+case ValueKind_Double: stack.values[stack.count++] = DOUBLE_VAL(a.double_val op b.double_val); break;\
 }\
 } break;\
 }\
-} while (0)\
+} while (0)
+#define B_ValueBinaryOp_NoFloat(a, b, op) \
+do {\
+switch(a.type) {\
+case ValueKind_Char: {\
+switch(b.type) {\
+case ValueKind_Char: stack.values[stack.count++] = CHAR_VAL(a.char_val op b.char_val); break;\
+case ValueKind_Integer: stack.values[stack.count++] = INT_VAL(a.char_val op b.int_val); break;\
+case ValueKind_Long: stack.values[stack.count++] = LONG_VAL(a.char_val op b.long_val); break;\
+}\
+} break;\
+case ValueKind_Integer: {\
+switch(b.type) {\
+case ValueKind_Char: stack.values[stack.count++] = INT_VAL(a.int_val op b.char_val); break;\
+case ValueKind_Integer: stack.values[stack.count++] = INT_VAL(a.int_val op b.int_val); break;\
+case ValueKind_Long: stack.values[stack.count++] = LONG_VAL(a.int_val op b.long_val); break;\
+}\
+} break;\
+case ValueKind_Long: {\
+switch(b.type) {\
+case ValueKind_Char: stack.values[stack.count++] = LONG_VAL(a.long_val op b.char_val); break;\
+case ValueKind_Integer: stack.values[stack.count++] = LONG_VAL(a.long_val op b.int_val); break;\
+case ValueKind_Long: stack.values[stack.count++] = LONG_VAL(a.long_val op b.long_val); break;\
+}\
+} break;\
+}\
+} while (0)
 
 static B_Value B_RunChunk(B_Chunk* chunk) {
     B_ValueArray stack = {0};
@@ -253,12 +299,79 @@ static B_Value B_RunChunk(B_Chunk* chunk) {
                 B_Value left = stack.values[--stack.count];
                 B_ValueBinaryOp(left, right, /);
             } break;
-            case Opcode_Percent: {
-                //B_Value left = stack.values[--stack.count];
-                //B_Value right = stack.values[--stack.count];
-                //B_ValueBinaryOp(left, right, %);
+            case Opcode_Ampersand: {
+                B_Value right = stack.values[--stack.count];
+                B_Value left = stack.values[--stack.count];
+                B_ValueBinaryOp_NoFloat(left, right, &);
+            } break;
+            case Opcode_Pipe: {
+                B_Value right = stack.values[--stack.count];
+                B_Value left = stack.values[--stack.count];
+                B_ValueBinaryOp_NoFloat(left, right, |);
+            } break;
+            case Opcode_Less: {
+                B_Value right = stack.values[--stack.count];
+                B_Value left = stack.values[--stack.count];
+                B_ValueBinaryOp(left, right, <);
+                stack.values[stack.count - 1].type = ValueKind_Bool;
+            } break;
+            case Opcode_LessEqual: {
+                B_Value right = stack.values[--stack.count];
+                B_Value left = stack.values[--stack.count];
+                B_ValueBinaryOp(left, right, <=);
+                stack.values[stack.count - 1].type = ValueKind_Bool;
+            } break;
+            case Opcode_Greater: {
+                B_Value right = stack.values[--stack.count];
+                B_Value left = stack.values[--stack.count];
+                B_ValueBinaryOp(left, right, >);
+                stack.values[stack.count - 1].type = ValueKind_Bool;
+            } break;
+            case Opcode_GreaterEqual: {
+                B_Value right = stack.values[--stack.count];
+                B_Value left = stack.values[--stack.count];
+                B_ValueBinaryOp(left, right, >=);
+                stack.values[stack.count - 1].type = ValueKind_Bool;
             } break;
             
+            case Opcode_EqualEqual: {
+                B_Value right = stack.values[--stack.count];
+                B_Value left = stack.values[--stack.count];
+                if (!IS_BOOL(left) && !IS_BOOL(right)) {
+                    B_ValueBinaryOp(left, right, ==);
+                    stack.values[stack.count - 1].type = ValueKind_Bool;
+                } else stack.values[stack.count++] = BOOL_VAL(left.bool_val == right.bool_val);
+            } break;
+            
+            case Opcode_BangEqual: {
+                B_Value right = stack.values[--stack.count];
+                B_Value left = stack.values[--stack.count];
+                if (!IS_BOOL(left) && !IS_BOOL(right)) {
+                    B_ValueBinaryOp(left, right, !=);
+                    stack.values[stack.count - 1].type = ValueKind_Bool;
+                } else stack.values[stack.count++] = BOOL_VAL(left.bool_val != right.bool_val);
+            } break;
+            
+            case Opcode_AmpersandAmpersand: {
+                B_Value right = stack.values[--stack.count];
+                B_Value left = stack.values[--stack.count];
+                stack.values[stack.count++] = BOOL_VAL(left.bool_val && right.bool_val);
+            } break;
+            
+            case Opcode_PipePipe: {
+                B_Value right = stack.values[--stack.count];
+                B_Value left = stack.values[--stack.count];
+                stack.values[stack.count++] = BOOL_VAL(left.bool_val || right.bool_val);
+            } break;
+            
+            case Opcode_Tilde: {
+                B_Value a = stack.values[--stack.count];
+                B_ValueUnaryOp_NoFloat(a, ~);
+            } break;
+            case Opcode_Bang: {
+                B_Value a = stack.values[--stack.count];
+                stack.values[stack.count++] = BOOL_VAL(!a.bool_val);
+            } break;
         }
     }
     

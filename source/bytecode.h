@@ -13,6 +13,7 @@
 
 typedef u32 B_ValueKind;
 enum {
+    ValueKind_Null,
     ValueKind_Char,
     ValueKind_Integer,
     ValueKind_Long,
@@ -33,6 +34,22 @@ typedef struct B_Value {
     };
 } B_Value;
 
+#define NULL_VAL          ((B_Value) { ValueKind_Null, .char_val = 0 })
+#define CHAR_VAL(value)   ((B_Value) { ValueKind_Char, .char_val = value })
+#define INT_VAL(value)    ((B_Value) { ValueKind_Integer, .int_val = value })
+#define LONG_VAL(value)   ((B_Value) { ValueKind_Long, .long_val = value })
+#define FLOAT_VAL(value)  ((B_Value) { ValueKind_Float, .float_val = value })
+#define DOUBLE_VAL(value) ((B_Value) { ValueKind_Double, .double_val = value })
+#define BOOL_VAL(value)   ((B_Value) { ValueKind_Bool, .bool_val = value })
+
+#define IS_NULL(value)   ((value).type == ValueKind_Null)
+#define IS_CHAR(value)   ((value).type == ValueKind_Char)
+#define IS_INT(value)    ((value).type == ValueKind_Integer)
+#define IS_LONG(value)   ((value).type == ValueKind_Long)
+#define IS_FLOAT(value)  ((value).type == ValueKind_Float)
+#define IS_DOUBLE(value) ((value).type == ValueKind_Double)
+#define IS_BOOL(value)   ((value).type == ValueKind_Bool)
+
 typedef struct B_ValueArray {
     u32 count;
     u32 capacity;
@@ -47,11 +64,13 @@ typedef u32 B_Opcode;
 enum {
     Opcode_Push, Opcode_Pop,
     
-    Opcode_Plus = 10,
-    Opcode_Minus,
-    Opcode_Star,
-    Opcode_Slash,
-    Opcode_Percent,
+    Opcode_Plus = 10, Opcode_Minus, Opcode_Star, Opcode_Slash,
+    Opcode_Ampersand, Opcode_Pipe,
+    Opcode_Tilde, Opcode_Bang,
+    Opcode_BangEqual, Opcode_EqualEqual,
+    Opcode_Less, Opcode_Greater,
+    Opcode_LessEqual, Opcode_GreaterEqual,
+    Opcode_AmpersandAmpersand, Opcode_PipePipe,
 };
 
 // Not allocated within an arena.

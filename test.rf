@@ -1,22 +1,5 @@
-//import "standard/glfw.rf";
-
-/*
-glfwInit();
-    
-    GLFWwindow* window = glfwCreateWindow(1080, 720, "", nullptr, nullptr);
-    
-    while (!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
-        glfwSwapBuffers(window);
-    }
-    
-    glfwDestroyWindow(window);
-    
-    glfwTerminate();
-*/
-
 int main() {
     float i = 10 / 20.f * 40;
-    
+    bool b = (1 != 2);
     return 0;
 }
