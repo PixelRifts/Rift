@@ -1148,7 +1148,7 @@ static P_Expr* P_MakeVariableNode(P_Parser* parser, string name, P_ValueType typ
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_Variable;
     expr->ret_type = type;
-    expr->can_assign = true;
+    expr->can_assign = !constant;
     expr->is_constant = constant;
     expr->op.variable = name;
     return expr;
@@ -1894,8 +1894,12 @@ static P_Expr* P_ExprPrimitiveTypename(P_Parser* parser) {
 
 static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
     if (left != nullptr) {
-        if (!left->can_assign)
-            report_error(parser, str_lit("Required variable name before = sign\n"));
+        if (!left->can_assign) {
+            if (left->is_constant)
+                report_error(parser, str_lit("Cannot assign to constant variable\n"));
+            else
+                report_error(parser, str_lit("Expected assignable expression on the left of = sign\n"));
+        }
         
         P_Expr* xpr = P_Expression(parser);
         if (xpr == nullptr) return nullptr;
@@ -2746,7 +2750,7 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8
             
             if (type_check(value->ret_type, m)) {
                 P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
-                if (is_constant) B_SetVariable(&interp, new_name, value);
+                //if (is_constant) B_SetVariable(&interp, new_name, value);
                 return P_MakeVarDeclAssignStmtNode(parser, type, name, P_MakeAddrNode(parser, m, value));
             }
         }
@@ -2803,7 +2807,7 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8
                 }
             }
             
-            if (is_constant) B_SetVariable(&interp, new_name, value);
+            //if (is_constant) B_SetVariable(&interp, new_name, value);
             P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
             return P_MakeVarDeclAssignStmtNode(parser, type, new_name, value);
         }

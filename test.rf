@@ -1,7 +1,7 @@
+const int j = 1 << 2;
+
 int main() {
-    const int j = 1 << 2;
-    j = 1;
-    float t = j / 2 * 40;
+    const float t = j / 2 * 40;
     
     return 0;
 }
