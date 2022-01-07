@@ -1,5 +1,7 @@
 int main() {
-    float i = 10 / 20.f * 40;
-    bool b = (1 != 2);
+    const int j = 1 << 2;
+    j = 1;
+    float t = j / 2 * 40;
+    
     return 0;
 }

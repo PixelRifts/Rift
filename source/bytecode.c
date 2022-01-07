@@ -1,11 +1,14 @@
 #include "bytecode.h"
+#include "parser.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 
+static var_value_array vars = {0};
+
 //~ Elpers
-static P_Expr* P_MakeIntNode(P_Parser* parser, i32 value) {
-    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+static P_Expr* P_MakeIntNode(B_Interpreter* interp, i32 value) {
+    P_Expr* expr = arena_alloc(&interp->arena, sizeof(P_Expr));
     expr->type = ExprType_IntLit;
     expr->ret_type = ValueType_Integer;
     expr->can_assign = false;
@@ -14,8 +17,8 @@ static P_Expr* P_MakeIntNode(P_Parser* parser, i32 value) {
     return expr;
 }
 
-static P_Expr* P_MakeLongNode(P_Parser* parser, i64 value) {
-    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+static P_Expr* P_MakeLongNode(B_Interpreter* interp, i64 value) {
+    P_Expr* expr = arena_alloc(&interp->arena, sizeof(P_Expr));
     expr->type = ExprType_LongLit;
     expr->ret_type = ValueType_Long;
     expr->can_assign = false;
@@ -24,8 +27,8 @@ static P_Expr* P_MakeLongNode(P_Parser* parser, i64 value) {
     return expr;
 }
 
-static P_Expr* P_MakeFloatNode(P_Parser* parser, f32 value) {
-    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+static P_Expr* P_MakeFloatNode(B_Interpreter* interp, f32 value) {
+    P_Expr* expr = arena_alloc(&interp->arena, sizeof(P_Expr));
     expr->type = ExprType_FloatLit;
     expr->ret_type = ValueType_Float;
     expr->can_assign = false;
@@ -34,8 +37,8 @@ static P_Expr* P_MakeFloatNode(P_Parser* parser, f32 value) {
     return expr;
 }
 
-static P_Expr* P_MakeDoubleNode(P_Parser* parser, f64 value) {
-    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+static P_Expr* P_MakeDoubleNode(B_Interpreter* interp, f64 value) {
+    P_Expr* expr = arena_alloc(&interp->arena, sizeof(P_Expr));
     expr->type = ExprType_DoubleLit;
     expr->ret_type = ValueType_Double;
     expr->can_assign = false;
@@ -44,8 +47,8 @@ static P_Expr* P_MakeDoubleNode(P_Parser* parser, f64 value) {
     return expr;
 }
 
-static P_Expr* P_MakeCharNode(P_Parser* parser, string value) {
-    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+static P_Expr* P_MakeCharNode(B_Interpreter* interp, string value) {
+    P_Expr* expr = arena_alloc(&interp->arena, sizeof(P_Expr));
     expr->type = ExprType_CharLit;
     expr->ret_type = ValueType_Char;
     expr->can_assign = false;
@@ -54,8 +57,8 @@ static P_Expr* P_MakeCharNode(P_Parser* parser, string value) {
     return expr;
 }
 
-static P_Expr* P_MakeBoolNode(P_Parser* parser, b8 value) {
-    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+static P_Expr* P_MakeBoolNode(B_Interpreter* interp, b8 value) {
+    P_Expr* expr = arena_alloc(&interp->arena, sizeof(P_Expr));
     expr->type = ExprType_BoolLit;
     expr->ret_type = ValueType_Bool;
     expr->can_assign = false;
@@ -65,13 +68,13 @@ static P_Expr* P_MakeBoolNode(P_Parser* parser, b8 value) {
 }
 
 //~ Values
-void B_InitValueArray(B_ValueArray* array) {
+void B_ValueArrayInit(B_ValueArray* array) {
     array->values = NULL;
     array->capacity = 0;
     array->count = 0;
 }
 
-void B_WriteValueArray(B_ValueArray* array, B_Value value) {
+void B_ValueArrayWrite(B_ValueArray* array, B_Value value) {
     if (array->capacity < array->count + 1) {
         B_Value* old_ptr = array->values;
         int old_cap = array->capacity;
@@ -84,8 +87,34 @@ void B_WriteValueArray(B_ValueArray* array, B_Value value) {
     array->values[array->count++] = value;
 }
 
-void B_FreeValueArray(B_ValueArray* array) {
+void B_ValueArrayFree(B_ValueArray* array) {
     free(array->values);
+}
+
+void B_ValueStackPush(B_ValueStack* stack, B_Value ret) {
+    if (stack->tos + 1 > stack->capacity) {
+        void* prev = stack->stack;
+        stack->capacity = GROW_CAPACITY_BIGGER(stack->capacity);
+        stack->stack = calloc(stack->capacity, sizeof(B_Value));
+        memmove(stack->stack, prev, stack->tos * sizeof(B_Value));
+        free(prev);
+    }
+    *(stack->stack + stack->tos) = ret;
+    stack->tos++;
+}
+
+void B_ValueStackPop(B_ValueStack* stack, B_Value* ret) {
+    stack->tos--;
+    if (ret != nullptr)
+        *ret = stack->stack[stack->tos];
+}
+
+void B_ValueStackPeek(B_ValueStack* stack, B_Value* ret) {
+    *ret = stack->stack[stack->tos - 1];
+}
+
+void B_ValueStackFree(B_ValueStack* stack) {
+    free(stack->stack);
 }
 
 //~ Chunks
@@ -93,7 +122,7 @@ void B_InitChunk(B_Chunk* chunk) {
     chunk->count = 0;
     chunk->capacity = 0;
     chunk->code = nullptr;
-    B_InitValueArray(&chunk->constants);
+    B_ValueArrayInit(&chunk->constants);
 }
 
 void B_WriteChunk(B_Chunk* chunk, u8 byte) {
@@ -110,17 +139,17 @@ void B_WriteChunk(B_Chunk* chunk, u8 byte) {
 }
 
 u8 B_AddConstant(B_Chunk* chunk, B_Value constant) {
-    B_WriteValueArray(&chunk->constants, constant);
+    B_ValueArrayWrite(&chunk->constants, constant);
     return chunk->constants.count - 1;
 }
 
 void B_FreeChunk(B_Chunk* chunk) {
-    B_FreeValueArray(&chunk->constants);
+    B_ValueArrayFree(&chunk->constants);
     free(chunk->code);
 }
 
 //~ AST-To-Chunk
-static void B_WriteExprToChunk(B_Chunk* chunk, P_Expr* expr) {
+static void B_WriteExprToChunk(B_Interpreter* interp, B_Chunk* chunk, P_Expr* expr) {
     switch (expr->type) {
         case ExprType_CharLit: {
             B_WriteChunk(chunk, Opcode_Push);
@@ -154,39 +183,48 @@ static void B_WriteExprToChunk(B_Chunk* chunk, P_Expr* expr) {
         } break;
         
         case ExprType_Binary: {
-            B_WriteExprToChunk(chunk, expr->op.binary.left);
-            B_WriteExprToChunk(chunk, expr->op.binary.right);
+            B_WriteExprToChunk(interp, chunk, expr->op.binary.left);
+            B_WriteExprToChunk(interp, chunk, expr->op.binary.right);
             B_WriteChunk(chunk, expr->op.binary.operator);
         } break;
         
         case ExprType_Unary: {
-            B_WriteExprToChunk(chunk, expr->op.unary.operand);
+            B_WriteExprToChunk(interp, chunk, expr->op.unary.operand);
             B_WriteChunk(chunk, expr->op.unary.operator);
+        } break;
+        
+        case ExprType_Variable: {
+            B_ObjString* str = arena_alloc(&interp->arena, sizeof(B_ObjString));
+            str->obj.type = ObjKind_String;
+            str->str = expr->op.variable;
+            u8 loc = B_AddConstant(chunk, OBJ_VAL((B_Obj*)((void*)str)));
+            B_WriteChunk(chunk, Opcode_Variable);
+            B_WriteChunk(chunk, loc);
         } break;
     }
 }
 
-static void B_ReadConstant(B_Chunk* chunk, B_ValueArray* stack, u32 i) {
+static void B_ReadConstant(B_Chunk* chunk, B_ValueStack* stack, u32 i) {
     u8 loc = chunk->code[i];
-    B_WriteValueArray(stack, chunk->constants.values[loc]);
+    B_ValueStackPush(stack, chunk->constants.values[loc]);
 }
 
 #define B_ValueUnaryOp_NoFloat(a, op) \
 do {\
 switch (a.type) {\
-case ValueKind_Char: stack.values[stack.count++] = CHAR_VAL(op a.char_val); break;\
-case ValueKind_Integer: stack.values[stack.count++] = INT_VAL(op a.int_val); break;\
-case ValueKind_Long: stack.values[stack.count++] = LONG_VAL(op a.long_val); break;\
+case ValueKind_Char: B_ValueStackPush(&stack, CHAR_VAL(op a.char_val)); break;\
+case ValueKind_Integer: B_ValueStackPush(&stack, INT_VAL(op a.int_val)); break;\
+case ValueKind_Long: B_ValueStackPush(&stack, LONG_VAL(op a.long_val)); break;\
 }\
 } while (0)
 #define B_ValueUnaryOp(a, op) \
 do {\
 switch (a.type) {\
-case ValueKind_Char: stack.values[stack.count++] = CHAR_VAL(op a.char_val); break;\
-case ValueKind_Integer: stack.values[stack.count++] = INT_VAL(op a.int_val); break;\
-case ValueKind_Long: stack.values[stack.count++] = LONG_VAL(op a.long_val); break;\
-case ValueKind_Float: stack.values[stack.count++] = FLOAT_VAL(op a.float_val); break;\
-case ValueKind_Double: stack.values[stack.count++] = DOUBLE_VAL(op a.double_val); break;\
+case ValueKind_Char: B_ValueStackPush(&stack, CHAR_VAL(op a.char_val)); break;\
+case ValueKind_Integer: B_ValueStackPush(&stack, INT_VAL(op a.int_val)); break;\
+case ValueKind_Long: B_ValueStackPush(&stack, LONG_VAL(op a.long_val)); break;\
+case ValueKind_Float: B_ValueStackPush(&stack, FLOAT_VAL(op a.float_val)); break;\
+case ValueKind_Double: B_ValueStackPush(&stack, DOUBLE_VAL(op a.double_val)); break;\
 }\
 } while (0)
 #define B_ValueBinaryOp(a, b, op) \
@@ -194,47 +232,47 @@ do {\
 switch(a.type) {\
 case ValueKind_Char: {\
 switch(b.type) {\
-case ValueKind_Char: stack.values[stack.count++] = CHAR_VAL(a.char_val op b.char_val); break;\
-case ValueKind_Integer: stack.values[stack.count++] = INT_VAL(a.char_val op b.int_val); break;\
-case ValueKind_Long: stack.values[stack.count++] = LONG_VAL(a.char_val op b.long_val); break;\
-case ValueKind_Float: stack.values[stack.count++] = FLOAT_VAL(a.char_val op b.float_val); break;\
-case ValueKind_Double: stack.values[stack.count++] = DOUBLE_VAL(a.char_val op b.double_val); break;\
+case ValueKind_Char: B_ValueStackPush(&stack, CHAR_VAL(a.char_val op b.char_val)); break;\
+case ValueKind_Integer: B_ValueStackPush(&stack, INT_VAL(a.char_val op b.int_val)); break;\
+case ValueKind_Long: B_ValueStackPush(&stack, LONG_VAL(a.char_val op b.long_val)); break;\
+case ValueKind_Float: B_ValueStackPush(&stack, FLOAT_VAL(a.char_val op b.float_val)); break;\
+case ValueKind_Double: B_ValueStackPush(&stack, DOUBLE_VAL(a.char_val op b.double_val)); break;\
 }\
 } break;\
 case ValueKind_Integer: {\
 switch(b.type) {\
-case ValueKind_Char: stack.values[stack.count++] = INT_VAL(a.int_val op b.char_val); break;\
-case ValueKind_Integer: stack.values[stack.count++] = INT_VAL(a.int_val op b.int_val); break;\
-case ValueKind_Long: stack.values[stack.count++] = LONG_VAL(a.int_val op b.long_val); break;\
-case ValueKind_Float: stack.values[stack.count++] = FLOAT_VAL(a.int_val op b.float_val); break;\
-case ValueKind_Double: stack.values[stack.count++] = DOUBLE_VAL(a.int_val op b.double_val); break;\
+case ValueKind_Char: B_ValueStackPush(&stack, INT_VAL(a.int_val op b.char_val)); break;\
+case ValueKind_Integer: B_ValueStackPush(&stack, INT_VAL(a.int_val op b.int_val)); break;\
+case ValueKind_Long: B_ValueStackPush(&stack, LONG_VAL(a.int_val op b.long_val)); break;\
+case ValueKind_Float: B_ValueStackPush(&stack, FLOAT_VAL(a.int_val op b.float_val)); break;\
+case ValueKind_Double: B_ValueStackPush(&stack, DOUBLE_VAL(a.int_val op b.double_val)); break;\
 }\
 } break;\
 case ValueKind_Long: {\
 switch(b.type) {\
-case ValueKind_Char: stack.values[stack.count++] = LONG_VAL(a.long_val op b.char_val); break;\
-case ValueKind_Integer: stack.values[stack.count++] = LONG_VAL(a.long_val op b.int_val); break;\
-case ValueKind_Long: stack.values[stack.count++] = LONG_VAL(a.long_val op b.long_val); break;\
-case ValueKind_Float: stack.values[stack.count++] = FLOAT_VAL(a.long_val op b.float_val); break;\
-case ValueKind_Double: stack.values[stack.count++] = DOUBLE_VAL(a.long_val op b.double_val); break;\
+case ValueKind_Char: B_ValueStackPush(&stack, LONG_VAL(a.long_val op b.char_val)); break;\
+case ValueKind_Integer: B_ValueStackPush(&stack, LONG_VAL(a.long_val op b.int_val)); break;\
+case ValueKind_Long: B_ValueStackPush(&stack, LONG_VAL(a.long_val op b.long_val)); break;\
+case ValueKind_Float: B_ValueStackPush(&stack, FLOAT_VAL(a.long_val op b.float_val)); break;\
+case ValueKind_Double: B_ValueStackPush(&stack, DOUBLE_VAL(a.long_val op b.double_val)); break;\
 }\
 } break;\
 case ValueKind_Float: {\
 switch(b.type) {\
-case ValueKind_Char: stack.values[stack.count++] = FLOAT_VAL(a.float_val op b.char_val); break;\
-case ValueKind_Integer: stack.values[stack.count++] = FLOAT_VAL(a.float_val op b.int_val); break;\
-case ValueKind_Long: stack.values[stack.count++] = FLOAT_VAL(a.float_val op b.long_val); break;\
-case ValueKind_Float: stack.values[stack.count++] = FLOAT_VAL(a.float_val op b.float_val); break;\
-case ValueKind_Double: stack.values[stack.count++] = DOUBLE_VAL(a.float_val op b.double_val); break;\
+case ValueKind_Char: B_ValueStackPush(&stack, FLOAT_VAL(a.float_val op b.char_val)); break;\
+case ValueKind_Integer: B_ValueStackPush(&stack, FLOAT_VAL(a.float_val op b.int_val)); break;\
+case ValueKind_Long: B_ValueStackPush(&stack, FLOAT_VAL(a.float_val op b.long_val)); break;\
+case ValueKind_Float: B_ValueStackPush(&stack, FLOAT_VAL(a.float_val op b.float_val)); break;\
+case ValueKind_Double: B_ValueStackPush(&stack, DOUBLE_VAL(a.float_val op b.double_val)); break;\
 }\
 } break;\
 case ValueKind_Double: {\
 switch(b.type) {\
-case ValueKind_Char: stack.values[stack.count++] = DOUBLE_VAL(a.double_val op b.char_val); break;\
-case ValueKind_Integer: stack.values[stack.count++] = DOUBLE_VAL(a.double_val op b.int_val); break;\
-case ValueKind_Long: stack.values[stack.count++] = DOUBLE_VAL(a.double_val op b.long_val); break;\
-case ValueKind_Float: stack.values[stack.count++] = DOUBLE_VAL(a.double_val op b.float_val); break;\
-case ValueKind_Double: stack.values[stack.count++] = DOUBLE_VAL(a.double_val op b.double_val); break;\
+case ValueKind_Char: B_ValueStackPush(&stack, DOUBLE_VAL(a.double_val op b.char_val)); break;\
+case ValueKind_Integer: B_ValueStackPush(&stack, DOUBLE_VAL(a.double_val op b.int_val)); break;\
+case ValueKind_Long: B_ValueStackPush(&stack, DOUBLE_VAL(a.double_val op b.long_val)); break;\
+case ValueKind_Float: B_ValueStackPush(&stack, DOUBLE_VAL(a.double_val op b.float_val)); break;\
+case ValueKind_Double: B_ValueStackPush(&stack, DOUBLE_VAL(a.double_val op b.double_val)); break;\
 }\
 } break;\
 }\
@@ -244,160 +282,213 @@ do {\
 switch(a.type) {\
 case ValueKind_Char: {\
 switch(b.type) {\
-case ValueKind_Char: stack.values[stack.count++] = CHAR_VAL(a.char_val op b.char_val); break;\
-case ValueKind_Integer: stack.values[stack.count++] = INT_VAL(a.char_val op b.int_val); break;\
-case ValueKind_Long: stack.values[stack.count++] = LONG_VAL(a.char_val op b.long_val); break;\
+case ValueKind_Char: B_ValueStackPush(&stack, CHAR_VAL(a.char_val op b.char_val)); break;\
+case ValueKind_Integer: B_ValueStackPush(&stack, INT_VAL(a.char_val op b.int_val)); break;\
+case ValueKind_Long: B_ValueStackPush(&stack, LONG_VAL(a.char_val op b.long_val)); break;\
 }\
 } break;\
 case ValueKind_Integer: {\
 switch(b.type) {\
-case ValueKind_Char: stack.values[stack.count++] = INT_VAL(a.int_val op b.char_val); break;\
-case ValueKind_Integer: stack.values[stack.count++] = INT_VAL(a.int_val op b.int_val); break;\
-case ValueKind_Long: stack.values[stack.count++] = LONG_VAL(a.int_val op b.long_val); break;\
+case ValueKind_Char: B_ValueStackPush(&stack, INT_VAL(a.int_val op b.char_val)); break;\
+case ValueKind_Integer: B_ValueStackPush(&stack, INT_VAL(a.int_val op b.int_val)); break;\
+case ValueKind_Long: B_ValueStackPush(&stack, LONG_VAL(a.int_val op b.long_val)); break;\
 }\
 } break;\
 case ValueKind_Long: {\
 switch(b.type) {\
-case ValueKind_Char: stack.values[stack.count++] = LONG_VAL(a.long_val op b.char_val); break;\
-case ValueKind_Integer: stack.values[stack.count++] = LONG_VAL(a.long_val op b.int_val); break;\
-case ValueKind_Long: stack.values[stack.count++] = LONG_VAL(a.long_val op b.long_val); break;\
+case ValueKind_Char: B_ValueStackPush(&stack, LONG_VAL(a.long_val op b.char_val)); break;\
+case ValueKind_Integer: B_ValueStackPush(&stack, LONG_VAL(a.long_val op b.int_val)); break;\
+case ValueKind_Long: B_ValueStackPush(&stack, LONG_VAL(a.long_val op b.long_val)); break;\
 }\
 } break;\
 }\
 } while (0)
 
 static B_Value B_RunChunk(B_Chunk* chunk) {
-    B_ValueArray stack = {0};
-    B_InitValueArray(&stack);
+    B_ValueStack stack = {0};
     
     for (u32 i = 0; i < chunk->count;) {
         i++;
         switch (chunk->code[i - 1]) {
-            case Opcode_Push: {
-                B_ReadConstant(chunk, &stack, i++);
+            case Opcode_Push: { B_ReadConstant(chunk, &stack, i++); } break;
+            case Opcode_Pop: { B_ValueStackPop(&stack, nullptr); } break;
+            case Opcode_Variable: {
+                string name = AS_STRING(chunk->constants.values[chunk->code[i++]]);
+                for (u32 i = 0; i < vars.count; i++) {
+                    if (str_eq(vars.elements[i].name, name)) {
+                        B_ValueStackPush(&stack, vars.elements[i].value);
+                    }
+                }
             } break;
             
-            case Opcode_Pop: { stack.count--; } break;
-            
             case Opcode_Plus: {
-                B_Value right = stack.values[--stack.count];
-                B_Value left = stack.values[--stack.count];
+                B_Value right, left;
+                B_ValueStackPop(&stack, &right);
+                B_ValueStackPop(&stack, &left);
                 B_ValueBinaryOp(left, right, +);
             } break;
             case Opcode_Minus: {
-                B_Value right = stack.values[--stack.count];
-                B_Value left = stack.values[--stack.count];
+                B_Value right, left;
+                B_ValueStackPop(&stack, &right);
+                B_ValueStackPop(&stack, &left);
                 B_ValueBinaryOp(left, right, -);
             } break;
             case Opcode_Star: {
-                B_Value right = stack.values[--stack.count];
-                B_Value left = stack.values[--stack.count];
+                B_Value right, left;
+                B_ValueStackPop(&stack, &right);
+                B_ValueStackPop(&stack, &left);
                 B_ValueBinaryOp(left, right, *);
             } break;
             case Opcode_Slash: {
-                B_Value right = stack.values[--stack.count];
-                B_Value left = stack.values[--stack.count];
+                B_Value right, left;
+                B_ValueStackPop(&stack, &right);
+                B_ValueStackPop(&stack, &left);
                 B_ValueBinaryOp(left, right, /);
             } break;
             case Opcode_Ampersand: {
-                B_Value right = stack.values[--stack.count];
-                B_Value left = stack.values[--stack.count];
+                B_Value right, left;
+                B_ValueStackPop(&stack, &right);
+                B_ValueStackPop(&stack, &left);
                 B_ValueBinaryOp_NoFloat(left, right, &);
             } break;
             case Opcode_Pipe: {
-                B_Value right = stack.values[--stack.count];
-                B_Value left = stack.values[--stack.count];
+                B_Value right, left;
+                B_ValueStackPop(&stack, &right);
+                B_ValueStackPop(&stack, &left);
                 B_ValueBinaryOp_NoFloat(left, right, |);
             } break;
+            
+            case Opcode_ShiftLeft: {
+                B_Value right, left;
+                B_ValueStackPop(&stack, &right);
+                B_ValueStackPop(&stack, &left);
+                B_ValueBinaryOp_NoFloat(left, right, <<);
+            } break;
+            case Opcode_ShiftRight: {
+                B_Value right, left;
+                B_ValueStackPop(&stack, &right);
+                B_ValueStackPop(&stack, &left);
+                B_ValueBinaryOp_NoFloat(left, right, >>);
+            } break;
+            
             case Opcode_Less: {
-                B_Value right = stack.values[--stack.count];
-                B_Value left = stack.values[--stack.count];
+                B_Value right, left;
+                B_ValueStackPop(&stack, &right);
+                B_ValueStackPop(&stack, &left);
                 B_ValueBinaryOp(left, right, <);
-                stack.values[stack.count - 1].type = ValueKind_Bool;
+                stack.stack[stack.tos - 1].type = ValueKind_Bool;
             } break;
             case Opcode_LessEqual: {
-                B_Value right = stack.values[--stack.count];
-                B_Value left = stack.values[--stack.count];
+                B_Value right, left;
+                B_ValueStackPop(&stack, &right);
+                B_ValueStackPop(&stack, &left);
                 B_ValueBinaryOp(left, right, <=);
-                stack.values[stack.count - 1].type = ValueKind_Bool;
+                stack.stack[stack.tos - 1].type = ValueKind_Bool;
             } break;
             case Opcode_Greater: {
-                B_Value right = stack.values[--stack.count];
-                B_Value left = stack.values[--stack.count];
+                B_Value right, left;
+                B_ValueStackPop(&stack, &right);
+                B_ValueStackPop(&stack, &left);
                 B_ValueBinaryOp(left, right, >);
-                stack.values[stack.count - 1].type = ValueKind_Bool;
+                stack.stack[stack.tos - 1].type = ValueKind_Bool;
             } break;
             case Opcode_GreaterEqual: {
-                B_Value right = stack.values[--stack.count];
-                B_Value left = stack.values[--stack.count];
+                B_Value right, left;
+                B_ValueStackPop(&stack, &right);
+                B_ValueStackPop(&stack, &left);
                 B_ValueBinaryOp(left, right, >=);
-                stack.values[stack.count - 1].type = ValueKind_Bool;
+                stack.stack[stack.tos - 1].type = ValueKind_Bool;
             } break;
             
             case Opcode_EqualEqual: {
-                B_Value right = stack.values[--stack.count];
-                B_Value left = stack.values[--stack.count];
+                B_Value right, left;
+                B_ValueStackPop(&stack, &right);
+                B_ValueStackPop(&stack, &left);
                 if (!IS_BOOL(left) && !IS_BOOL(right)) {
                     B_ValueBinaryOp(left, right, ==);
-                    stack.values[stack.count - 1].type = ValueKind_Bool;
-                } else stack.values[stack.count++] = BOOL_VAL(left.bool_val == right.bool_val);
+                    stack.stack[stack.tos - 1].type = ValueKind_Bool;
+                } else B_ValueStackPush(&stack, BOOL_VAL(left.bool_val == right.bool_val));
             } break;
             
             case Opcode_BangEqual: {
-                B_Value right = stack.values[--stack.count];
-                B_Value left = stack.values[--stack.count];
+                B_Value right, left;
+                B_ValueStackPop(&stack, &right);
+                B_ValueStackPop(&stack, &left);
                 if (!IS_BOOL(left) && !IS_BOOL(right)) {
                     B_ValueBinaryOp(left, right, !=);
-                    stack.values[stack.count - 1].type = ValueKind_Bool;
-                } else stack.values[stack.count++] = BOOL_VAL(left.bool_val != right.bool_val);
+                    stack.stack[stack.tos - 1].type = ValueKind_Bool;
+                } else B_ValueStackPush(&stack, BOOL_VAL(left.bool_val != right.bool_val));
             } break;
             
             case Opcode_AmpersandAmpersand: {
-                B_Value right = stack.values[--stack.count];
-                B_Value left = stack.values[--stack.count];
-                stack.values[stack.count++] = BOOL_VAL(left.bool_val && right.bool_val);
+                B_Value right, left;
+                B_ValueStackPop(&stack, &right);
+                B_ValueStackPop(&stack, &left);
+                B_ValueStackPush(&stack, BOOL_VAL(left.bool_val && right.bool_val));
             } break;
             
             case Opcode_PipePipe: {
-                B_Value right = stack.values[--stack.count];
-                B_Value left = stack.values[--stack.count];
-                stack.values[stack.count++] = BOOL_VAL(left.bool_val || right.bool_val);
+                B_Value right, left;
+                B_ValueStackPop(&stack, &right);
+                B_ValueStackPop(&stack, &left);
+                B_ValueStackPush(&stack, BOOL_VAL(left.bool_val || right.bool_val));
             } break;
             
             case Opcode_Tilde: {
-                B_Value a = stack.values[--stack.count];
+                B_Value a;
+                B_ValueStackPop(&stack, &a);
                 B_ValueUnaryOp_NoFloat(a, ~);
             } break;
+            
             case Opcode_Bang: {
-                B_Value a = stack.values[--stack.count];
-                stack.values[stack.count++] = BOOL_VAL(!a.bool_val);
+                B_Value a;
+                B_ValueStackPop(&stack, &a);
+                B_ValueStackPush(&stack, BOOL_VAL(!a.bool_val));
             } break;
         }
     }
     
-    B_Value ret = stack.values[0];
-    B_FreeValueArray(&stack);
+    B_Value ret = stack.stack[0];
+    B_ValueStackFree(&stack);
     
     return ret;
 }
 
-static P_Expr* B_ValueToExpr(P_Parser* parser, B_Value result) {
+static P_Expr* B_ValueToExpr(B_Interpreter* interp, B_Value result) {
     switch (result.type) {
-        case ValueKind_Char: return P_MakeCharNode(parser, str_from_format(&parser->arena, "%c", result.char_val));
-        case ValueKind_Integer: return P_MakeIntNode(parser, result.int_val);
-        case ValueKind_Long: return P_MakeLongNode(parser, result.long_val);
-        case ValueKind_Float: return P_MakeFloatNode(parser, result.float_val);
-        case ValueKind_Double: return P_MakeDoubleNode(parser, result.double_val);
-        case ValueKind_Bool: return P_MakeBoolNode(parser, result.bool_val);
+        case ValueKind_Char: return P_MakeCharNode(interp, str_from_format(&interp->arena, "%c", result.char_val));
+        case ValueKind_Integer: return P_MakeIntNode(interp, result.int_val);
+        case ValueKind_Long: return P_MakeLongNode(interp, result.long_val);
+        case ValueKind_Float: return P_MakeFloatNode(interp, result.float_val);
+        case ValueKind_Double: return P_MakeDoubleNode(interp, result.double_val);
+        case ValueKind_Bool: return P_MakeBoolNode(interp, result.bool_val);
     }
     return nullptr;
 }
 
-P_Expr* B_EvaluateExpr(P_Parser* parser, P_Expr* expr) {
+void B_SetVariable(B_Interpreter* interp, string name, P_Expr* value) {
     B_Chunk chunk = {0};
     B_InitChunk(&chunk);
-    B_WriteExprToChunk(&chunk, expr);
+    B_WriteExprToChunk(interp, &chunk, value);
+    B_Value resolved = B_RunChunk(&chunk);
+    B_FreeChunk(&chunk);
+    
+    var_value_array_add(&interp->arena, &vars, (var_value_entry) { .name = name, .value = resolved });
+}
+
+P_Expr* B_EvaluateExpr(B_Interpreter* interp, P_Expr* expr) {
+    B_Chunk chunk = {0};
+    B_InitChunk(&chunk);
+    B_WriteExprToChunk(interp, &chunk, expr);
     B_Value result = B_RunChunk(&chunk);
     B_FreeChunk(&chunk);
-    return B_ValueToExpr(parser, result);
+    return B_ValueToExpr(interp, result);
+}
+
+void B_Init(B_Interpreter* interp) {
+    arena_init(&interp->arena);
+}
+
+void B_Free(B_Interpreter* interp) {
+    arena_free(&interp->arena);
 }

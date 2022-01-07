@@ -21,6 +21,7 @@ enum {
     TokenType_Less, TokenType_Greater,
     TokenType_LessEqual, TokenType_GreaterEqual,
     TokenType_AmpersandAmpersand, TokenType_PipePipe,
+    TokenType_ShiftLeft, TokenType_ShiftRight,
     
     TokenType_Percent,
     TokenType_PlusPlus, TokenType_MinusMinus,
@@ -29,6 +30,7 @@ enum {
     TokenType_SlashEqual, TokenType_PercentEqual, TokenType_AmpersandEqual,
     TokenType_PipeEqual,
     TokenType_HatEqual, TokenType_TildeEqual,
+    
     TokenType_OpenBrace, TokenType_OpenParenthesis, TokenType_OpenBracket,
     TokenType_CloseBrace, TokenType_CloseParenthesis, TokenType_CloseBracket,
     TokenType_Comma, TokenType_Dot, TokenType_Semicolon, TokenType_Colon,
@@ -36,7 +38,7 @@ enum {
     
     TokenType_Struct, TokenType_Enum, TokenType_Union, TokenType_FlagEnum,
     TokenType_Return, TokenType_Break, TokenType_Continue, TokenType_Import,
-    TokenType_Null, TokenType_Nullptr,
+    TokenType_Null, TokenType_Nullptr, TokenType_Const,
     TokenType_If, TokenType_Else, TokenType_Do, TokenType_For, TokenType_While,
     TokenType_Switch, TokenType_Match, TokenType_Case, TokenType_Default,
     TokenType_True, TokenType_False, TokenType_Native,
