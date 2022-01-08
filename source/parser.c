@@ -2995,6 +2995,9 @@ static P_Stmt* P_StmtFlagEnumerationDecl(P_Parser* parser, b8 native, b8 has_all
         
         if (P_Match(parser, TokenType_Equal)) {
             P_Expression(parser);
+        }  else if (P_Match(parser, TokenType_ShiftLeft)) {
+            P_Consume(parser, TokenType_Equal, str_lit("Expected = after <<\n"));
+            P_Expression(parser);
         }
         
         if (P_Match(parser, TokenType_CloseBrace)) break;
@@ -4145,7 +4148,7 @@ static P_PreStmt* P_PreStmtFlagEnumerationDecl(P_Parser* parser, b8 native, b8 h
     value_type_list member_types = {0};
     
     expr_array exprs = {0};
-    i32 value = 1;
+    u32 value = 1;
     
     // Parse Members
     while (!P_Match(parser, TokenType_CloseBrace)) {
@@ -4171,16 +4174,28 @@ static P_PreStmt* P_PreStmtFlagEnumerationDecl(P_Parser* parser, b8 native, b8 h
                     report_error(parser, str_lit("Expression can only return Integer Type\n"));
                 B_SetVariable(&interp, formatted, val);
                 expr_array_add(&parser->arena, &exprs, val);
-                value = val->op.integer_lit;
-                printf("%d\n", value);
             }
-        } else {
+        } else if (P_Match(parser, TokenType_ShiftLeft)) {
+            // @refactor Change to ShiftLeftEqual when I add that
+            P_Consume(parser, TokenType_Equal, str_lit("Expected = after <<\n"));
+            P_Expr* node = P_Expression(parser);
+            if (node != nullptr) {
+                if (!type_check(node->ret_type, ValueType_Integer))
+                    report_error(parser, str_lit("Expression can only return Integer Type\n"));
+                i32 t = node->op.integer_lit;
+                if (t & (1 << 31)) report_error(parser, str_lit("Integer Limit Exceeded in flag enum\n"));
+                value = 1 << t;
+                node = P_MakeIntNode(parser, value);
+                expr_array_add(&parser->arena, &exprs, node);
+                B_SetVariable(&interp, formatted, node);
+            }
             value <<= 1;
+        } else {
             P_Expr* node = P_MakeIntNode(parser, value);
             expr_array_add(&parser->arena, &exprs, node);
             B_SetVariable(&interp, formatted, node);
             if (value & (1 << 31)) report_error(parser, str_lit("Integer Limit Exceeded in flag enum\n"));
-            printf("%d\n", value);
+            value <<= 1;
         }
         
         if (P_Match(parser, TokenType_CloseBrace)) break;
