@@ -1,9 +1,9 @@
 const int j = 1 << 2;
 
 flagenum an_enum {
-    p = 2,
+    p = j,
     q,
-    r = p,
+    r,
     s
 }
 

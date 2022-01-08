@@ -2415,11 +2415,11 @@ static P_Expr* P_ExprPrecedence(P_Parser* parser, P_Precedence precedence) {
         P_InfixParseFn infix = P_GetRule(parser->previous.type)->infix;
         e = infix(parser, e);
     }
-    
-    if (e->is_constant && 
-        (e->type == ExprType_Binary
-         || e->type == ExprType_Unary
-         || e->type == ExprType_Variable)) e = B_EvaluateExpr(&interp, e);
+    if (e != nullptr)
+        if (e->is_constant && 
+            (e->type == ExprType_Binary
+             || e->type == ExprType_Unary
+             || e->type == ExprType_Variable)) e = B_EvaluateExpr(&interp, e);
     return e;
 }
 
@@ -2729,7 +2729,7 @@ static P_Stmt* P_StmtOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has_a
 //- Op Overloading subsection end 
 
 static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8 is_constant, b8 has_all_tags) {
-    P_NamespaceCheckRedefinition(parser, name, false, false);
+    if (!(is_constant && parser->scope_depth == 0)) P_NamespaceCheckRedefinition(parser, name, false, false);
     
     string new_name = parser->scope_depth == 0 ? str_cat(&parser->arena, parser->current_namespace->flatname, name) : name;
     var_entry_key key = { .name = name, .depth = parser->scope_depth };
@@ -4166,12 +4166,14 @@ static P_PreStmt* P_PreStmtFlagEnumerationDecl(P_Parser* parser, b8 native, b8 h
         
         if (P_Match(parser, TokenType_Equal)) {
             P_Expr* val = P_Expression(parser);
-            if (!type_check(val->ret_type, ValueType_Integer))
-                report_error(parser, str_lit("Expression can only return Integer Type\n"));
-            B_SetVariable(&interp, formatted, val);
-            expr_array_add(&parser->arena, &exprs, val);
-            value = val->op.integer_lit;
-            printf("%d\n", value);
+            if (val != nullptr) {
+                if (!type_check(val->ret_type, ValueType_Integer))
+                    report_error(parser, str_lit("Expression can only return Integer Type\n"));
+                B_SetVariable(&interp, formatted, val);
+                expr_array_add(&parser->arena, &exprs, val);
+                value = val->op.integer_lit;
+                printf("%d\n", value);
+            }
         } else {
             value <<= 1;
             P_Expr* node = P_MakeIntNode(parser, value);
@@ -4236,10 +4238,16 @@ static P_PreStmt* P_PreStmtConstVar(P_Parser* parser, b8 has_all_tags) {
     P_ConsumeType(parser, str_lit("Expected type of variable\n"));
     P_Consume(parser, TokenType_Identifier, str_lit("Expected var name after type\n"));
     string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    string actual = str_cat(&parser->arena, parser->current_namespace->flatname, name);
     P_Consume(parser, TokenType_Equal, str_lit("Expected = after variable name\n"));
     P_Expr* expr = P_Expression(parser);
     if (!expr->is_constant) report_error(parser, str_lit("Cannot have a native const variable\n"));
     B_SetVariable(&interp, name, expr);
+    
+    var_entry_key k = { .name = name, .depth = parser->scope_depth };
+    var_entry_val v = { .mangled_name = actual, .type = expr->ret_type, .constant = true };
+    var_hash_table_set(&parser->current_namespace->variables, k, v);
+    
     return P_MakePreNothingNode(parser);
 }
 
