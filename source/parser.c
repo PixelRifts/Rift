@@ -2990,7 +2990,7 @@ static P_Stmt* P_StmtFlagEnumerationDecl(P_Parser* parser, b8 native, b8 has_all
         string member_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
         
         var_entry_key k = { .name = member_name, .depth = parser->scope_depth };
-        var_entry_val v = { .mangled_name = str_from_format(&parser->arena, "_flagenum_%.*s_%.*s", str_expand(actual), str_expand(member_name)), .type = ValueType_Integer };
+        var_entry_val v = { .mangled_name = str_from_format(&parser->arena, "_enum_%.*s_%.*s", str_expand(actual), str_expand(member_name)), .type = ValueType_Integer };
         var_hash_table_set(&parser->current_namespace->variables, k, v);
         
         if (P_Match(parser, TokenType_Equal)) {
@@ -4156,7 +4156,7 @@ static P_PreStmt* P_PreStmtFlagEnumerationDecl(P_Parser* parser, b8 native, b8 h
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
         string member_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
-        string formatted = str_from_format(&parser->arena, "_flagenum_%.*s_%.*s", str_expand(actual), str_expand(member_name));
+        string formatted = str_from_format(&parser->arena, "_enum_%.*s_%.*s", str_expand(actual), str_expand(member_name));
         if (str_eq(member_name, str_lit("count")))
             report_error(parser, str_lit("Cannot have enum member with name 'count'. It is reserved\n"));
         

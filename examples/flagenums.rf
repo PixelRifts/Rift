@@ -1,0 +1,24 @@
+const int j = 0;
+
+flagenum EntityState {
+    DEAD <<= j, // 1 << 0
+    BURNING,    // 1 << 1
+    SLOWED,     // 1 << 2
+    LAVA    = SLOWED | BURNING,
+    CLEANSE = ~(SLOWED | BURNING),
+    RUNNING,    // 1 << 3
+    HEALING <<= 6,
+    FALLING,    // 1 << 7
+}
+
+int main() {
+    printf("Dead: %d\n", EntityStae.DEAD);
+    printf("Burning: %d\n", EntityStae.BURNING);
+    printf("Slowed: %d\n", EntityStae.SLOWED);
+    printf("Lava: %d\n", EntityStae.LAVA);
+    printf("Cleanse: %d\n", EntityStae.CLEANSE);
+    printf("Running: %d\n", EntityStae.RUNNING);
+    printf("Healing: %d\n", EntityStae.HEALING);
+    printf("Falling: %d\n", EntityStae.FALLING);
+    return 0;
+}
