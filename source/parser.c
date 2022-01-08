@@ -2418,7 +2418,8 @@ static P_Expr* P_ExprPrecedence(P_Parser* parser, P_Precedence precedence) {
     
     if (e->is_constant && 
         (e->type == ExprType_Binary
-         || e->type == ExprType_Unary)) e = B_EvaluateExpr(&interp, e);
+         || e->type == ExprType_Unary
+         || e->type == ExprType_Variable)) e = B_EvaluateExpr(&interp, e);
     return e;
 }
 
@@ -4054,6 +4055,7 @@ static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_a
     value_type_list member_types = {0};
     
     expr_array exprs = {0};
+    i32 iota = 0;
     
     // Parse Members
     while (!P_Match(parser, TokenType_CloseBrace)) {
@@ -4061,6 +4063,7 @@ static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_a
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
         string member_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        string formatted = str_from_format(&parser->arena, "_enum_%.*s_%.*s", str_expand(actual), str_expand(member_name));
         if (str_eq(member_name, str_lit("count")))
             report_error(parser, str_lit("Cannot have enum member with name 'count'. It is reserved\n"));
         
@@ -4068,16 +4071,21 @@ static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_a
         member_count++;
         
         var_entry_key k = { .name = member_name, .depth = parser->scope_depth };
-        var_entry_val v = { .mangled_name = str_from_format(&parser->arena, "_enum_%.*s_%.*s", str_expand(actual), str_expand(member_name)), .type = ValueType_Integer };
+        var_entry_val v = { .mangled_name = formatted, .type = ValueType_Integer, .constant = true };
         var_hash_table_set(&parser->current_namespace->variables, k, v);
         
         if (P_Match(parser, TokenType_Equal)) {
             P_Expr* val = P_Expression(parser);
             if (!type_check(val->ret_type, ValueType_Integer))
                 report_error(parser, str_lit("Expression can only return Integer Type\n"));
+            if (!val->is_constant) report_error(parser, str_lit("Expression is not a constant\n"));
+            B_SetVariable(&interp, member_name, val);
             expr_array_add(&parser->arena, &exprs, val);
+            iota = val->op.integer_lit;
         } else {
             expr_array_add(&parser->arena, &exprs, nullptr);
+            B_SetVariable(&interp, member_name, P_MakeIntNode(parser, iota));
+            iota++;
         }
         
         if (P_Match(parser, TokenType_CloseBrace)) break;
@@ -4145,6 +4153,7 @@ static P_PreStmt* P_PreStmtFlagEnumerationDecl(P_Parser* parser, b8 native, b8 h
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
         string member_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        string formatted = str_from_format(&parser->arena, "_flagenum_%.*s_%.*s", str_expand(actual), str_expand(member_name));
         if (str_eq(member_name, str_lit("count")))
             report_error(parser, str_lit("Cannot have enum member with name 'count'. It is reserved\n"));
         
@@ -4152,18 +4161,24 @@ static P_PreStmt* P_PreStmtFlagEnumerationDecl(P_Parser* parser, b8 native, b8 h
         member_count++;
         
         var_entry_key k = { .name = member_name, .depth = parser->scope_depth };
-        var_entry_val v = { .mangled_name = str_from_format(&parser->arena, "_flagenum_%.*s_%.*s", str_expand(actual), str_expand(member_name)), .type = ValueType_Integer };
+        var_entry_val v = { .mangled_name = formatted, .type = ValueType_Integer, .constant = true };
         var_hash_table_set(&parser->current_namespace->variables, k, v);
         
         if (P_Match(parser, TokenType_Equal)) {
             P_Expr* val = P_Expression(parser);
             if (!type_check(val->ret_type, ValueType_Integer))
                 report_error(parser, str_lit("Expression can only return Integer Type\n"));
+            B_SetVariable(&interp, formatted, val);
             expr_array_add(&parser->arena, &exprs, val);
+            value = val->op.integer_lit;
+            printf("%d\n", value);
         } else {
-            expr_array_add(&parser->arena, &exprs, P_MakeIntNode(parser, value));
-            if (value & (1 << 31)) report_error(parser, str_lit("Integer Limit Exceeded in flag enum\n"));
             value <<= 1;
+            P_Expr* node = P_MakeIntNode(parser, value);
+            expr_array_add(&parser->arena, &exprs, node);
+            B_SetVariable(&interp, formatted, node);
+            if (value & (1 << 31)) report_error(parser, str_lit("Integer Limit Exceeded in flag enum\n"));
+            printf("%d\n", value);
         }
         
         if (P_Match(parser, TokenType_CloseBrace)) break;

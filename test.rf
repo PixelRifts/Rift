@@ -1,5 +1,12 @@
 const int j = 1 << 2;
 
+flagenum an_enum {
+    p = 2,
+    q,
+    r = p,
+    s
+}
+
 int main() {
     const float t = j / 2 * 40;
     
