@@ -12,13 +12,13 @@ flagenum EntityState {
 }
 
 int main() {
-    printf("Dead: %d\n", EntityStae.DEAD);
-    printf("Burning: %d\n", EntityStae.BURNING);
-    printf("Slowed: %d\n", EntityStae.SLOWED);
-    printf("Lava: %d\n", EntityStae.LAVA);
-    printf("Cleanse: %d\n", EntityStae.CLEANSE);
-    printf("Running: %d\n", EntityStae.RUNNING);
-    printf("Healing: %d\n", EntityStae.HEALING);
-    printf("Falling: %d\n", EntityStae.FALLING);
+    printf("Dead: %d\n", EntityState.DEAD);
+    printf("Burning: %d\n", EntityState.BURNING);
+    printf("Slowed: %d\n", EntityState.SLOWED);
+    printf("Lava: %d\n", EntityState.LAVA);
+    printf("Cleanse: %d\n", EntityState.CLEANSE);
+    printf("Running: %d\n", EntityState.RUNNING);
+    printf("Healing: %d\n", EntityState.HEALING);
+    printf("Falling: %d\n", EntityState.FALLING);
     return 0;
 }
