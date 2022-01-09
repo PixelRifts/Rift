@@ -4,10 +4,9 @@
 //#define OUT_TO_CONSOLE
 
 // All types will go through this map
-static P_ValueType type_map(E_Emitter* emitter, P_ValueType type) {
-    type.full_type = str_replace_all(&emitter->parser.arena, type.full_type, str_lit("long"), str_lit("long long"));
-    type.full_type = str_replace_all(&emitter->parser.arena, type.full_type, str_lit("string"), str_lit("const char *"));
-    return type;
+static void type_map(E_Emitter* emitter, P_ValueType* type) {
+    type->base_type = str_replace_all(&emitter->parser.arena, type->base_type, str_lit("long"), str_lit("long long"));
+    type->base_type = str_replace_all(&emitter->parser.arena, type->base_type, str_lit("string"), str_lit("const char *"));
 }
 
 static void E_Write(E_Emitter* emitter, const char* text) {
@@ -120,9 +119,12 @@ static void E_EmitTypeAndName(E_Emitter* emitter, P_ValueType* type, string name
         E_Write(emitter, ")");
         
     } else {
-        E_WriteF(emitter, "%.*s ", str_expand(type->base_type));
+        // Make local copy to not destroy the types
+        P_ValueType emit = *type;
+        type_map(emitter, &emit);
+        E_WriteF(emitter, "%.*s ", str_expand(emit.base_type));
         if (type->mod_ct != 0) {
-            E_EmitTypeMods_Recursive(emitter, type->mods, type->mod_ct - 1, name, type->mod_ct == 1);
+            E_EmitTypeMods_Recursive(emitter, emit.mods, emit.mod_ct - 1, name, emit.mod_ct == 1);
         } else {
             E_WriteF(emitter, "%.*s", str_expand(name));
         }
@@ -148,14 +150,13 @@ static void E_EmitTypeFnptr_Fndecl(E_Emitter* emitter, P_ValueType* type, string
         value_type_list_node* curr_type = param_types.first;
         if (arity != 0) {
             for (u32 i = 0; i < arity; i++) {
-                P_ValueType c_type = type_map(emitter, curr_type->type);
-                if (str_eq(c_type.full_type, str_lit("..."))) {
-                    E_WriteF(emitter, "%.*s", str_expand(c_type.full_type));
+                if (str_eq(curr_type->type.full_type, str_lit("..."))) {
+                    E_WriteF(emitter, "%.*s", str_expand(curr_type->type.full_type));
                     *varargs_name = (string) { .str = curr_name->str, .size = curr_name->size };
                     break;
                 }
                 
-                E_EmitTypeAndName(emitter, &c_type, (string) { .str = curr_name->str, .size = curr_name->size }, false);
+                E_EmitTypeAndName(emitter, &curr_type->type, (string) { .str = curr_name->str, .size = curr_name->size }, false);
                 if (i != arity - 1)
                     E_Write(emitter, ", ");
                 
@@ -198,14 +199,13 @@ static void E_EmitTypeAndName_Fndecl(E_Emitter* emitter, P_ValueType* type, stri
         value_type_list_node* curr_type = param_types.first;
         if (arity != 0) {
             for (u32 i = 0; i < arity; i++) {
-                P_ValueType c_type = type_map(emitter, curr_type->type);
-                if (str_eq(c_type.full_type, str_lit("..."))) {
-                    E_WriteF(emitter, "%.*s", str_expand(c_type.full_type));
+                if (str_eq(curr_type->type.full_type, str_lit("..."))) {
+                    E_WriteF(emitter, "%.*s", str_expand(curr_type->type.full_type));
                     *varargs_name = (string) { .str = curr_name->str, .size = curr_name->size };
                     break;
                 }
                 
-                E_EmitTypeAndName(emitter, &c_type, (string) { .str = curr_name->str, .size = curr_name->size }, false);
+                E_EmitTypeAndName(emitter, &curr_type->type, (string) { .str = curr_name->str, .size = curr_name->size }, false);
                 if (i != arity - 1)
                     E_Write(emitter, ", ");
                 
@@ -421,24 +421,21 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
         } break;
         
         case StmtType_VarDecl: {
-            P_ValueType type = type_map(emitter, stmt->op.var_decl.type);
-            E_EmitTypeAndName(emitter, &type, stmt->op.var_decl.name, false);
+            E_EmitTypeAndName(emitter, &stmt->op.var_decl.type, stmt->op.var_decl.name, false);
             E_WriteLine(emitter, ";");
         } break;
         
         case StmtType_VarDeclAssign: {
-            P_ValueType type = type_map(emitter, stmt->op.var_decl_assign.type);
-            E_EmitTypeAndName(emitter, &type, stmt->op.var_decl_assign.name, false);
+            E_EmitTypeAndName(emitter, &stmt->op.var_decl_assign.type, stmt->op.var_decl_assign.name, false);
             E_Write(emitter, " = ");
             E_EmitExpression(emitter, stmt->op.var_decl_assign.val);
             E_WriteLine(emitter, ";");
         } break;
         
         case StmtType_FuncDecl: {
-            P_ValueType type = type_map(emitter, stmt->op.func_decl.type);
             string varargs;
             string arg_before_varargs;
-            E_EmitTypeAndName_Fndecl(emitter, &type, stmt->op.func_decl.name, false, stmt->op.func_decl.param_names, stmt->op.func_decl.param_types, stmt->op.func_decl.arity, stmt->op.func_decl.varargs, &varargs, &arg_before_varargs);
+            E_EmitTypeAndName_Fndecl(emitter, &stmt->op.func_decl.type, stmt->op.func_decl.name, false, stmt->op.func_decl.param_names, stmt->op.func_decl.param_types, stmt->op.func_decl.arity, stmt->op.func_decl.varargs, &varargs, &arg_before_varargs);
             if (stmt->op.func_decl.block != nullptr) {
                 if (stmt->op.func_decl.block->type != StmtType_Block)
                     E_WriteLine(emitter, " {");
@@ -468,11 +465,9 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             string_list_node* curr_name = stmt->op.struct_decl.member_names.first;
             value_type_list_node* curr_type = stmt->op.struct_decl.member_types.first;
             for (u32 i = 0; i < stmt->op.struct_decl.member_count; i++) {
-                P_ValueType c_type = type_map(emitter, curr_type->type);
-                
                 for (u32 idt = 0; idt < indent + 1; idt++)
                     E_Write(emitter, "\t");
-                E_EmitTypeAndName(emitter, &c_type, (string) { .str = curr_name->str, .size = curr_name->size }, false);
+                E_EmitTypeAndName(emitter, &curr_type->type, (string) { .str = curr_name->str, .size = curr_name->size }, false);
                 E_WriteLine(emitter, ";");
                 
                 curr_name = curr_name->next;
@@ -486,11 +481,9 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             string_list_node* curr_name = stmt->op.union_decl.member_names.first;
             value_type_list_node* curr_type = stmt->op.union_decl.member_types.first;
             for (u32 i = 0; i < stmt->op.union_decl.member_count; i++) {
-                P_ValueType c_type = type_map(emitter, curr_type->type);
-                
                 for (u32 idt = 0; idt < indent + 1; idt++)
                     E_Write(emitter, "\t");
-                E_EmitTypeAndName(emitter, &c_type, (string) { .str = curr_name->str, .size = curr_name->size }, false);
+                E_EmitTypeAndName(emitter, &curr_type->type, (string) { .str = curr_name->str, .size = curr_name->size }, false);
                 E_WriteLine(emitter, ";");
                 
                 curr_name = curr_name->next;
@@ -658,9 +651,8 @@ static void E_EmitPreStatement(E_Emitter* emitter, P_PreStmt* stmt, u32 indent) 
     
     switch (stmt->type) {
         case PreStmtType_ForwardDecl: {
-            P_ValueType type = type_map(emitter, stmt->op.forward_decl.type);
             string _, __;
-            E_EmitTypeAndName_Fndecl(emitter, &type, stmt->op.forward_decl.name, false, stmt->op.forward_decl.param_names, stmt->op.forward_decl.param_types, stmt->op.forward_decl.arity, false, &_, &__);
+            E_EmitTypeAndName_Fndecl(emitter, &stmt->op.forward_decl.type, stmt->op.forward_decl.name, false, stmt->op.forward_decl.param_names, stmt->op.forward_decl.param_types, stmt->op.forward_decl.arity, false, &_, &__);
             E_WriteLine(emitter, ";");
         } break;
         
