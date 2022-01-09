@@ -4,8 +4,11 @@
 #define DATA_STRUCTURES_H
 
 #define TABLE_MAX_LOAD 0.75
+
+#ifndef GROW_CAPACITY
 #define GROW_CAPACITY(capacity) ((capacity) < 8 ? 8 : (capacity) * 2)
 #define GROW_CAPACITY_BIGGER(capacity) ((capacity) < 32 ? 32 : (capacity) * 2)
+#endif
 
 #include "defines.h"
 #include "str.h"
@@ -19,6 +22,7 @@ typedef struct var_entry_key {
 typedef struct var_entry_val {
     string mangled_name;
     P_ValueType type;
+    b8 constant;
 } var_entry_val;
 
 typedef struct var_table_entry {
@@ -192,6 +196,20 @@ typedef struct expr_array {
 void expr_array_add(M_Arena* arena, expr_array* array, struct P_Expr* mod);
 
 
+typedef struct var_value_entry {
+    string name;
+    B_Value value;
+} var_value_entry;
+
+typedef struct var_value_array {
+    u32 capacity;
+    u32 count;
+    var_value_entry* elements;
+} var_value_array;
+
+void var_value_array_add(M_Arena* arena, var_value_array* array, struct var_value_entry mod);
+
+
 
 struct P_Namespace;
 typedef struct P_Namespace* P_NamespacePtr;
@@ -215,5 +233,6 @@ typedef struct using_stack {
 void using_stack_push(M_Arena* arena, using_stack* stack, struct P_Namespace* mod);
 void using_stack_pop(using_stack* stack, struct P_Namespace** ret);
 void using_stack_peek(using_stack* stack, struct P_Namespace** ret);
+
 
 #endif //DATA_STRUCTURES_H

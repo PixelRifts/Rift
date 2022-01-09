@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "bytecode.h"
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -19,6 +20,7 @@
 
 //~ Globals
 static M_Arena global_arena;
+static B_Interpreter interp;
 static P_Namespace global_namespace;
 static opoverload_hash_table op_overloads;
 static typedef_hash_table typedefs;
@@ -148,7 +150,7 @@ void P_Advance(P_Parser* parser) {
     while (true) {
         parser->next_two = L_LexToken(&parser->lexer);
         if (parser->next_two.type != TokenType_Error) break;
-        report_error_at_current(parser, str_lit("%.*s\n"), (i32)parser->next.length, parser->next.start);
+        report_error_at_current(parser, str_lit("%.*s\n"), (i32)parser->next_two.length, parser->next_two.start);
     }
 }
 
@@ -1142,12 +1144,12 @@ static P_Expr* P_MakeEnumDotNode(P_Parser* parser, P_ValueType type, string left
     return expr;
 }
 
-static P_Expr* P_MakeVariableNode(P_Parser* parser, string name, P_ValueType type) {
+static P_Expr* P_MakeVariableNode(P_Parser* parser, string name, P_ValueType type, b8 constant) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_Variable;
     expr->ret_type = type;
-    expr->can_assign = true;
-    expr->is_constant = false;
+    expr->can_assign = !constant;
+    expr->is_constant = constant;
     expr->op.variable = name;
     return expr;
 }
@@ -1530,7 +1532,6 @@ static P_PreStmt* P_MakePreNothingNode(P_Parser* parser) {
 static P_Expr* P_ExprPrecedence(P_Parser* parser, P_Precedence precedence);
 static P_ParseRule* P_GetRule(L_TokenType type);
 static P_Expr* P_Expression(P_Parser* parser);
-static P_Stmt* P_Statement(P_Parser* parser);
 static P_Stmt* P_Declaration(P_Parser* parser);
 
 static P_Expr* P_ExprInteger(P_Parser* parser) {
@@ -1599,9 +1600,9 @@ static P_Expr* P_ExprVar_NamespaceOverride(P_Parser* parser, P_Namespace* nmspc)
     if (P_GetVariable_InNamespace(parser, nmspc, name, &value)) {
         if (is_ref(&value.type)) {
             P_ValueType ret = P_ReduceType(value.type);
-            return P_MakeDerefNode(parser, ret, P_MakeVariableNode(parser, name, value.type));
+            return P_MakeDerefNode(parser, ret, P_MakeVariableNode(parser, name, value.type, value.constant));
         }
-        return P_MakeVariableNode(parser, value.mangled_name, value.type);
+        return P_MakeVariableNode(parser, value.mangled_name, value.type, value.constant);
     }
     
     P_Container* type = type_array_get_in_namespace(parser, nmspc, name, parser->scope_depth);
@@ -1642,9 +1643,9 @@ static P_Expr* P_ExprVar(P_Parser* parser) {
     if (P_GetVariable(parser, name, &value)) {
         if (is_ref(&value.type)) {
             P_ValueType ret = P_ReduceType(value.type);
-            return P_MakeDerefNode(parser, ret, P_MakeVariableNode(parser, name, value.type));
+            return P_MakeDerefNode(parser, ret, P_MakeVariableNode(parser, name, value.type, value.constant));
         }
-        return P_MakeVariableNode(parser, value.mangled_name, value.type);
+        return P_MakeVariableNode(parser, value.mangled_name, value.type, value.constant);
     }
     
     for (i32 u = parser->usings.tos - 1; u >= 0; u--) {
@@ -1893,8 +1894,12 @@ static P_Expr* P_ExprPrimitiveTypename(P_Parser* parser) {
 
 static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
     if (left != nullptr) {
-        if (!left->can_assign)
-            report_error(parser, str_lit("Required variable name before = sign\n"));
+        if (!left->can_assign) {
+            if (left->is_constant)
+                report_error(parser, str_lit("Cannot assign to constant variable\n"));
+            else
+                report_error(parser, str_lit("Expected assignable expression on the left of = sign\n"));
+        }
         
         P_Expr* xpr = P_Expression(parser);
         if (xpr == nullptr) return nullptr;
@@ -2087,83 +2092,94 @@ static P_Expr* P_ExprBinary(P_Parser* parser, P_Expr* left) {
         
     } else {
         switch (op_type) {
+            
             case TokenType_Plus: {
-                P_BindDouble(parser, left, right, pairs_operator_arithmetic_term, sizeof(pairs_operator_arithmetic_term), str_lit("Cannot apply binary operator + to %.*s and %.*s\n"));
+                P_BindDouble(parser, left, right, pairs_operator_arithmetic_term, pairs_operator_arithmetic_term_count, str_lit("Cannot apply binary operator + to %.*s and %.*s\n"));
                 ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
             } break;
             
             case TokenType_Minus: {
-                P_BindDouble(parser, left, right, pairs_operator_arithmetic_term, sizeof(pairs_operator_arithmetic_term), str_lit("Cannot apply binary operator - to %.*s and %.*s\n"));
+                P_BindDouble(parser, left, right, pairs_operator_arithmetic_term, pairs_operator_arithmetic_term_count, str_lit("Cannot apply binary operator - to %.*s and %.*s\n"));
                 ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
             } break;
             
             case TokenType_Star: {
-                P_BindDouble(parser, left, right, pairs_operator_arithmetic_factor, sizeof(pairs_operator_arithmetic_factor), str_lit("Cannot apply binary operator * to %.*s and %.*s\n"));
+                P_BindDouble(parser, left, right, pairs_operator_arithmetic_factor, pairs_operator_arithmetic_factor_count, str_lit("Cannot apply binary operator * to %.*s and %.*s\n"));
                 ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
             } break;
             
             case TokenType_Slash: {
-                P_BindDouble(parser, left, right, pairs_operator_arithmetic_factor, sizeof(pairs_operator_arithmetic_factor), str_lit("Cannot apply binary operator / to %.*s and %.*s\n"));
+                P_BindDouble(parser, left, right, pairs_operator_arithmetic_factor, pairs_operator_arithmetic_factor_count, str_lit("Cannot apply binary operator / to %.*s and %.*s\n"));
                 ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
             } break;
             
             case TokenType_Percent: {
-                P_BindDouble(parser, left, right, pairs_operator_arithmetic_factor, sizeof(pairs_operator_arithmetic_factor), str_lit("Cannot apply binary operator % to %.*s and %.*s\n"));
+                P_BindDouble(parser, left, right, pairs_operator_bin, pairs_operator_bin_count, str_lit("Cannot apply binary operator %% to %.*s and %.*s\n"));
                 ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
             } break;
             
             case TokenType_Hat: {
-                P_BindDouble(parser, left, right, pairs_operator_bin, sizeof(pairs_operator_bin), str_lit("Cannot apply binary operator ^ to %.*s and %.*s\n"));
+                P_BindDouble(parser, left, right, pairs_operator_bin, pairs_operator_bin_count, str_lit("Cannot apply binary operator ^ to %.*s and %.*s\n"));
                 ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
             } break;
             
             case TokenType_Ampersand: {
-                P_BindDouble(parser, left, right, pairs_operator_bin, sizeof(pairs_operator_bin), str_lit("Cannot apply binary operator & to %.*s and %.*s\n"));
+                P_BindDouble(parser, left, right, pairs_operator_bin, pairs_operator_bin_count, str_lit("Cannot apply binary operator & to %.*s and %.*s\n"));
                 ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
             } break;
             
             case TokenType_Pipe: {
-                P_BindDouble(parser, left, right, pairs_operator_bin, sizeof(pairs_operator_bin), str_lit("Cannot apply binary operator | to %.*s and %.*s\n"));
+                P_BindDouble(parser, left, right, pairs_operator_bin, pairs_operator_bin_count, str_lit("Cannot apply binary operator | to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
+            } break;
+            
+            case TokenType_ShiftLeft: {
+                P_BindDouble(parser, left, right, pairs_operator_bin, pairs_operator_bin_count, str_lit("Cannot apply binary operator << to %.*s and %.*s\n"));
+                ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
+            } break;
+            
+            case TokenType_ShiftRight: {
+                P_BindDouble(parser, left, right, pairs_operator_bin, pairs_operator_bin_count, str_lit("Cannot apply binary operator >> to %.*s and %.*s\n"));
                 ret = P_MakeBinaryNode(parser, op_type, left, right, P_GetNumberBinaryValType(left, right));
             } break;
             
             case TokenType_AmpersandAmpersand: {
-                P_BindDouble(parser, left, right, pairs_operator_logical, sizeof(pairs_operator_logical), str_lit("Cannot apply binary operator && to %.*s and %.*s\n"));
+                P_BindDouble(parser, left, right, pairs_operator_logical, pairs_operator_logical_count, str_lit("Cannot apply binary operator && to %.*s and %.*s\n"));
                 ret = P_MakeBinaryNode(parser, op_type, left, right, ValueType_Bool);
             } break;
             
             case TokenType_PipePipe: {
-                P_BindDouble(parser, left, right, pairs_operator_logical, sizeof(pairs_operator_logical), str_lit("Cannot apply binary operator || to %.*s and %.*s\n"));
+                P_BindDouble(parser, left, right, pairs_operator_logical, pairs_operator_logical_count, str_lit("Cannot apply binary operator || to %.*s and %.*s\n"));
                 ret = P_MakeBinaryNode(parser, op_type, left, right, ValueType_Bool);
             } break;
             
             case TokenType_EqualEqual: {
-                P_BindDouble(parser, left, right, pairs_operator_equality, sizeof(pairs_operator_equality), str_lit("Cannot apply binary operator == to %.*s and %.*s\n"));
+                P_BindDouble(parser, left, right, pairs_operator_equality, pairs_operator_equality_count, str_lit("Cannot apply binary operator == to %.*s and %.*s\n"));
                 ret = P_MakeBinaryNode(parser, op_type, left, right, ValueType_Bool);
             } break;
             
             case TokenType_BangEqual: {
-                P_BindDouble(parser, left, right, pairs_operator_equality, sizeof(pairs_operator_equality), str_lit("Cannot apply binary operator != to %.*s and %.*s\n"));
+                P_BindDouble(parser, left, right, pairs_operator_equality, pairs_operator_equality_count, str_lit("Cannot apply binary operator != to %.*s and %.*s\n"));
                 ret = P_MakeBinaryNode(parser, op_type, left, right, ValueType_Bool);
             } break;
             
             case TokenType_Less: {
-                P_BindDouble(parser, left, right, pairs_operator_cmp, sizeof(pairs_operator_cmp), str_lit("Cannot apply binary operator < to %.*s and %.*s\n"));
+                P_BindDouble(parser, left, right, pairs_operator_cmp, pairs_operator_cmp_count, str_lit("Cannot apply binary operator < to %.*s and %.*s\n"));
                 ret = P_MakeBinaryNode(parser, op_type, left, right, ValueType_Bool);
             } break;
             
             case TokenType_Greater: {
-                P_BindDouble(parser, left, right, pairs_operator_cmp, sizeof(pairs_operator_cmp), str_lit("Cannot apply binary operator > to %.*s and %.*s\n"));
+                P_BindDouble(parser, left, right, pairs_operator_cmp, pairs_operator_cmp_count, str_lit("Cannot apply binary operator > to %.*s and %.*s\n"));
                 ret = P_MakeBinaryNode(parser, op_type, left, right, ValueType_Bool);
             } break;
             
             case TokenType_LessEqual: {
-                P_BindDouble(parser, left, right, pairs_operator_cmp, sizeof(pairs_operator_cmp), str_lit("Cannot apply binary operator <= to %.*s and %.*s\n"));
+                P_BindDouble(parser, left, right, pairs_operator_cmp, pairs_operator_cmp_count, str_lit("Cannot apply binary operator <= to %.*s and %.*s\n"));
                 ret = P_MakeBinaryNode(parser, op_type, left, right, ValueType_Bool);
             } break;
             
             case TokenType_GreaterEqual: {
-                P_BindDouble(parser, left, right, pairs_operator_cmp, sizeof(pairs_operator_cmp), str_lit("Cannot apply binary operator >= to %.*s and %.*s\n"));
+                P_BindDouble(parser, left, right, pairs_operator_cmp, pairs_operator_cmp_count, str_lit("Cannot apply binary operator >= to %.*s and %.*s\n"));
                 ret = P_MakeBinaryNode(parser, op_type, left, right, ValueType_Bool);
             } break;
         }
@@ -2316,6 +2332,8 @@ P_ParseRule parse_rules[] = {
     [TokenType_Minus]              = { P_ExprUnary, P_ExprBinary, Prec_Unary, Prec_Term   },
     [TokenType_Star]               = { P_ExprDeref, P_ExprBinary, Prec_Unary, Prec_Factor },
     [TokenType_Slash]              = { nullptr,     P_ExprBinary, Prec_None,  Prec_Factor },
+    [TokenType_ShiftLeft]          = { nullptr,     P_ExprBinary, Prec_None,  Prec_Factor },
+    [TokenType_ShiftRight]         = { nullptr,     P_ExprBinary, Prec_None,  Prec_Factor },
     [TokenType_Percent]            = { nullptr,     P_ExprBinary, Prec_None,  Prec_Factor },
     [TokenType_PlusPlus]           = { nullptr, nullptr, Prec_None, Prec_None },
     [TokenType_MinusMinus]         = { nullptr, nullptr, Prec_None, Prec_None },
@@ -2397,6 +2415,11 @@ static P_Expr* P_ExprPrecedence(P_Parser* parser, P_Precedence precedence) {
         P_InfixParseFn infix = P_GetRule(parser->previous.type)->infix;
         e = infix(parser, e);
     }
+    if (e != nullptr)
+        if (e->is_constant && 
+            (e->type == ExprType_Binary
+             || e->type == ExprType_Unary
+             || e->type == ExprType_Variable)) e = B_EvaluateExpr(&interp, e);
     return e;
 }
 
@@ -2686,7 +2709,10 @@ static P_Stmt* P_StmtOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has_a
             return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opleq"));
             case TokenType_GreaterEqual:
             return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opgreq"));
-            
+            case TokenType_ShiftLeft:
+            return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opshl"));
+            case TokenType_ShiftRight:
+            return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opshr"));
             case TokenType_OpenBracket: {
                 P_Consume(parser, TokenType_CloseBracket, str_lit("Expected ] after [\n"));
                 return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opindex"));
@@ -2702,12 +2728,12 @@ static P_Stmt* P_StmtOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has_a
 }
 //- Op Overloading subsection end 
 
-static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8 has_all_tags) {
-    P_NamespaceCheckRedefinition(parser, name, false, false);
+static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8 is_constant, b8 has_all_tags) {
+    if (!(is_constant && parser->scope_depth == 0)) P_NamespaceCheckRedefinition(parser, name, false, false);
     
     string new_name = parser->scope_depth == 0 ? str_cat(&parser->arena, parser->current_namespace->flatname, name) : name;
     var_entry_key key = { .name = name, .depth = parser->scope_depth };
-    var_entry_val set = (var_entry_val) { .mangled_name = new_name, .type = type };
+    var_entry_val set = { .mangled_name = new_name, .type = type, .constant = is_constant };
     var_hash_table_set(&parser->current_namespace->variables, key, set);
     
     if (type_check(type, ValueType_Void))
@@ -2725,6 +2751,7 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8
             
             if (type_check(value->ret_type, m)) {
                 P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
+                //if (is_constant) B_SetVariable(&interp, new_name, value);
                 return P_MakeVarDeclAssignStmtNode(parser, type, name, P_MakeAddrNode(parser, m, value));
             }
         }
@@ -2745,6 +2772,8 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8
                         value->ret_type.full_type = type.full_type;
                         value->op.funcname.name = val->mangled_name;
                         
+                        if (is_constant) report_error(parser, str_lit("Function Pointer constants not supported"));
+                        
                         P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
                         return P_MakeVarDeclAssignStmtNode(parser, type, new_name, value);
                     }
@@ -2759,6 +2788,9 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8
                     report_error(parser, str_lit("Incompatible function pointer types\n"));
                 } else {
                     P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
+                    
+                    if (is_constant) report_error(parser, str_lit("Function Pointer constants not supported"));
+                    
                     return P_MakeVarDeclAssignStmtNode(parser, type, new_name, value);
                 }
             } else {
@@ -2776,6 +2808,7 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8
                 }
             }
             
+            //if (is_constant) B_SetVariable(&interp, new_name, value);
             P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
             return P_MakeVarDeclAssignStmtNode(parser, type, new_name, value);
         }
@@ -2788,6 +2821,10 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8
     if (is_array(&type)) {
         if (type.mods[type.mod_ct - 1].op.array_expr->type == ExprType_Nullptr)
             report_error(parser, str_lit("Uninitialized Array with unspecified size\n"));
+    }
+    
+    if (is_constant) {
+        report_error(parser, str_lit("Uninitialized Constant\n"));
     }
     
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
@@ -2953,10 +2990,13 @@ static P_Stmt* P_StmtFlagEnumerationDecl(P_Parser* parser, b8 native, b8 has_all
         string member_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
         
         var_entry_key k = { .name = member_name, .depth = parser->scope_depth };
-        var_entry_val v = { .mangled_name = str_from_format(&parser->arena, "_flagenum_%.*s_%.*s", str_expand(actual), str_expand(member_name)), .type = ValueType_Integer };
+        var_entry_val v = { .mangled_name = str_from_format(&parser->arena, "_enum_%.*s_%.*s", str_expand(actual), str_expand(member_name)), .type = ValueType_Integer };
         var_hash_table_set(&parser->current_namespace->variables, k, v);
         
         if (P_Match(parser, TokenType_Equal)) {
+            P_Expression(parser);
+        }  else if (P_Match(parser, TokenType_ShiftLeft)) {
+            P_Consume(parser, TokenType_Equal, str_lit("Expected = after <<\n"));
             P_Expression(parser);
         }
         
@@ -3182,14 +3222,14 @@ static P_Stmt* P_StmtIf(P_Parser* parser) {
     
     parser->block_stmt_should_begin_scope = false;
     P_ScopeContext* scope_context = P_BeginScope(parser, ScopeType_If);
-    P_Stmt* then = P_Statement(parser);
+    P_Stmt* then = P_Declaration(parser);
     P_EndScope(parser, scope_context);
     parser->block_stmt_should_begin_scope = true;
     
     if (P_Match(parser, TokenType_Else)) {
         parser->block_stmt_should_begin_scope = false;
         P_ScopeContext* scope_context = P_BeginScope(parser, ScopeType_Else);
-        P_Stmt* else_s = P_Statement(parser);
+        P_Stmt* else_s = P_Declaration(parser);
         P_EndScope(parser, scope_context);
         parser->block_stmt_should_begin_scope = true;
         
@@ -3219,7 +3259,7 @@ static P_Stmt* P_StmtFor(P_Parser* parser) {
         P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression\n"));
     }
     
-    P_Stmt* then = P_Statement(parser);
+    P_Stmt* then = P_Declaration(parser);
     P_EndScope(parser, scope_context);
     parser->block_stmt_should_begin_scope = true;
     
@@ -3361,7 +3401,7 @@ static P_Stmt* P_StmtBreak(P_Parser* parser) {
           P_IsInScope(parser, ScopeType_While)  ||
           P_IsInScope(parser, ScopeType_Switch) ||
           P_IsInScope(parser, ScopeType_Match)  ||
-          P_IsInScope(parser,  ScopeType_DoWhile)))
+          P_IsInScope(parser, ScopeType_DoWhile)))
         report_error(parser, str_lit("Cannot have break statement in this block\n"));
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after break\n"));
     return P_MakeBreakStmtNode(parser);
@@ -3370,7 +3410,7 @@ static P_Stmt* P_StmtBreak(P_Parser* parser) {
 static P_Stmt* P_StmtContinue(P_Parser* parser) {
     if (!(P_IsInScope(parser, ScopeType_For)   ||
           P_IsInScope(parser, ScopeType_While) ||
-          P_IsInScope(parser,  ScopeType_DoWhile)))
+          P_IsInScope(parser, ScopeType_DoWhile)))
         report_error(parser, str_lit("Cannot have continue statement in this block\n"));
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after continue\n"));
     return P_MakeContinueStmtNode(parser);
@@ -3385,9 +3425,9 @@ static P_Stmt* P_StmtWhile(P_Parser* parser) {
     P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression\n"));
     
     parser->block_stmt_should_begin_scope = false;
-    P_ScopeContext* scope_context = P_BeginScope(parser, ScopeType_None);
+    P_ScopeContext* scope_context = P_BeginScope(parser, ScopeType_While);
     
-    P_Stmt* then = P_Statement(parser);
+    P_Stmt* then = P_Declaration(parser);
     
     P_EndScope(parser, scope_context);
     parser->block_stmt_should_begin_scope = true;
@@ -3399,7 +3439,7 @@ static P_Stmt* P_StmtDoWhile(P_Parser* parser) {
     parser->block_stmt_should_begin_scope = false;
     P_ScopeContext* scope_context = P_BeginScope(parser, ScopeType_DoWhile);
     
-    P_Stmt* then = P_Statement(parser);
+    P_Stmt* then = P_Declaration(parser);
     P_Consume(parser, TokenType_While, str_lit("Expected 'while'"));
     P_Consume(parser, TokenType_OpenParenthesis, str_lit("Expected ( after while\n"));
     P_Expr* condition = P_Expression(parser);
@@ -3459,6 +3499,8 @@ static P_Stmt* P_Statement(P_Parser* parser) {
         }
     }
     
+    // FIXME(voxel): any unknown first token throws this weird error
+    
     report_error(parser, str_lit("Cannot Have Statements that exist outside of functions\n"));
     P_Advance(parser);
     return nullptr;
@@ -3482,6 +3524,12 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
     b8 native = false;
     if (P_Match(parser, TokenType_Native))
         native = true;
+    // Const
+    b8 constant = false;
+    if (P_Match(parser, TokenType_Const))
+        constant = true;
+    if (native && constant)
+        report_error(parser, str_lit("Declaration cannot be native AND constant\n"));
     
     if (P_IsTypeToken(parser)) {
         P_ValueType type = P_ConsumeType(parser, str_lit("There's an error in the parser. (P_Declaration)\n"));
@@ -3495,7 +3543,7 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
             if (P_Match(parser, TokenType_OpenParenthesis)) {
                 s = P_StmtFuncDecl(parser, type, name, native, has_all_tags);
             } else {
-                s = P_StmtVarDecl(parser, type, name, has_all_tags);
+                s = P_StmtVarDecl(parser, type, name, constant, has_all_tags);
             }
         }
         
@@ -3740,7 +3788,10 @@ static P_PreStmt* P_PreOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has
         return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("<="), str_lit("_opleq"), TokenType_LessEqual);
         case TokenType_GreaterEqual:
         return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit(">="), str_lit("_opgreq"), TokenType_GreaterEqual);
-        
+        case TokenType_ShiftLeft:
+        return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("<<"), str_lit("_opshl"), TokenType_ShiftLeft);
+        case TokenType_ShiftRight:
+        return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit(">>"), str_lit("_opshr"), TokenType_ShiftRight);
         case TokenType_OpenBracket: {
             P_Consume(parser, TokenType_CloseBracket, str_lit("Expected ] after [\n"));
             return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("[]"), str_lit("_opindex"), TokenType_OpenBracket);
@@ -4007,6 +4058,7 @@ static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_a
     value_type_list member_types = {0};
     
     expr_array exprs = {0};
+    i32 iota = 0;
     
     // Parse Members
     while (!P_Match(parser, TokenType_CloseBrace)) {
@@ -4014,6 +4066,7 @@ static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_a
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
         string member_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        string formatted = str_from_format(&parser->arena, "_enum_%.*s_%.*s", str_expand(actual), str_expand(member_name));
         if (str_eq(member_name, str_lit("count")))
             report_error(parser, str_lit("Cannot have enum member with name 'count'. It is reserved\n"));
         
@@ -4021,16 +4074,21 @@ static P_PreStmt* P_PreStmtEnumerationDecl(P_Parser* parser, b8 native, b8 has_a
         member_count++;
         
         var_entry_key k = { .name = member_name, .depth = parser->scope_depth };
-        var_entry_val v = { .mangled_name = str_from_format(&parser->arena, "_enum_%.*s_%.*s", str_expand(actual), str_expand(member_name)), .type = ValueType_Integer };
+        var_entry_val v = { .mangled_name = formatted, .type = ValueType_Integer, .constant = true };
         var_hash_table_set(&parser->current_namespace->variables, k, v);
         
         if (P_Match(parser, TokenType_Equal)) {
             P_Expr* val = P_Expression(parser);
             if (!type_check(val->ret_type, ValueType_Integer))
                 report_error(parser, str_lit("Expression can only return Integer Type\n"));
+            if (!val->is_constant) report_error(parser, str_lit("Expression is not a constant\n"));
+            B_SetVariable(&interp, member_name, val);
             expr_array_add(&parser->arena, &exprs, val);
+            iota = val->op.integer_lit;
         } else {
             expr_array_add(&parser->arena, &exprs, nullptr);
+            B_SetVariable(&interp, member_name, P_MakeIntNode(parser, iota));
+            iota++;
         }
         
         if (P_Match(parser, TokenType_CloseBrace)) break;
@@ -4090,7 +4148,7 @@ static P_PreStmt* P_PreStmtFlagEnumerationDecl(P_Parser* parser, b8 native, b8 h
     value_type_list member_types = {0};
     
     expr_array exprs = {0};
-    i32 value = 1;
+    u32 value = 1;
     
     // Parse Members
     while (!P_Match(parser, TokenType_CloseBrace)) {
@@ -4098,6 +4156,7 @@ static P_PreStmt* P_PreStmtFlagEnumerationDecl(P_Parser* parser, b8 native, b8 h
         
         P_Consume(parser, TokenType_Identifier, str_lit("Expected member name\n"));
         string member_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        string formatted = str_from_format(&parser->arena, "_enum_%.*s_%.*s", str_expand(actual), str_expand(member_name));
         if (str_eq(member_name, str_lit("count")))
             report_error(parser, str_lit("Cannot have enum member with name 'count'. It is reserved\n"));
         
@@ -4105,16 +4164,36 @@ static P_PreStmt* P_PreStmtFlagEnumerationDecl(P_Parser* parser, b8 native, b8 h
         member_count++;
         
         var_entry_key k = { .name = member_name, .depth = parser->scope_depth };
-        var_entry_val v = { .mangled_name = str_from_format(&parser->arena, "_flagenum_%.*s_%.*s", str_expand(actual), str_expand(member_name)), .type = ValueType_Integer };
+        var_entry_val v = { .mangled_name = formatted, .type = ValueType_Integer, .constant = true };
         var_hash_table_set(&parser->current_namespace->variables, k, v);
         
         if (P_Match(parser, TokenType_Equal)) {
             P_Expr* val = P_Expression(parser);
-            if (!type_check(val->ret_type, ValueType_Integer))
-                report_error(parser, str_lit("Expression can only return Integer Type\n"));
-            expr_array_add(&parser->arena, &exprs, val);
+            if (val != nullptr) {
+                if (!type_check(val->ret_type, ValueType_Integer))
+                    report_error(parser, str_lit("Expression can only return Integer Type\n"));
+                B_SetVariable(&interp, formatted, val);
+                expr_array_add(&parser->arena, &exprs, val);
+            }
+        } else if (P_Match(parser, TokenType_ShiftLeft)) {
+            // @refactor Change to ShiftLeftEqual when I add that
+            P_Consume(parser, TokenType_Equal, str_lit("Expected = after <<\n"));
+            P_Expr* node = P_Expression(parser);
+            if (node != nullptr) {
+                if (!type_check(node->ret_type, ValueType_Integer))
+                    report_error(parser, str_lit("Expression can only return Integer Type\n"));
+                i32 t = node->op.integer_lit;
+                if (t & (1 << 31)) report_error(parser, str_lit("Integer Limit Exceeded in flag enum\n"));
+                value = 1 << t;
+                node = P_MakeIntNode(parser, value);
+                expr_array_add(&parser->arena, &exprs, node);
+                B_SetVariable(&interp, formatted, node);
+            }
+            value <<= 1;
         } else {
-            expr_array_add(&parser->arena, &exprs, P_MakeIntNode(parser, value));
+            P_Expr* node = P_MakeIntNode(parser, value);
+            expr_array_add(&parser->arena, &exprs, node);
+            B_SetVariable(&interp, formatted, node);
             if (value & (1 << 31)) report_error(parser, str_lit("Integer Limit Exceeded in flag enum\n"));
             value <<= 1;
         }
@@ -4166,6 +4245,25 @@ static P_PreStmt* P_PreStmtCinsert(P_Parser* parser, b8 has_all_tags) {
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after filename\n"));
     if (!has_all_tags) return P_MakePreNothingNode(parser);
     return P_MakePreCinsertStmtNode(parser, code);
+}
+
+static P_PreStmt* P_PreStmtConstVar(P_Parser* parser, b8 has_all_tags) {
+    if (P_Match(parser, TokenType_Native))
+        report_error(parser, str_lit("Cannot have a native const variable\n"));
+    P_ConsumeType(parser, str_lit("Expected type of variable\n"));
+    P_Consume(parser, TokenType_Identifier, str_lit("Expected var name after type\n"));
+    string name = { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+    string actual = str_cat(&parser->arena, parser->current_namespace->flatname, name);
+    P_Consume(parser, TokenType_Equal, str_lit("Expected = after variable name\n"));
+    P_Expr* expr = P_Expression(parser);
+    if (!expr->is_constant) report_error(parser, str_lit("Cannot have a native const variable\n"));
+    B_SetVariable(&interp, name, expr);
+    
+    var_entry_key k = { .name = name, .depth = parser->scope_depth };
+    var_entry_val v = { .mangled_name = actual, .type = expr->ret_type, .constant = true };
+    var_hash_table_set(&parser->current_namespace->variables, k, v);
+    
+    return P_MakePreNothingNode(parser);
 }
 
 static P_PreStmt* P_PreStmtImport(P_Parser* parser) {
@@ -4297,6 +4395,8 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
         s = P_PreStmtCinclude(parser, has_all_tags);
     } else if (P_Match(parser, TokenType_Cinsert)) {
         s = P_PreStmtCinsert(parser, has_all_tags);
+    } else if (P_Match(parser, TokenType_Const)) {
+        s = P_PreStmtConstVar(parser, has_all_tags);
     }
     
     if (!has_all_tags) s = P_MakePreNothingNode(parser);
@@ -4388,6 +4488,7 @@ void P_GlobalInit(string_list tags) {
     type_array_init(&global_namespace.types);
     opoverload_hash_table_init(&op_overloads);
     typedef_hash_table_init(&typedefs);
+    B_Init(&interp);
     active_tags = tags;
     imports = (string_list){0};
     imports_parsing = (string_list){0};
@@ -4462,317 +4563,5 @@ void P_GlobalFree() {
     opoverload_hash_table_free(&op_overloads);
     typedef_hash_table_free(&typedefs);
     arena_free(&global_arena);
-}
-
-static void P_PrintExprAST_Indent(M_Arena* arena, P_Expr* expr, u8 indent) {
-    for (u8 i = 0; i < indent; i++)
-        printf("  ");
-    
-    switch (expr->type) {
-        case ExprType_IntLit: {
-            printf("%d [Integer]\n", expr->op.integer_lit);
-        } break;
-        
-        case ExprType_LongLit: {
-#ifdef CPCOM_WIN
-            printf("%I64d [Long]\n", expr->op.long_lit);
-#else
-#  ifdef CPCOM_LINUX
-            printf("%I64lld [Long]\n", expr->op.long_lit);
-#  endif
-#endif
-        } break;
-        
-        case ExprType_FloatLit: {
-            printf("%f [Float]\n", expr->op.float_lit);
-        } break;
-        
-        case ExprType_DoubleLit: {
-            printf("%f [Double]\n", expr->op.double_lit);
-        } break;
-        
-        case ExprType_StringLit: {
-            printf("%.*s [String]\n", str_expand(expr->op.string_lit));
-        } break;
-        
-        case ExprType_CharLit: {
-            printf("%.*s [Char]\n", str_expand(expr->op.char_lit));
-        } break;
-        
-        case ExprType_BoolLit: {
-            printf("%s [Bool]\n", expr->op.bool_lit ? "True" : "False");
-        } break;
-        
-        case ExprType_Assignment: {
-            P_PrintExprAST_Indent(arena, expr->op.assignment.name, indent + 1);
-            printf("=\n");
-            P_PrintExprAST_Indent(arena, expr->op.assignment.value, indent + 1);
-        } break;
-        
-        case ExprType_Cast: {
-            printf("(%.*s) Cast\n", str_expand(expr->ret_type.full_type));
-            P_PrintExprAST_Indent(arena, expr->op.cast, indent + 1);
-        } break;
-        
-        case ExprType_Variable: {
-            printf("%.*s\n", str_expand(expr->op.variable));
-        } break;
-        
-        case ExprType_Typename: {
-            printf("%.*s [Typename]\n", str_expand(expr->op.typename.full_type));
-        } break;
-        
-        case ExprType_Funcname: {
-            printf("%.*s [Funcname]\n", str_expand(expr->op.funcname.name));
-        } break;
-        
-        case ExprType_Lambda: {
-            printf("%.*s [Lambda]\n", str_expand(expr->op.lambda));
-        } break;
-        
-        case ExprType_Unary: {
-            printf("%.*s\n", str_expand(L__get_string_from_type__(expr->op.unary.operator)));
-            P_PrintExprAST_Indent(arena, expr->op.unary.operand, indent + 1);
-        } break;
-        
-        case ExprType_Nullptr: {
-            printf("nullptr\n");
-        } break;
-        
-        case ExprType_ArrayLit: {
-            printf("Array: \n");
-            for (u32 i = 0; i < expr->op.array.count; i++) {
-                P_PrintExprAST_Indent(arena, expr->op.array.elements[i], indent + 1);
-            }
-        } break;
-        
-        case ExprType_Binary: {
-            printf("%.*s\n", str_expand(L__get_string_from_type__(expr->op.binary.operator)));
-            P_PrintExprAST_Indent(arena, expr->op.binary.left, indent + 1);
-            P_PrintExprAST_Indent(arena, expr->op.binary.right, indent + 1);
-        } break;
-        
-        case ExprType_FuncCall: {
-            printf("%.*s()\n", str_expand(expr->op.func_call.name));
-            for (u32 i = 0; i < expr->op.func_call.call_arity; i++)
-                P_PrintExprAST_Indent(arena, expr->op.func_call.params[i], indent + 1);
-        } break;
-        
-        case ExprType_Call: {
-            printf("()\n");
-            P_PrintExprAST_Indent(arena, expr->op.call.left, indent + 1);
-            for (u32 i = 0; i < expr->op.call.call_arity; i++)
-                P_PrintExprAST_Indent(arena, expr->op.call.params[i], indent + 1);
-        } break;
-        
-        case ExprType_Index: {
-            printf("[Index]");
-            P_PrintExprAST_Indent(arena, expr->op.index.operand, indent + 1);
-            P_PrintExprAST_Indent(arena, expr->op.index.index, indent + 1);
-        } break;
-        
-        case ExprType_Addr: {
-            printf("[Get Address]\n");
-            P_PrintExprAST_Indent(arena, expr->op.addr, indent + 1);
-        } break;
-        
-        case ExprType_Deref: {
-            printf("[Deref]\n");
-            P_PrintExprAST_Indent(arena, expr->op.deref, indent + 1);
-        } break;
-        
-        case ExprType_Dot: {
-            printf(".%.*s [Member Access]\n", str_expand(expr->op.dot.right));
-            P_PrintExprAST_Indent(arena, expr->op.dot.left, indent + 1);
-        } break;
-        
-        case ExprType_EnumDot: {
-            printf("%.*s.%.*s [Enum Access]\n", str_expand(expr->op.enum_dot.left), str_expand(expr->op.enum_dot.right));
-        } break;
-        
-        case ExprType_Sizeof: {
-            printf("[Sizeof]\n");
-            P_PrintExprAST_Indent(arena, expr->op.sizeof_e, indent + 1);
-        } break;
-        
-        case ExprType_Offsetof: {
-            printf("[Offsetof] %.*s\n", str_expand(expr->op.offsetof_e.member_name));
-            P_PrintExprAST_Indent(arena, expr->op.offsetof_e.typename, indent + 1);
-        } break;
-    }
-}
-
-void P_PrintExprAST(P_Expr* expr) {
-    M_Arena arena;
-    arena_init(&arena);
-    P_PrintExprAST_Indent(&arena, expr, 0);
-    arena_free(&arena);
-}
-
-static void P_PrintAST_Indent(M_Arena* arena, P_Stmt* stmt, u8 indent) {
-    for (u8 i = 0; i < indent; i++)
-        printf("  ");
-    
-    switch (stmt->type) {
-        case StmtType_Block: {
-            printf("Block Statement:\n");
-            if (stmt->op.block != nullptr)
-                P_PrintAST_Indent(arena, stmt->op.block, indent + 1);
-        } break;
-        
-        case StmtType_Expression: {
-            printf("Expression Statement:\n");
-            P_PrintExprAST_Indent(arena, stmt->op.expression, indent + 1);
-        } break;
-        
-        case StmtType_If: {
-            printf("If Statement:\n");
-            P_PrintExprAST_Indent(arena, stmt->op.if_s.condition, indent + 1);
-            for (u8 i = 0; i < indent; i++)
-                printf("  ");
-            printf("Then\n");
-            P_PrintAST_Indent(arena, stmt->op.if_s.then, indent + 1);
-        } break;
-        
-        case StmtType_IfElse: {
-            printf("If Statement:\n");
-            P_PrintExprAST_Indent(arena, stmt->op.if_else.condition, indent + 1);
-            for (u8 i = 0; i < indent; i++)
-                printf("  ");
-            printf("Then\n");
-            P_PrintAST_Indent(arena, stmt->op.if_else.then, indent + 1);
-            for (u8 i = 0; i < indent; i++)
-                printf("  ");
-            printf("Else\n");
-            P_PrintAST_Indent(arena, stmt->op.if_else.else_s, indent + 1);
-        } break;
-        
-        case StmtType_Return: {
-            printf("Return Statement:\n");
-            P_PrintExprAST_Indent(arena, stmt->op.returned, indent + 1);
-        } break;
-        
-        case StmtType_VarDecl: {
-            printf("Variable Declaration:\n");
-            for (u8 i = 0; i < indent; i++)
-                printf("  ");
-            printf("%.*s: %.*s\n", str_expand(stmt->op.var_decl.name), str_expand(stmt->op.var_decl.type.full_type));
-        } break;
-        
-        case StmtType_VarDeclAssign: {
-            printf("Variable Declaration:\n");
-            for (u8 i = 0; i < indent; i++)
-                printf("  ");
-            printf("%.*s: %.*s = \n", str_expand(stmt->op.var_decl_assign.name), str_expand(stmt->op.var_decl_assign.type.full_type));
-            P_PrintExprAST_Indent(arena, stmt->op.var_decl_assign.val, indent + 1);
-        } break;
-        
-        case StmtType_FuncDecl: {
-            printf("Function Declaration: %.*s: %.*s\n", str_expand(stmt->op.func_decl.name), str_expand(stmt->op.func_decl.type.full_type));
-            if (stmt->op.func_decl.block != nullptr)
-                P_PrintAST_Indent(arena, stmt->op.func_decl.block, indent + 1);
-        } break;
-        
-        case StmtType_StructDecl: {
-            printf("Struct Declaration: %s\n", stmt->op.struct_decl.name.str);
-            string_list_node* curr = stmt->op.struct_decl.member_names.first;
-            value_type_list_node* type = stmt->op.struct_decl.member_types.first;
-            for (u32 i = 0; i < stmt->op.struct_decl.member_count; i++) {
-                for (u8 idt = 0; idt < indent + 1; idt++)
-                    printf("  ");
-                printf("%.*s: %.*s\n", str_node_expand(curr), str_expand(type->type.full_type));
-                
-                curr = curr->next;
-                type = type->next;
-            }
-        } break;
-        
-        case StmtType_EnumDecl: {
-            printf("Enum Declaration: %s\n", stmt->op.enum_decl.name.str);
-            string_list_node* curr = stmt->op.enum_decl.member_names.first;
-            for (u32 i = 0; i < stmt->op.enum_decl.member_count; i++) {
-                for (u8 idt = 0; idt < indent + 1; idt++)
-                    printf("  ");
-                printf("%.*s\n", str_node_expand(curr));
-                
-                curr = curr->next;
-            }
-        } break;
-        
-        case StmtType_For: {
-            printf("For Loop:\n");
-            if (stmt->op.for_s.init != nullptr)
-                P_PrintAST_Indent(arena, stmt->op.for_s.init, indent + 1);
-            P_PrintExprAST_Indent(arena, stmt->op.for_s.condition, indent + 1);
-            if (stmt->op.for_s.loopexec != nullptr)
-                P_PrintExprAST_Indent(arena, stmt->op.for_s.loopexec, indent + 1);
-            P_PrintAST_Indent(arena, stmt->op.for_s.then, indent + 1);
-        } break;
-        
-        case StmtType_While: {
-            printf("While Loop:\n");
-            P_PrintExprAST_Indent(arena, stmt->op.while_s.condition, indent + 1);
-            P_PrintAST_Indent(arena, stmt->op.while_s.then, indent + 1);
-        } break;
-        
-        
-        case StmtType_Switch: {
-            printf("Switch:\n");
-            P_PrintExprAST_Indent(arena, stmt->op.switch_s.switched, indent + 1);
-            P_PrintAST_Indent(arena, stmt->op.switch_s.then, indent + 1);
-        } break;
-        
-        case StmtType_Match: {
-            printf("Match:\n");
-            P_PrintExprAST_Indent(arena, stmt->op.match_s.matched, indent + 1);
-            P_PrintAST_Indent(arena, stmt->op.match_s.then, indent + 1);
-        } break;
-        
-        case StmtType_Case: {
-            printf("Case:\n");
-            P_PrintExprAST_Indent(arena, stmt->op.case_s.value, indent + 1);
-            P_PrintAST_Indent(arena, stmt->op.case_s.then, indent + 1);
-        } break;
-        
-        case StmtType_MatchCase: {
-            printf("Matched Case:\n");
-            P_PrintExprAST_Indent(arena, stmt->op.case_s.value, indent + 1);
-            P_PrintAST_Indent(arena, stmt->op.case_s.then, indent + 1);
-        } break;
-        
-        case StmtType_Default: {
-            printf("Default:\n");
-            P_PrintAST_Indent(arena, stmt->op.default_s.then, indent + 1);
-        } break;
-        
-        case StmtType_MatchDefault: {
-            printf("Matched Default:\n");
-            P_PrintAST_Indent(arena, stmt->op.mdefault_s.then, indent + 1);
-        } break;
-        
-        case StmtType_Break: {
-            printf("Break\n");
-        } break;
-        
-        case StmtType_Continue: {
-            printf("Continue\n");
-        } break;
-        
-        case StmtType_DoWhile: {
-            printf("Do-While Loop:\n");
-            P_PrintExprAST_Indent(arena, stmt->op.do_while.condition, indent + 1);
-            P_PrintAST_Indent(arena, stmt->op.do_while.then, indent + 1);
-        } break;
-        
-    }
-    
-    if (stmt->next != nullptr)
-        P_PrintAST_Indent(arena, stmt->next, indent);
-}
-
-void P_PrintAST(P_Stmt* stmt) {
-    M_Arena arena;
-    arena_init(&arena);
-    P_PrintAST_Indent(&arena, stmt, 0);
-    arena_free(&arena);
+    B_Free(&interp);
 }

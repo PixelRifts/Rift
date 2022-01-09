@@ -7,7 +7,6 @@
 #include "defines.h"
 #include "str.h"
 #include "types.h"
-#include "data_structures.h"
 
 typedef u32 P_Precedence;
 enum {
@@ -49,8 +48,10 @@ enum {
     ExprType_Sizeof, ExprType_Offsetof, ExprType_Namespacename, ExprType_Arrow
 };
 
-struct P_Stmt;
+#include "bytecode.h"
+#include "data_structures.h"
 
+struct P_Stmt;
 typedef struct P_Namespace P_Namespace;
 typedef struct P_Expr P_Expr;
 struct P_Expr {
@@ -160,8 +161,6 @@ struct P_PreStmt {
 };
 
 
-#include "data_structures.h"
-
 typedef struct P_Namespace {
     string unitname;
     string flatname;
@@ -213,7 +212,6 @@ typedef struct P_ParserSnap {
 struct P_Parser;
 P_ParserSnap P_TakeSnapshot(struct P_Parser* parser);
 void         P_ApplySnapshot(struct P_Parser* parser, P_ParserSnap snap);
-
 
 typedef struct P_Parser {
     M_Arena arena;
@@ -281,7 +279,5 @@ void P_Initialize(P_Parser* parser, string source, string filename, b8 is_root);
 void P_PreParse(P_Parser* parser);
 void P_Parse(P_Parser* parser);
 void P_Free(P_Parser* parser);
-void P_PrintExprAST(P_Expr* expr);
-void P_PrintAST(P_Stmt* stmt);
 
 #endif //PARSER_H

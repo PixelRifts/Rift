@@ -1,3 +1,4 @@
+#include "bytecode.h" // Bad
 #include "data_structures.h"
 
 static const func_entry_val tombstone = {
@@ -654,6 +655,18 @@ void expr_array_add(M_Arena* arena, expr_array* array, struct P_Expr* mod) {
         array->capacity = GROW_CAPACITY(array->capacity);
         array->elements = arena_alloc(arena, array->capacity * sizeof(struct P_Expr*));
         memmove(array->elements, prev, array->count * sizeof(struct P_Expr*));
+    }
+    *(array->elements + array->count) = mod;
+    array->count++;
+}
+
+//~ Var-Values
+void var_value_array_add(M_Arena* arena, var_value_array* array, struct var_value_entry mod) {
+    if (array->count + 1 > array->capacity) {
+        void* prev = array->elements;
+        array->capacity = GROW_CAPACITY(array->capacity);
+        array->elements = arena_alloc(arena, array->capacity * sizeof(var_value_entry));
+        memmove(array->elements, prev, array->count * sizeof(var_value_entry));
     }
     *(array->elements + array->count) = mod;
     array->count++;

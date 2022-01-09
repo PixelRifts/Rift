@@ -66,6 +66,7 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_Nullptr: return str_lit("Nullptr");
         case TokenType_Break: return str_lit("Break");
         case TokenType_Continue: return str_lit("Continue");
+        case TokenType_Const: return str_lit("Const");
         case TokenType_Switch: return str_lit("Switch");
         case TokenType_Match: return str_lit("Match");
         case TokenType_Case: return str_lit("Case");
@@ -200,8 +201,10 @@ static L_Token L_Number(L_Lexer* lexer) {
         if (L_Peek(lexer) == 'f' || L_Peek(lexer) == 'F') {
             L_Advance(lexer);
             type = TokenType_FloatLit;
-        } else if (is_whitespace(L_Peek(lexer)) || L_Peek(lexer) == 'd' || L_Peek(lexer) == 'D') {
+        } else if (L_Peek(lexer) == 'd' || L_Peek(lexer) == 'D') {
             L_Advance(lexer);
+            type = TokenType_DoubleLit;
+        } else if (!is_alpha(L_Peek(lexer))) {
             type = TokenType_DoubleLit;
         } else {
             return L_ErrorToken(lexer, str_lit("Unrecognised number suffix"));
@@ -260,7 +263,11 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
         case 'c': {
             switch (lexer->start[1]) {
                 case 'h': return L_MatchType(lexer, 2, str_lit("ar"), TokenType_Char);
-                case 'o': return L_MatchType(lexer, 2, str_lit("ntinue"), TokenType_Continue);
+                case 'o': {
+                    if (L_MatchType(lexer, 2, str_lit("ntinue"), TokenType_Continue) == TokenType_Continue) {
+                        return TokenType_Continue;
+                    } else return L_MatchType(lexer, 2, str_lit("nst"), TokenType_Const);
+                }
                 case 'a': return L_MatchType(lexer, 2, str_lit("se"), TokenType_Case);
                 case 'i': {
                     if (L_MatchType(lexer, 2, str_lit("nclude"), TokenType_Cinclude) == TokenType_Cinclude) {
@@ -392,8 +399,8 @@ L_Token L_LexToken(L_Lexer* lexer) {
         case '-': return L_QuadHandle(lexer, '=', TokenType_MinusEqual, '-', TokenType_MinusMinus, '>', TokenType_ThinArrow, TokenType_Minus);
         case '*':  return L_DoubleHandle(lexer, '=', TokenType_StarEqual, TokenType_Star);
         case '%':  return L_DoubleHandle(lexer, '=', TokenType_PercentEqual, TokenType_Percent);
-        case '<':  return L_DoubleHandle(lexer, '=', TokenType_LessEqual, TokenType_Less);
-        case '>':  return L_DoubleHandle(lexer, '=', TokenType_GreaterEqual, TokenType_Greater);
+        case '<':  return L_TripleHandle(lexer, '=', TokenType_LessEqual, '<', TokenType_ShiftLeft, TokenType_Less);
+        case '>':  return L_TripleHandle(lexer, '=', TokenType_GreaterEqual, '>', TokenType_ShiftRight, TokenType_Greater);
         
         case '/':  {
             if (L_Peek(lexer) == '/') {
