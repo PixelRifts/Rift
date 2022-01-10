@@ -52,7 +52,7 @@ static void E_WriteLineF(E_Emitter* emitter, const char* text, ...) {
 }
 
 static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr);
-static void E_EmitTypeAndName(E_Emitter* emitter, P_ValueType* type, string name, b8 noname);
+static void E_EmitTypeAndName(E_Emitter* emitter, P_ValueType* type, string name);
 
 static void E_EmitTypeMods_Recursive(E_Emitter* emitter, P_ValueTypeMod* mods, i32 mod_idx, string name_if_negone, b8 is_only_one) {
     if (mod_idx == -1) {
@@ -92,7 +92,7 @@ static void E_EmitTypeFnptr(E_Emitter* emitter, P_ValueType* type, string name) 
         E_Write(emitter, "(");
         value_type_list_node* curr = type->op.func_ptr.func_param_types->first;
         while (curr != nullptr) {
-            E_EmitTypeAndName(emitter, &curr->type, (string){0}, false);
+            E_EmitTypeAndName(emitter, &curr->type, (string){0});
             if (curr->next != nullptr)
                 E_Write(emitter, ", ");
             curr = curr->next;
@@ -103,15 +103,15 @@ static void E_EmitTypeFnptr(E_Emitter* emitter, P_ValueType* type, string name) 
     }
 }
 
-static void E_EmitTypeAndName(E_Emitter* emitter, P_ValueType* type, string name, b8 noname) {
+static void E_EmitTypeAndName(E_Emitter* emitter, P_ValueType* type, string name) {
     if (type->type == ValueTypeType_FuncPointer) {
         P_ValueType* ret = E_GetBottommostReturntype(type);
-        E_EmitTypeAndName(emitter, ret, (string){0}, true);
+        E_EmitTypeAndName(emitter, ret, (string){0});
         E_EmitTypeFnptr(emitter, type->op.func_ptr.ret_type, name);
         E_Write(emitter, "(");
         value_type_list_node* curr = type->op.func_ptr.func_param_types->first;
         while (curr != nullptr) {
-            E_EmitTypeAndName(emitter, &curr->type, (string){0}, false);
+            E_EmitTypeAndName(emitter, &curr->type, (string){0});
             if (curr->next != nullptr)
                 E_Write(emitter, ", ");
             curr = curr->next;
@@ -122,23 +122,25 @@ static void E_EmitTypeAndName(E_Emitter* emitter, P_ValueType* type, string name
         // Make local copy to not destroy the types
         P_ValueType emit = *type;
         type_map(emitter, &emit);
-        E_WriteF(emitter, "%.*s ", str_expand(emit.base_type));
+        
+        E_WriteF(emitter, "%.*s", str_expand(emit.base_type));
+        
         if (type->mod_ct != 0) {
             E_EmitTypeMods_Recursive(emitter, emit.mods, emit.mod_ct - 1, name, emit.mod_ct == 1);
         } else {
-            E_WriteF(emitter, "%.*s", str_expand(name));
+            if (name.size) E_WriteF(emitter, " %.*s", str_expand(name));
         }
     }
 }
 
-static void E_EmitTypeFnptr_Fndecl(E_Emitter* emitter, P_ValueType* type, string name, b8 noname, string_list param_names, value_type_list param_types, u32 arity, b8 varargs, string* varargs_name, string* arg_before_varargs_name) {
+static void E_EmitTypeFnptr_Fndecl(E_Emitter* emitter, P_ValueType* type, string name, string_list param_names, value_type_list param_types, u32 arity, b8 varargs, string* varargs_name, string* arg_before_varargs_name) {
     if (type->type == ValueTypeType_FuncPointer) {
         E_Write(emitter, "(*");
-        E_EmitTypeFnptr_Fndecl(emitter, type->op.func_ptr.ret_type, name, true, param_names, param_types, arity, varargs, varargs_name, arg_before_varargs_name);
+        E_EmitTypeFnptr_Fndecl(emitter, type->op.func_ptr.ret_type, name, param_names, param_types, arity, varargs, varargs_name, arg_before_varargs_name);
         E_Write(emitter, "(");
         value_type_list_node* curr = type->op.func_ptr.func_param_types->first;
         while (curr != nullptr) {
-            E_EmitTypeAndName(emitter, &curr->type, (string){0}, false);
+            E_EmitTypeAndName(emitter, &curr->type, (string){0});
             if (curr->next != nullptr)
                 E_Write(emitter, ", ");
             curr = curr->next;
@@ -156,7 +158,7 @@ static void E_EmitTypeFnptr_Fndecl(E_Emitter* emitter, P_ValueType* type, string
                     break;
                 }
                 
-                E_EmitTypeAndName(emitter, &curr_type->type, (string) { .str = curr_name->str, .size = curr_name->size }, false);
+                E_EmitTypeAndName(emitter, &curr_type->type, (string) { .str = curr_name->str, .size = curr_name->size });
                 if (i != arity - 1)
                     E_Write(emitter, ", ");
                 
@@ -175,16 +177,16 @@ static void E_EmitTypeFnptr_Fndecl(E_Emitter* emitter, P_ValueType* type, string
     }
 }
 
-static void E_EmitTypeAndName_Fndecl(E_Emitter* emitter, P_ValueType* type, string name, b8 noname, string_list param_names, value_type_list param_types, u32 arity, b8 varargs, string* varargs_name, string* arg_before_varargs_name) {
+static void E_EmitTypeAndName_Fndecl(E_Emitter* emitter, P_ValueType* type, string name, string_list param_names, value_type_list param_types, u32 arity, b8 varargs, string* varargs_name, string* arg_before_varargs_name) {
     if (type->type == ValueTypeType_FuncPointer) {
         
         P_ValueType* ret = E_GetBottommostReturntype(type);
-        E_EmitTypeAndName(emitter, ret, (string){0}, false);
-        E_EmitTypeFnptr_Fndecl(emitter, type->op.func_ptr.ret_type, name, true, param_names, param_types, arity, varargs, varargs_name, arg_before_varargs_name);
+        E_EmitTypeAndName(emitter, ret, (string){0});
+        E_EmitTypeFnptr_Fndecl(emitter, type->op.func_ptr.ret_type, name, param_names, param_types, arity, varargs, varargs_name, arg_before_varargs_name);
         E_Write(emitter, "(");
         value_type_list_node* curr = type->op.func_ptr.func_param_types->first;
         while (curr != nullptr) {
-            E_EmitTypeAndName(emitter, &curr->type, (string){0}, false);
+            E_EmitTypeAndName(emitter, &curr->type, (string){0});
             if (curr->next != nullptr)
                 E_Write(emitter, ", ");
             curr = curr->next;
@@ -192,7 +194,7 @@ static void E_EmitTypeAndName_Fndecl(E_Emitter* emitter, P_ValueType* type, stri
         E_Write(emitter, ")");
         
     } else {
-        E_EmitTypeAndName(emitter, type, name, noname);
+        E_EmitTypeAndName(emitter, type, name);
         E_Write(emitter, "(");
         
         string_list_node* curr_name = param_names.first;
@@ -205,7 +207,7 @@ static void E_EmitTypeAndName_Fndecl(E_Emitter* emitter, P_ValueType* type, stri
                     break;
                 }
                 
-                E_EmitTypeAndName(emitter, &curr_type->type, (string) { .str = curr_name->str, .size = curr_name->size }, false);
+                E_EmitTypeAndName(emitter, &curr_type->type, (string) { .str = curr_name->str, .size = curr_name->size });
                 if (i != arity - 1)
                     E_Write(emitter, ", ");
                 
@@ -322,8 +324,25 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
             E_Write(emitter, ")");
         } break;
         
+        case ExprType_CompoundLit: {
+            if (expr->op.compound_lit.should_cast) {
+                E_Write(emitter, "(");
+                E_EmitTypeAndName(emitter, &expr->ret_type, (string) {0});
+                E_Write(emitter, ")");
+            }
+            E_Write(emitter, "{");
+            string_list_node* curr = expr->op.compound_lit.names.first;
+            for (u32 i = 0; i < expr->op.compound_lit.val_count; i++) {
+                E_WriteF(emitter, ".%.*s = ", str_node_expand(curr));
+                E_EmitExpression(emitter, expr->op.compound_lit.values[i]);
+                if (i != expr->op.compound_lit.val_count - 1) E_Write(emitter, ", ");
+                curr = curr->next;
+            }
+            E_Write(emitter, "}");
+        } break;
+        
         case ExprType_Typename: {
-            E_EmitTypeAndName(emitter, &expr->op.typename, (string) {0}, false);
+            E_EmitTypeAndName(emitter, &expr->op.typename, (string) {0});
         } break;
         
         case ExprType_Funcname: {
@@ -336,7 +355,7 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
         
         case ExprType_Cast: {
             E_Write(emitter, "(");
-            E_EmitTypeAndName(emitter, &expr->ret_type, (string) {0}, false);
+            E_EmitTypeAndName(emitter, &expr->ret_type, (string) {0});
             E_Write(emitter, ")");
             E_EmitExpression(emitter, expr->op.cast);
         } break;
@@ -421,12 +440,12 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
         } break;
         
         case StmtType_VarDecl: {
-            E_EmitTypeAndName(emitter, &stmt->op.var_decl.type, stmt->op.var_decl.name, false);
+            E_EmitTypeAndName(emitter, &stmt->op.var_decl.type, stmt->op.var_decl.name);
             E_WriteLine(emitter, ";");
         } break;
         
         case StmtType_VarDeclAssign: {
-            E_EmitTypeAndName(emitter, &stmt->op.var_decl_assign.type, stmt->op.var_decl_assign.name, false);
+            E_EmitTypeAndName(emitter, &stmt->op.var_decl_assign.type, stmt->op.var_decl_assign.name);
             E_Write(emitter, " = ");
             E_EmitExpression(emitter, stmt->op.var_decl_assign.val);
             E_WriteLine(emitter, ";");
@@ -435,7 +454,7 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
         case StmtType_FuncDecl: {
             string varargs;
             string arg_before_varargs;
-            E_EmitTypeAndName_Fndecl(emitter, &stmt->op.func_decl.type, stmt->op.func_decl.name, false, stmt->op.func_decl.param_names, stmt->op.func_decl.param_types, stmt->op.func_decl.arity, stmt->op.func_decl.varargs, &varargs, &arg_before_varargs);
+            E_EmitTypeAndName_Fndecl(emitter, &stmt->op.func_decl.type, stmt->op.func_decl.name, stmt->op.func_decl.param_names, stmt->op.func_decl.param_types, stmt->op.func_decl.arity, stmt->op.func_decl.varargs, &varargs, &arg_before_varargs);
             if (stmt->op.func_decl.block != nullptr) {
                 if (stmt->op.func_decl.block->type != StmtType_Block)
                     E_WriteLine(emitter, " {");
@@ -467,7 +486,7 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             for (u32 i = 0; i < stmt->op.struct_decl.member_count; i++) {
                 for (u32 idt = 0; idt < indent + 1; idt++)
                     E_Write(emitter, "\t");
-                E_EmitTypeAndName(emitter, &curr_type->type, (string) { .str = curr_name->str, .size = curr_name->size }, false);
+                E_EmitTypeAndName(emitter, &curr_type->type, (string) { .str = curr_name->str, .size = curr_name->size });
                 E_WriteLine(emitter, ";");
                 
                 curr_name = curr_name->next;
@@ -483,7 +502,7 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             for (u32 i = 0; i < stmt->op.union_decl.member_count; i++) {
                 for (u32 idt = 0; idt < indent + 1; idt++)
                     E_Write(emitter, "\t");
-                E_EmitTypeAndName(emitter, &curr_type->type, (string) { .str = curr_name->str, .size = curr_name->size }, false);
+                E_EmitTypeAndName(emitter, &curr_type->type, (string) { .str = curr_name->str, .size = curr_name->size });
                 E_WriteLine(emitter, ";");
                 
                 curr_name = curr_name->next;
@@ -652,7 +671,7 @@ static void E_EmitPreStatement(E_Emitter* emitter, P_PreStmt* stmt, u32 indent) 
     switch (stmt->type) {
         case PreStmtType_ForwardDecl: {
             string _, __;
-            E_EmitTypeAndName_Fndecl(emitter, &stmt->op.forward_decl.type, stmt->op.forward_decl.name, false, stmt->op.forward_decl.param_names, stmt->op.forward_decl.param_types, stmt->op.forward_decl.arity, false, &_, &__);
+            E_EmitTypeAndName_Fndecl(emitter, &stmt->op.forward_decl.type, stmt->op.forward_decl.name, stmt->op.forward_decl.param_names, stmt->op.forward_decl.param_types, stmt->op.forward_decl.arity, false, &_, &__);
             E_WriteLine(emitter, ";");
         } break;
         

@@ -1,10 +1,12 @@
 native void printf(string format, ... rest);
 
-void proc(string what) {
-    printf("%s", what);
+struct just_a_struct {
+    int alpha;
+    int beta;
 }
 
 int main() {
-    proc("This");
+    just_a_struct s = (just_a_struct) { .alpha = 10, .beta = 20 };
+    
     return 0;
 }

@@ -37,6 +37,9 @@ enum {
     ValueTypeCollection_Bool,
 };
 
+#include "bytecode.h"
+#include "data_structures.h"
+
 typedef u32 P_ExprType;
 enum {
     ExprType_IntLit, ExprType_LongLit, ExprType_FloatLit, ExprType_DoubleLit,
@@ -45,11 +48,9 @@ enum {
     ExprType_Variable, ExprType_FuncCall, ExprType_Dot, ExprType_EnumDot,
     ExprType_Cast, ExprType_Index, ExprType_Addr, ExprType_Deref,
     ExprType_Nullptr, ExprType_ArrayLit, ExprType_Lambda, ExprType_Call,
-    ExprType_Sizeof, ExprType_Offsetof, ExprType_Namespacename, ExprType_Arrow
+    ExprType_Sizeof, ExprType_Offsetof, ExprType_Namespacename, ExprType_Arrow,
+    ExprType_CompoundLit
 };
-
-#include "bytecode.h"
-#include "data_structures.h"
 
 struct P_Stmt;
 typedef struct P_Namespace P_Namespace;
@@ -86,6 +87,7 @@ struct P_Expr {
         struct { string left; string right; b8 native; } enum_dot;
         struct { P_Expr* name; P_Expr* value; } assignment;
         struct { string name; P_Expr** params; u32 call_arity; } func_call;
+        struct { string_list names; P_Expr** values; u32 val_count; b8 should_cast; } compound_lit;
         struct { P_Expr* left; P_Expr** params; u32 call_arity; } call;
     } op;
 };

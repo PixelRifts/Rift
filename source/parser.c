@@ -6,15 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PATH_MAX 4096
-#ifdef CPCOM_WIN
-#  include <direct.h>
-#  define get_cwd _getcwd
-#elif defined(CPCOM_LINUX)
-#  include <unistd.h>
-#  define get_cwd getcwd
-#endif
-
 #include "operator_bindings.h"
 #include "types.h"
 
@@ -1206,6 +1197,21 @@ static P_Expr* P_MakeFuncCallNode(P_Parser* parser, string name, P_ValueType typ
     return expr;
 }
 
+static P_Expr* P_MakeCompoundLitNode(P_Parser* parser, P_ValueType type, string_list names, P_Expr** values, u32 val_count, b8 should_cast) {
+    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+    expr->type = ExprType_CompoundLit;
+    expr->ret_type = type;
+    expr->can_assign = false;
+    expr->is_constant = true;
+    for (u32 i = 0; i < val_count; i++)
+        if (!values[i]->is_constant) expr->is_constant = false;
+    expr->op.compound_lit.names = names;
+    expr->op.compound_lit.values = values;
+    expr->op.compound_lit.val_count = val_count;
+    expr->op.compound_lit.should_cast = should_cast;
+    return expr;
+}
+
 static P_Expr* P_MakeCallNode(P_Parser* parser, P_Expr* left, P_ValueType type, P_Expr** exprs, u32 call_arity) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_Call;
@@ -1954,51 +1960,81 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
     return nullptr;
 }
 
+// Could be Group, Could be Explicit Cast, Could be Compound Literal
 static P_Expr* P_ExprGroup(P_Parser* parser) {
     P_Expr* in = P_Expression(parser);
     if (in == nullptr) return nullptr;
+    P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected )\n"));
     
     if (in->type == ExprType_Typename) {
-        // Explicit Cast syntax
-        P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after typename\n"));
-        P_Expr* to_be_casted = P_Expression(parser);
+        P_Container* type = type_array_get_in_namespace(parser, in->op.typename.op.basic.nmspc, in->op.typename.full_type, parser->scope_depth);
         
-        b8 allowed_cast = false;
-        if (!type_check(to_be_casted->ret_type, in->op.typename)) {
-            {
-                i32 perm = -1;
-                for (u32 i = 0; i < type_heirarchy_length; i++) {
-                    if (str_eq(type_heirarchy[i].base_type, in->op.typename.full_type)) {
-                        perm = i;
-                        break;
-                    }
-                }
-                if (perm != -1) {
-                    i32 other = -1;
-                    for (u32 i = 0; i < type_heirarchy_length; i++) {
-                        if (str_eq(type_heirarchy[i].base_type, to_be_casted->ret_type.full_type)) {
-                            other = i;
-                            break;
-                        }
-                    }
-                    allowed_cast = other != -1;
+        if (type != nullptr && parser->current.type == TokenType_OpenBrace && (parser->next.type == TokenType_Dot || parser->next.type == TokenType_CloseBrace)) {
+            // Compound Literal
+            P_Consume(parser, TokenType_OpenBrace, str_lit("Expected { for compound literal\n"));
+            string_list names = {0};
+            expr_array exprs = {0};
+            while (!P_Match(parser, TokenType_CloseBrace)) {
+                P_Consume(parser, TokenType_Dot, str_lit("Expected .\n"));
+                P_Consume(parser, TokenType_Identifier, str_lit("Expected member name after .\n"));
+                string name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+                
+                if (!member_exists(type, name))
+                    report_error(parser, str_lit("Member %.*s doesn't exist in type %.*s\n"), str_expand(name), str_expand(in->op.typename.full_type));
+                
+                string_list_push(&parser->arena, &names, name);
+                P_Consume(parser, TokenType_Equal, str_lit("Expected = after member name\n"));
+                P_Expr* val = P_Expression(parser);
+                expr_array_add(&parser->arena, &exprs, val);
+                
+                if (!P_Match(parser, TokenType_Comma)) {
+                    P_Consume(parser, TokenType_CloseBrace, str_lit("Expected } or ,\n"));
+                    break;
                 }
             }
             
-            if (is_ptr(&in->op.typename)) {
-                if (is_ptr(&to_be_casted->ret_type))
-                    allowed_cast = true;
-            }
-        } else allowed_cast = true;
-        
-        if (allowed_cast)
-            return P_MakeCastNode(parser, in->op.typename, to_be_casted);
-        
-        report_error(parser, str_lit("Cannot cast from %.*s to %.*s\n"), str_expand(to_be_casted->ret_type.full_type), str_expand(in->op.typename.full_type));
-        return nullptr;
+            return P_MakeCompoundLitNode(parser, in->op.typename, names, exprs.elements, exprs.count, parser->scope_depth != 0);
+            
+        } else {
+            // Explicit Cast syntax
+            P_Expr* to_be_casted = P_Expression(parser);
+            
+            b8 allowed_cast = false;
+            if (!type_check(to_be_casted->ret_type, in->op.typename)) {
+                {
+                    i32 perm = -1;
+                    for (u32 i = 0; i < type_heirarchy_length; i++) {
+                        if (str_eq(type_heirarchy[i].base_type, in->op.typename.full_type)) {
+                            perm = i;
+                            break;
+                        }
+                    }
+                    if (perm != -1) {
+                        i32 other = -1;
+                        for (u32 i = 0; i < type_heirarchy_length; i++) {
+                            if (str_eq(type_heirarchy[i].base_type, to_be_casted->ret_type.full_type)) {
+                                other = i;
+                                break;
+                            }
+                        }
+                        allowed_cast = other != -1;
+                    }
+                }
+                
+                if (is_ptr(&in->op.typename)) {
+                    if (is_ptr(&to_be_casted->ret_type))
+                        allowed_cast = true;
+                }
+            } else allowed_cast = true;
+            
+            if (allowed_cast)
+                return P_MakeCastNode(parser, in->op.typename, to_be_casted);
+            
+            report_error(parser, str_lit("Cannot cast from %.*s to %.*s\n"), str_expand(to_be_casted->ret_type.full_type), str_expand(in->op.typename.full_type));
+            return nullptr;
+        }
     }
     
-    P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after expression\n"));
     return in;
 }
 

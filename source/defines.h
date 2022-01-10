@@ -54,5 +54,14 @@ exit(-10);          \
 #else
 # error "The compiler only supports windows and linux for now"
 #endif
+#define PATH_MAX 4096
+
+#ifdef CPCOM_WIN
+#  include <direct.h>
+#  define get_cwd _getcwd
+#elif defined(CPCOM_LINUX)
+#  include <unistd.h>
+#  define get_cwd getcwd
+#endif
 
 #endif //DEFINES_H
