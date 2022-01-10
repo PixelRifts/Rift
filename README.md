@@ -6,11 +6,15 @@ Rift - A Language Transpiler
 ## Getting Started
 1) Clone the Repo to your machine
 2) Make a bin directory in the repo root
-3) To regenerate the example, run `./build.bat` and then `bin\rift.exe ./test.rf`.
+3) To regenerate the example:
+    a) On Windows, run `./build.bat` and then `bin\rift.exe ./test.rf`.
+    b) On Linux, run `./build.sh` and then `./bin/rift ./test.rf`.
+4) To run the example:
+    a) On Linux, run `./run.sh`.
 
 ## NOTES
-- This project is currently windows only. You can easily add linux support yourself. (The only thing that is windows specific is in `mem.c`). (make sure to remove #error in the linux block in defines.h too)
-- You can build the project with llvm clang on windows or gcc on linux
+- This project is currently windows and linux only.
+- You can build the project with llvm clang on windows or gcc on linux.
 
 ## TODOS
 - Nested Comment Blocks

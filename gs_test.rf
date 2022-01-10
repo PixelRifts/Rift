@@ -1,5 +1,4 @@
-import "standard.cp";
-import "gs.cp";
+import "gs.rf";
 
 GS.gs_command_buffer_t cb;
 GS.gs_immediate_draw_t imm;
