@@ -10,7 +10,7 @@
 #ifdef CPCOM_WIN
 #  include <direct.h>
 #  define get_cwd _getcwd
-#elif CPCOM_LINUX
+#elif defined(CPCOM_LINUX)
 #  include <unistd.h>
 #  define get_cwd getcwd
 #endif

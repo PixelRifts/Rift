@@ -4,14 +4,14 @@
 
 #ifdef CPCOM_WIN
 #include <windows.h>
-#elif CPCOM_LINUX
+#elif defined(CPCOM_LINUX)
 #include <sys/mman.h>
 #endif
 
 static void* mem_reserve(u64 size) {
 #ifdef CPCOM_WIN
     void* memory = VirtualAlloc(0, size, MEM_RESERVE, PAGE_NOACCESS);
-#elif CPCOM_LINUX
+#elif defined(CPCOM_LINUX)
     void* memory = mmap(nullptr, size, PROT_NONE, MAP_PRIVATE | MAP_ANON, -1, 0);
 #endif
     return memory;
@@ -20,7 +20,7 @@ static void* mem_reserve(u64 size) {
 static void mem_release(void* memory, u64 size) {
 #ifdef CPCOM_WIN
     VirtualFree(memory, 0, MEM_RELEASE);
-#elif CPCOM_LINUX
+#elif defined(CPCOM_LINUX)
     munmap(memory, size);
 #endif
 }
@@ -28,7 +28,7 @@ static void mem_release(void* memory, u64 size) {
 static void mem_commit(void* memory, u64 size) {
 #ifdef CPCOM_WIN
     VirtualAlloc(memory, size, MEM_COMMIT, PAGE_READWRITE);
-#elif CPCOM_LINUX
+#elif defined(CPCOM_LINUX)
     mprotect(memory, size, PROT_READ | PROT_WRITE);
 #endif
 }
@@ -36,7 +36,7 @@ static void mem_commit(void* memory, u64 size) {
 static void mem_decommit(void* memory, u64 size) {
 #ifdef CPCOM_WIN
     VirtualFree(memory, size, MEM_DECOMMIT);
-#elif CPCOM_LINUX
+#elif defined(CPCOM_LINUX)
     mprotect(memory, size, PROT_NONE);
 #endif
 }
