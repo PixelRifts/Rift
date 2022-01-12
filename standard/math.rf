@@ -1,3 +1,4 @@
+namespace std {
 namespace Math {
     struct vec2 { float x; float y; }
     struct vec3 { float x; float y; float z; }
@@ -133,11 +134,10 @@ namespace Math {
     float operator[](mat2 a, int index) {
         return a.m[index];
     }
-    /* 
-    //i'm not sure for loops and ++ operator works rn
+    /*
     bool operator==(mat2 a, mat2 b) {
         bool equals = true;
-        for (int i = 0; i < 4; i = i + 1) {
+        for (int i = 0; i < 4; i++) {
             if (a[i] != b[i]) {
                 equals = false;
             }
@@ -147,7 +147,7 @@ namespace Math {
     
     mat2 operator+(mat2 a, mat2 b) {
         mat2 m;
-        for (int i = 0; i < 4; i = i + 1) {
+        for (int i = 0; i < 4; i++) {
             m[i] = a[i] + b[i];
         }
         return m;
@@ -155,7 +155,7 @@ namespace Math {
     
     mat2 operator-(mat2 a, mat2 b) {
         mat2 m;
-        for (int i = 0; i < 4; i = i + 1) {
+        for (int i = 0; i < 4; i++) {
             m[i] = a[i] - b[i];
         }
         return m;
@@ -163,7 +163,7 @@ namespace Math {
     
     mat2 operator*(mat2 a, float s) {
         mat2 m;
-        for (int i = 0; i < 4; i = i + 1) {
+        for (int i = 0; i < 4; i++) {
             m[i] = a[i] * s;
         }
         return m;
@@ -171,10 +171,11 @@ namespace Math {
     
     mat2 operator/(mat2 a, float s) {
         mat2 m;
-        for (int i = 0; i < 4; i = i + 1) {
+        for (int i = 0; i < 4; i++) {
             m[i] = a[i] / s;
         }
         return m;
     }
     */
+}
 }
