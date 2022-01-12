@@ -177,7 +177,7 @@ static b8 P_IsTypeToken(P_Parser* parser) {
         parser->current.type == TokenType_Char   ||
         parser->current.type == TokenType_Bool   ||
         parser->current.type == TokenType_Void   ||
-        parser->current.type == TokenType_String) return true;
+        parser->current.type == TokenType_Cstring) return true;
     
     if (parser->current.type == TokenType_Hat) {
         // This is for lambda syntax
@@ -243,6 +243,10 @@ static b8 P_IsTypeToken(P_Parser* parser) {
 static P_ValueType P_ReduceType(P_ValueType in) {
     if (in.mod_ct == 0) return in;
     in.mod_ct--;
+    
+    if (str_eq(in.base_type, ValueType_Cstring.base_type))
+        return ValueType_Char;
+    
     switch (in.mods[in.mod_ct].type) {
         case ValueTypeModType_Pointer: {
             in.full_type.size--;
@@ -344,7 +348,7 @@ static b8 P_MatchType(P_Parser* parser, P_ValueType* rettype, string* custom_err
     if (parser->current.type == TokenType_Int || parser->current.type == TokenType_Long ||
         parser->current.type == TokenType_Float || parser->current.type == TokenType_Double ||
         parser->current.type == TokenType_Bool || parser->current.type == TokenType_Char ||
-        parser->current.type == TokenType_Void || parser->current.type == TokenType_String ||
+        parser->current.type == TokenType_Void || parser->current.type == TokenType_Cstring ||
         parser->current.type == TokenType_Identifier) {
         string with_nmspc = {0};
         P_Namespace* nmspc = nullptr;
@@ -773,8 +777,8 @@ static b8 P_CheckValueType(P_ValueTypeCollection expected, P_ValueType type) {
         return type_check(type, ValueType_Integer) || type_check(type, ValueType_Long);
     } else if (expected == ValueTypeCollection_DecimalNumber) {
         return type_check(type, ValueType_Double) || type_check(type, ValueType_Float);
-    } else if (expected == ValueTypeCollection_String) {
-        return type_check(type, ValueType_String);
+    } else if (expected == ValueTypeCollection_Cstring) {
+        return type_check(type, ValueType_Cstring);
     } else if (expected == ValueTypeCollection_Char) {
         return type_check(type, ValueType_Char);
     } else if (expected == ValueTypeCollection_Bool) {
@@ -979,11 +983,11 @@ static P_Expr* P_MakeDoubleNode(P_Parser* parser, f64 value) {
 
 static P_Expr* P_MakeStringNode(P_Parser* parser, string value) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
-    expr->type = ExprType_StringLit;
-    expr->ret_type = ValueType_String;
+    expr->type = ExprType_CstringLit;
+    expr->ret_type = ValueType_Cstring;
     expr->can_assign = false;
     expr->is_constant = true;
-    expr->op.string_lit = value;
+    expr->op.cstring_lit = value;
     return expr;
 }
 
@@ -2085,7 +2089,8 @@ static P_Expr* P_ExprIndex(P_Parser* parser, P_Expr* left) {
         if (!type_check(right->ret_type, ValueType_Integer))
             report_error(parser, str_lit("The [] Operator expects an Integer. Got %.*s\n"), str_expand(right->ret_type.full_type));
         
-        P_ValueType ret = P_ReduceType(left->ret_type);
+        P_ValueType ret;
+        ret = P_ReduceType(left->ret_type);
         return P_MakeIndexNode(parser, ret, left, right);
     }
     return nullptr;
@@ -2396,7 +2401,7 @@ P_ParseRule parse_rules[] = {
     [TokenType_FloatLit]           = { P_ExprFloat,   nullptr, Prec_Primary, Prec_None },
     [TokenType_DoubleLit]          = { P_ExprDouble,  nullptr, Prec_Primary, Prec_None },
     [TokenType_LongLit]            = { P_ExprLong,    nullptr, Prec_Primary, Prec_None },
-    [TokenType_StringLit]          = { P_ExprString,  nullptr, Prec_Primary, Prec_None },
+    [TokenType_CstringLit]         = { P_ExprString,  nullptr, Prec_Primary, Prec_None },
     [TokenType_CharLit]            = { P_ExprChar,    nullptr, Prec_Primary, Prec_None },
     [TokenType_Plus]               = { P_ExprUnary, P_ExprBinary, Prec_Unary, Prec_Term   },
     [TokenType_Minus]              = { P_ExprUnary, P_ExprBinary, Prec_Unary, Prec_Term   },
@@ -2459,7 +2464,7 @@ P_ParseRule parse_rules[] = {
     [TokenType_Bool]               = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
     [TokenType_Double]             = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
     [TokenType_Char]               = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
-    [TokenType_String]             = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
+    [TokenType_Cstring]             = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
     [TokenType_Long]               = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
     [TokenType_Void]               = { nullptr, nullptr, Prec_None, Prec_None },
     [TokenType_Sizeof ]            = { P_ExprSizeof,   nullptr, Prec_Call, Prec_None },
@@ -3146,13 +3151,13 @@ static P_Stmt* P_StmtUsing(P_Parser* parser) {
 }
 
 static P_Stmt* P_StmtCinclude(P_Parser* parser, b8 has_all_tags) {
-    P_Consume(parser, TokenType_StringLit, str_lit("Expected Filename after 'cinclude'\n"));
+    P_Consume(parser, TokenType_CstringLit, str_lit("Expected Filename after 'cinclude'\n"));
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after filename\n"));
     return P_MakeNothingNode(parser);
 }
 
 static P_Stmt* P_StmtCinsert(P_Parser* parser, b8 has_all_tags) {
-    P_Consume(parser, TokenType_StringLit, str_lit("Expected Some code after 'cinsert'\n"));
+    P_Consume(parser, TokenType_CstringLit, str_lit("Expected Some code after 'cinsert'\n"));
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after code\n"));
     return P_MakeNothingNode(parser);
 }
@@ -3165,7 +3170,7 @@ static P_Stmt* P_StmtTypedef(P_Parser* parser, b8 has_all_tags) {
 }
 
 static P_Stmt* P_StmtImport(P_Parser* parser, b8 has_all_tags) {
-    P_Consume(parser, TokenType_StringLit, str_lit("Expected Filename after 'import'\n"));
+    P_Consume(parser, TokenType_CstringLit, str_lit("Expected Filename after 'import'\n"));
     
     // String adjusted to be only the filename without quotes
     string name = { .str = (u8*)parser->previous.start + 1, .size = parser->previous.length - 2 };
@@ -4301,7 +4306,7 @@ static P_PreStmt* P_PreStmtFlagEnumerationDecl(P_Parser* parser, b8 native, b8 h
 }
 
 static P_PreStmt* P_PreStmtCinclude(P_Parser* parser, b8 has_all_tags) {
-    P_Consume(parser, TokenType_StringLit, str_lit("Expected Filename after 'cinclude'\n"));
+    P_Consume(parser, TokenType_CstringLit, str_lit("Expected Filename after 'cinclude'\n"));
     string name = { .str = (u8*)parser->previous.start + 1, .size = parser->previous.length - 2 };
     name = str_replace_all(&parser->arena, name, str_lit("\\"), str_lit("/"));
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after filename\n"));
@@ -4310,7 +4315,7 @@ static P_PreStmt* P_PreStmtCinclude(P_Parser* parser, b8 has_all_tags) {
 }
 
 static P_PreStmt* P_PreStmtCinsert(P_Parser* parser, b8 has_all_tags) {
-    P_Consume(parser, TokenType_StringLit, str_lit("Expected Code in quotes after 'cinsert'\n"));
+    P_Consume(parser, TokenType_CstringLit, str_lit("Expected Code in quotes after 'cinsert'\n"));
     string code = { .str = (u8*)parser->previous.start + 1, .size = parser->previous.length - 2 };
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after filename\n"));
     if (!has_all_tags) return P_MakePreNothingNode(parser);
@@ -4337,7 +4342,7 @@ static P_PreStmt* P_PreStmtConstVar(P_Parser* parser, b8 has_all_tags) {
 }
 
 static P_PreStmt* P_PreStmtImport(P_Parser* parser) {
-    P_Consume(parser, TokenType_StringLit, str_lit("Expected string after 'import'\n"));
+    P_Consume(parser, TokenType_CstringLit, str_lit("Expected string after 'import'\n"));
     
     // String adjusted to be only the filename without quotes
     string name = { .str = (u8*)parser->previous.start + 1, .size = parser->previous.length - 2 };

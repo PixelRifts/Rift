@@ -265,8 +265,8 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
             E_WriteF(emitter, "%.*s", str_expand(expr->op.char_lit));
         } break;
         
-        case ExprType_StringLit: {
-            E_WriteF(emitter, "%.*s", str_expand(expr->op.string_lit));
+        case ExprType_CstringLit: {
+            E_WriteF(emitter, "%.*s", str_expand(expr->op.cstring_lit));
         } break;
         
         case ExprType_ArrayLit: {

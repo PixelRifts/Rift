@@ -11,7 +11,7 @@ namespace GLFW {
     native void glfwInitHint(int hint, int value);
     native void glfwGetVersion(int* major, int* minor, int* rev);
     
-    native GLFWwindow* glfwCreateWindow(int width, int height, string name, GLFWmonitor* moniotr, GLFWwindow* share);
+    native GLFWwindow* glfwCreateWindow(int width, int height, cstring name, GLFWmonitor* moniotr, GLFWwindow* share);
     native bool glfwWindowShouldClose(GLFWwindow* window);
     native void glfwSwapBuffers(GLFWwindow* window);
     native void glfwPollEvents();

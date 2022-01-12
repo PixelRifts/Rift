@@ -76,7 +76,7 @@ extern const P_ValueType ValueType_Long;
 extern const P_ValueType ValueType_Float;
 extern const P_ValueType ValueType_Double;
 
-extern const P_ValueType ValueType_String;
+extern const P_ValueType ValueType_Cstring;
 extern const P_ValueType ValueType_Char;
 extern const P_ValueType ValueType_Bool;
 extern const P_ValueType ValueType_Void;

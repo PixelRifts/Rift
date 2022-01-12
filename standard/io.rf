@@ -3,5 +3,5 @@ native struct FILE;
 native FILE *stdout;
 native FILE *stderr;
 
-native void printf(string format, ... rest);
-native void fprintf(FILE *out, string format, ... rest);
+native void printf(cstring format, ... rest);
+native void fprintf(FILE *out, cstring format, ... rest);
