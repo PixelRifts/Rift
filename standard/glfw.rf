@@ -1,6 +1,7 @@
 // Is this good?
 cinclude "GLFW/glfw3.h";
 
+namespace std { // i'm debating whether or not this goes in std
 namespace GLFW {
     native struct GLFWwindow;
     native struct GLFWmonitor;
@@ -15,4 +16,5 @@ namespace GLFW {
     native void glfwSwapBuffers(GLFWwindow* window);
     native void glfwPollEvents();
     native void glfwDestroyWindow(GLFWwindow* window);
+}
 }

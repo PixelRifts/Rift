@@ -280,7 +280,7 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
         
         case ExprType_Assignment: {
             E_EmitExpression(emitter, expr->op.assignment.name);
-            E_Write(emitter, " = ");
+            E_WriteF(emitter, "%s", L__get_string_from_type__(expr->op.assignment.operator).str);
             E_EmitExpression(emitter, expr->op.assignment.value);
         } break;
         
@@ -297,6 +297,16 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
             E_WriteF(emitter, "%s", L__get_string_from_type__(expr->op.unary.operator).str);
             E_EmitExpression(emitter, expr->op.unary.operand);
             E_Write(emitter, ")");
+        } break;
+
+        case ExprType_Increment: {
+            E_EmitExpression(emitter, expr->op.increment.left);
+            E_Write(emitter, "++");
+        } break;
+
+        case ExprType_Decrement: {
+            E_EmitExpression(emitter, expr->op.decrement.left);
+            E_Write(emitter, "--");
         } break;
         
         case ExprType_Variable: {

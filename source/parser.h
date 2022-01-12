@@ -21,7 +21,7 @@ enum {
     Prec_Comparison,  // < > <= >=
     Prec_Term,        // + -
     Prec_Factor,      // * /
-    Prec_Unary,       // ! - *(deref) &(addr) ~
+    Prec_Unary,       // ! - *(deref) &(addr) ~ ++ --
     Prec_Call,        // . () []
     Prec_Primary
 };
@@ -49,7 +49,7 @@ enum {
     ExprType_Cast, ExprType_Index, ExprType_Addr, ExprType_Deref,
     ExprType_Nullptr, ExprType_ArrayLit, ExprType_Lambda, ExprType_Call,
     ExprType_Sizeof, ExprType_Offsetof, ExprType_Namespacename, ExprType_Arrow,
-    ExprType_CompoundLit
+    ExprType_CompoundLit, ExprType_Increment, ExprType_Decrement,
 };
 
 struct P_Stmt;
@@ -81,11 +81,13 @@ struct P_Expr {
         struct { P_Expr* typename; string member_name; } offsetof_e;
         struct { L_TokenType operator; P_Expr* left; P_Expr* right; } binary;
         struct { L_TokenType operator; P_Expr* operand; } unary;
+        struct { P_Expr* left; } increment;
+        struct { P_Expr* left; } decrement;
         struct { P_Expr* left; string right; } dot;
         struct { P_Expr* left; string right; } arrow;
         struct { P_Expr* operand; P_Expr* index; } index;
         struct { string left; string right; b8 native; } enum_dot;
-        struct { P_Expr* name; P_Expr* value; } assignment;
+        struct { L_TokenType operator; P_Expr* name; P_Expr* value; } assignment;
         struct { string name; P_Expr** params; u32 call_arity; } func_call;
         struct { string_list names; P_Expr** values; u32 val_count; b8 should_cast; } compound_lit;
         struct { P_Expr* left; P_Expr** params; u32 call_arity; } call;

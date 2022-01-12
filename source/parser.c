@@ -1049,14 +1049,35 @@ static P_Expr* P_MakeBinaryNode(P_Parser* parser, L_TokenType type, P_Expr* left
     return expr;
 }
 
-static P_Expr* P_MakeAssignmentNode(P_Parser* parser, P_Expr* name, P_Expr* value) {
+static P_Expr* P_MakeAssignmentNode(P_Parser* parser, L_TokenType operator, P_Expr* name, P_Expr* value) {
     P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
     expr->type = ExprType_Assignment;
     expr->ret_type = value->ret_type;
     expr->can_assign = false;
     expr->is_constant = value->is_constant;
+    expr->op.assignment.operator = operator;
     expr->op.assignment.name = name;
     expr->op.assignment.value = value;
+    return expr;
+}
+
+static P_Expr* P_MakeIncrementNode(P_Parser* parser, P_Expr* left) {
+    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+    expr->type = ExprType_Increment;
+    expr->ret_type = left->ret_type;
+    expr->is_constant = false;
+    expr->can_assign = false;
+    expr->op.increment.left = left;
+    return expr;
+}
+
+static P_Expr* P_MakeDecrementNode(P_Parser* parser, P_Expr* left) {
+    P_Expr* expr = arena_alloc(&parser->arena, sizeof(P_Expr));
+    expr->type = ExprType_Decrement;
+    expr->ret_type = left->ret_type;
+    expr->is_constant = false;
+    expr->can_assign = false;
+    expr->op.decrement.left = left;
     return expr;
 }
 
@@ -1909,15 +1930,20 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
         
         P_Expr* xpr = P_Expression(parser);
         if (xpr == nullptr) return nullptr;
+
+        L_TokenType op_type = parser->previous_two.type;
         
         if (is_ref(&left->ret_type)) {
             P_ValueType m = P_ReduceType(left->ret_type);
             if (type_check(xpr->ret_type, m)) {
-                return P_MakeAssignmentNode(parser, left, P_MakeAddrNode(parser, m, xpr));
+                return P_MakeAssignmentNode(parser, op_type, left, P_MakeAddrNode(parser, m, xpr));
             }
         }
         
         if (left->ret_type.type == ValueTypeType_FuncPointer) {
+            if (op_type != TokenType_Equal) {
+                report_error(parser, str_lit("Invalid assignment operator\n"));
+            }
             if (xpr->type == ExprType_Funcname) {
                 string start_name = xpr->op.funcname.name;
                 // Differentiate the Funcname based on what params we need
@@ -1933,7 +1959,7 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
                         xpr->ret_type.full_type = left->ret_type.full_type;
                         xpr->op.funcname.name = val->mangled_name;
                         
-                        return P_MakeAssignmentNode(parser, left, xpr);
+                        return P_MakeAssignmentNode(parser, op_type, left, xpr);
                     }
                     
                     key.depth--;
@@ -1944,7 +1970,7 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
                 if (!type_check(xpr->ret_type, left->ret_type)) {
                     report_error(parser, str_lit("Incompatible function pointer types\n"));
                 } else {
-                    return P_MakeAssignmentNode(parser, left, xpr);
+                    return P_MakeAssignmentNode(parser, op_type, left, xpr);
                 }
             } else {
                 report_error(parser, str_lit("Expected function pointer\n"));
@@ -1952,7 +1978,7 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
         }
         
         if (type_check(xpr->ret_type, left->ret_type)) {
-            return P_MakeAssignmentNode(parser, left, xpr);
+            return P_MakeAssignmentNode(parser, op_type, left, xpr);
         }
         
         report_error(parser, str_lit("Cannot assign %.*s to variable of type %.*s\n"), str_expand(xpr->ret_type.full_type), str_expand(left->ret_type.full_type));
@@ -2081,6 +2107,14 @@ static P_Expr* P_ExprDeref(P_Parser* parser) {
     
     P_ValueType ret = P_ReduceType(e->ret_type);
     return P_MakeDerefNode(parser, ret, e);
+}
+
+static P_Expr* P_ExprIncrement(P_Parser* parser, P_Expr* left) {
+    return P_MakeIncrementNode(parser, left);
+}
+
+static P_Expr* P_ExprDecrement(P_Parser* parser, P_Expr* left) {
+    return P_MakeDecrementNode(parser, left);
 }
 
 static P_Expr* P_ExprUnary(P_Parser* parser) {
@@ -2371,8 +2405,8 @@ P_ParseRule parse_rules[] = {
     [TokenType_ShiftLeft]          = { nullptr,     P_ExprBinary, Prec_None,  Prec_Factor },
     [TokenType_ShiftRight]         = { nullptr,     P_ExprBinary, Prec_None,  Prec_Factor },
     [TokenType_Percent]            = { nullptr,     P_ExprBinary, Prec_None,  Prec_Factor },
-    [TokenType_PlusPlus]           = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_MinusMinus]         = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_PlusPlus]           = { nullptr, P_ExprIncrement, Prec_None, Prec_Unary },
+    [TokenType_MinusMinus]         = { nullptr, P_ExprDecrement, Prec_None, Prec_Unary },
     [TokenType_Backslash]          = { nullptr, nullptr, Prec_None, Prec_None },
     [TokenType_Hat]                = { P_ExprLambda, P_ExprBinary, Prec_Primary, Prec_BitXor },
     [TokenType_Ampersand]          = { P_ExprAddr,   P_ExprBinary, Prec_Unary,   Prec_BitAnd },
@@ -2380,15 +2414,15 @@ P_ParseRule parse_rules[] = {
     [TokenType_Tilde]              = { P_ExprUnary, nullptr,  Prec_Unary, Prec_None },
     [TokenType_Bang]               = { P_ExprUnary, nullptr,  Prec_Unary, Prec_None },
     [TokenType_Equal]              = { nullptr, P_ExprAssign, Prec_None, Prec_Assignment },
-    [TokenType_PlusEqual]          = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_MinusEqual]         = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_StarEqual]          = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_SlashEqual]         = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_PercentEqual]       = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_AmpersandEqual]     = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_PipeEqual]          = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_HatEqual]           = { nullptr, nullptr, Prec_None, Prec_None },
-    [TokenType_TildeEqual]         = { nullptr, nullptr, Prec_None, Prec_None },
+    [TokenType_PlusEqual]          = { nullptr, P_ExprAssign, Prec_None, Prec_Assignment },
+    [TokenType_MinusEqual]         = { nullptr, P_ExprAssign, Prec_None, Prec_Assignment },
+    [TokenType_StarEqual]          = { nullptr, P_ExprAssign, Prec_None, Prec_Assignment },
+    [TokenType_SlashEqual]         = { nullptr, P_ExprAssign, Prec_None, Prec_Assignment },
+    [TokenType_PercentEqual]       = { nullptr, P_ExprAssign, Prec_None, Prec_Assignment },
+    [TokenType_AmpersandEqual]     = { nullptr, P_ExprAssign, Prec_None, Prec_Assignment },
+    [TokenType_PipeEqual]          = { nullptr, P_ExprAssign, Prec_None, Prec_Assignment },
+    [TokenType_HatEqual]           = { nullptr, P_ExprAssign, Prec_None, Prec_Assignment },
+    [TokenType_TildeEqual]         = { nullptr, P_ExprAssign, Prec_None, Prec_Assignment },
     [TokenType_EqualEqual]         = { nullptr, P_ExprBinary, Prec_None, Prec_Equality },
     [TokenType_BangEqual]          = { nullptr, P_ExprBinary, Prec_None, Prec_Equality },
     [TokenType_Less]               = { nullptr, P_ExprBinary, Prec_None, Prec_Comparison },
