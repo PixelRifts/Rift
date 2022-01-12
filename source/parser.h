@@ -32,7 +32,7 @@ enum {
     ValueTypeCollection_Pointer,
     ValueTypeCollection_WholeNumber,
     ValueTypeCollection_DecimalNumber,
-    ValueTypeCollection_String,
+    ValueTypeCollection_Cstring,
     ValueTypeCollection_Char,
     ValueTypeCollection_Bool,
 };
@@ -43,7 +43,7 @@ enum {
 typedef u32 P_ExprType;
 enum {
     ExprType_IntLit, ExprType_LongLit, ExprType_FloatLit, ExprType_DoubleLit,
-    ExprType_StringLit, ExprType_CharLit, ExprType_BoolLit, ExprType_Typename,
+    ExprType_CstringLit, ExprType_CharLit, ExprType_BoolLit, ExprType_Typename,
     ExprType_Funcname, ExprType_Unary, ExprType_Binary, ExprType_Assignment,
     ExprType_Variable, ExprType_FuncCall, ExprType_Dot, ExprType_EnumDot,
     ExprType_Cast, ExprType_Index, ExprType_Addr, ExprType_Deref,
@@ -67,7 +67,7 @@ struct P_Expr {
         f64    double_lit;
         b8     bool_lit;
         string char_lit; // Is a string for transpiling reasons. :(
-        string string_lit;
+        string cstring_lit;
         P_ValueType typename;
         P_Namespace* namespace;
         string lambda;

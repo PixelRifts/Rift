@@ -8,7 +8,7 @@ const P_ValueType ValueType_Long = value_type_abs_nc("long");
 const P_ValueType ValueType_Float = value_type_abs_nc("float");
 const P_ValueType ValueType_Double = value_type_abs_nc("double");
 
-const P_ValueType ValueType_String = value_type_abs_nc("string");
+const P_ValueType ValueType_Cstring = value_type_abs_nc("cstring");
 const P_ValueType ValueType_Char = value_type_abs_nc("char");
 const P_ValueType ValueType_Bool = value_type_abs_nc("bool");
 const P_ValueType ValueType_Void = value_type_abs_nc("void");
@@ -61,7 +61,11 @@ b8 value_type_list_equals(value_type_list* a, value_type_list* b) {
 }
 
 b8 is_ptr(P_ValueType* a) {
-    if (a->mod_ct == 0) return false;
+    if (a->mod_ct == 0) {
+        if (str_eq(a->base_type, ValueType_Cstring.base_type))
+            return true;
+        return false;
+    }
     if (a->mods[a->mod_ct - 1].type != ValueTypeModType_Pointer) return false;
     return true;
 }

@@ -40,7 +40,7 @@ P_BinaryOpPair pairs_operator_bin[] = {
 u32 pairs_operator_equality_count = 4;
 P_BinaryOpPair pairs_operator_equality[] = {
     { .left = ValueTypeCollection_Number, .right = ValueTypeCollection_Number },
-    { .left = ValueTypeCollection_String, .right = ValueTypeCollection_String },
+    { .left = ValueTypeCollection_Cstring, .right = ValueTypeCollection_Cstring },
     { .left = ValueTypeCollection_Char, .right = ValueTypeCollection_Char },
     { .left = ValueTypeCollection_Bool, .right = ValueTypeCollection_Bool },
 };

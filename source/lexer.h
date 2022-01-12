@@ -10,7 +10,7 @@ typedef u32 L_TokenType;
 enum {
     TokenType_Error, TokenType_EOF, TokenType_Whitespace,
     
-    TokenType_Identifier, TokenType_StringLit,
+    TokenType_Identifier, TokenType_CstringLit,
     TokenType_IntLit, TokenType_FloatLit, TokenType_DoubleLit, TokenType_CharLit,
     TokenType_LongLit,
     
@@ -43,7 +43,7 @@ enum {
     TokenType_Switch, TokenType_Match, TokenType_Case, TokenType_Default,
     TokenType_True, TokenType_False, TokenType_Native,
     TokenType_Namespace, TokenType_Using,
-    TokenType_Int, TokenType_String, TokenType_Float, TokenType_Bool,
+    TokenType_Int, TokenType_Cstring, TokenType_Float, TokenType_Bool,
     TokenType_Double, TokenType_Char, TokenType_Long, TokenType_Void,
     
     TokenType_Tag, TokenType_Sizeof, TokenType_Offsetof, TokenType_Cinclude,

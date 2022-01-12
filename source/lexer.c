@@ -8,7 +8,7 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_EOF: return str_lit("EOF");
         case TokenType_Whitespace: return str_lit("Whitespace");
         case TokenType_Identifier: return str_lit("Identifier");
-        case TokenType_StringLit: return str_lit("String Literal");
+        case TokenType_CstringLit: return str_lit("Null-terminated String Literal");
         case TokenType_CharLit: return str_lit("Character Literal");
         case TokenType_IntLit: return str_lit("Integer Literal");
         case TokenType_FloatLit: return str_lit("Float Literal");
@@ -84,7 +84,7 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_Double: return str_lit("Double");
         case TokenType_Char: return str_lit("Char");
         case TokenType_Long: return str_lit("Long");
-        case TokenType_String: return str_lit("String");
+        case TokenType_Cstring: return str_lit("Null-Terminated String");
         case TokenType_Native: return str_lit("Native");
         case TokenType_Namespace: return str_lit("Namespace");
         case TokenType_Using: return str_lit("Using");
@@ -175,7 +175,7 @@ static L_Token L_String(L_Lexer* lexer) {
         L_Advance(lexer);
     }
     L_Advance(lexer); // Closing quote
-    return L_MakeToken(lexer, TokenType_StringLit);
+    return L_MakeToken(lexer, TokenType_CstringLit);
 }
 
 static L_Token L_Char(L_Lexer* lexer) {
@@ -262,6 +262,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
         
         case 'c': {
             switch (lexer->start[1]) {
+                case 's': return L_MatchType(lexer, 2, str_lit("tring"), TokenType_Cstring);
                 case 'h': return L_MatchType(lexer, 2, str_lit("ar"), TokenType_Char);
                 case 'o': {
                     if (L_MatchType(lexer, 2, str_lit("ntinue"), TokenType_Continue) == TokenType_Continue) {
@@ -279,11 +280,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
         
         case 's': {
             switch (lexer->start[1]) {
-                case 't': {
-                    if (L_MatchType(lexer, 2, str_lit("ruct"), TokenType_Struct) == TokenType_Struct) {
-                        return TokenType_Struct;
-                    } else return L_MatchType(lexer, 2, str_lit("ring"), TokenType_String);
-                }
+                case 't': return L_MatchType(lexer, 2, str_lit("ruct"), TokenType_Struct);
                 case 'w': return L_MatchType(lexer, 2, str_lit("itch"), TokenType_Switch);
                 case 'i': return L_MatchType(lexer, 2, str_lit("zeof"), TokenType_Sizeof);
             }
