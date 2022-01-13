@@ -8,14 +8,17 @@ typedef struct P_BinaryOpPair {
     P_ValueTypeCollection right;
 } P_BinaryOpPair;
 
+u32 list_operator_arithmetic_count = 1;
 P_ValueTypeCollection list_operator_arithmetic[] = {
     ValueTypeCollection_Number
 };
 
+u32 list_operator_bin_count = 1;
 P_ValueTypeCollection list_operator_bin[] = {
     ValueTypeCollection_Number
 };
 
+u32 list_operator_logical_count = 1;
 P_ValueTypeCollection list_operator_logical[] = {
     ValueTypeCollection_Bool
 };

@@ -1,4 +1,4 @@
-native void printf(cstring format, ... rest);
+native void  printf(cstring format, ... rest);
 native void* malloc(long size);
 native void* calloc(int count, int elem_size);
 native void* memset(void* block, int ch, int size);
@@ -12,17 +12,18 @@ struct just_a_struct {
 }
 
 int main() {
-    cstring v = malloc(16);
+    //just_a_struct s = (just_a_struct) { .alpha = 10, .beta = 20 };
+    //just_a_struct t = (just_a_struct) { .alpha = 1, .beta = 2 };
+    //s += t;
     
-    just_a_struct s = (just_a_struct) { .alpha = 10, .beta = 20 };
-
     int i = 0;
-    
     i += 1;
     i -= 4;
     i *= 2;
     i /= 6;
-
+    --i;
+    ++i;
+    
     printf("%d\n", i);
     
     return 0;

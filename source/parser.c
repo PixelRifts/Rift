@@ -794,7 +794,7 @@ static void P_Bind(P_Parser* parser, P_Expr* expr, P_ValueTypeCollection* expect
             return;
         }
     }
-    report_error(parser, error_msg, expr->ret_type.full_type);
+    report_error(parser, error_msg, str_expand(expr->ret_type.full_type));
 }
 
 static void P_BindDouble(P_Parser* parser, P_Expr* left, P_Expr* right, P_BinaryOpPair* expected, u32 flagct, string error_msg) {
@@ -1931,11 +1931,16 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
             else
                 report_error(parser, str_lit("Expected assignable expression on the left of = sign\n"));
         }
+        L_TokenType op_type = parser->previous.type;
         
         P_Expr* xpr = P_Expression(parser);
         if (xpr == nullptr) return nullptr;
-
-        L_TokenType op_type = parser->previous_two.type;
+        
+        if (op_type != TokenType_Equal) {
+            if (!(P_CheckValueType(ValueTypeCollection_Number, left->ret_type) || P_CheckValueType(ValueTypeCollection_Number, xpr->ret_type))) {
+                report_error(parser, str_lit("Cannot use %.*s operator on %.*s\n"), str_expand(L__get_string_from_type__(op_type)), str_expand(left->ret_type.full_type));
+            }
+        }
         
         if (is_ref(&left->ret_type)) {
             P_ValueType m = P_ReduceType(left->ret_type);
@@ -2115,10 +2120,18 @@ static P_Expr* P_ExprDeref(P_Parser* parser) {
 }
 
 static P_Expr* P_ExprIncrement(P_Parser* parser, P_Expr* left) {
+    if (!left->can_assign)
+        report_error(parser, str_lit("Cannot Increment Non assignable expression\n"));
+    if (!P_CheckValueType(ValueTypeCollection_Number, left->ret_type))
+        report_error(parser, str_lit("Cannot Increment expression with type %.*s\n"), str_expand(left->ret_type.base_type));
     return P_MakeIncrementNode(parser, left);
 }
 
 static P_Expr* P_ExprDecrement(P_Parser* parser, P_Expr* left) {
+    if (!left->can_assign)
+        report_error(parser, str_lit("Cannot Increment Non assignable expression\n"));
+    if (!P_CheckValueType(ValueTypeCollection_Number, left->ret_type))
+        report_error(parser, str_lit("Cannot Increment expression with type %.*s\n"), str_expand(left->ret_type.base_type));
     return P_MakeDecrementNode(parser, left);
 }
 
@@ -2126,21 +2139,31 @@ static P_Expr* P_ExprUnary(P_Parser* parser) {
     L_TokenType op_type = parser->previous.type;
     P_Expr* operand = P_ExprPrecedence(parser, Prec_Unary);
     P_ValueType ret_type;
+    
+    // TODO(voxel): @refactor pull out into table and simple lookup
     switch (op_type) {
         case TokenType_Plus: {
-            P_Bind(parser, operand, list_operator_arithmetic, sizeof(list_operator_arithmetic), str_lit("Cannot apply unary operator + to %s\n"));
+            P_Bind(parser, operand, list_operator_arithmetic, list_operator_arithmetic_count, str_lit("Cannot apply unary operator + to %.*s\n"));
             ret_type = operand->ret_type;
         } break;
         case TokenType_Minus: {
-            P_Bind(parser, operand, list_operator_arithmetic, sizeof(list_operator_arithmetic), str_lit("Cannot apply unary operator - to %s\n"));
+            P_Bind(parser, operand, list_operator_arithmetic, list_operator_arithmetic_count, str_lit("Cannot apply unary operator - to %.*s\n"));
             ret_type = operand->ret_type;
         } break;
         case TokenType_Tilde: {
-            P_Bind(parser, operand, list_operator_bin, sizeof(list_operator_bin), str_lit("Cannot apply unary operator ~ to %s\n"));
+            P_Bind(parser, operand, list_operator_bin, list_operator_bin_count, str_lit("Cannot apply unary operator ~ to %.*s\n"));
             ret_type = operand->ret_type;
         } break;
         case TokenType_Bang: {
-            P_Bind(parser, operand, list_operator_logical, sizeof(list_operator_logical), str_lit("Cannot apply unary operator ! to %s\n"));
+            P_Bind(parser, operand, list_operator_logical, list_operator_logical_count, str_lit("Cannot apply unary operator ! to %.*s\n"));
+            ret_type = operand->ret_type;
+        } break;
+        case TokenType_PlusPlus: {
+            P_Bind(parser, operand, list_operator_arithmetic, list_operator_arithmetic_count, str_lit("Cannot apply unary operator ++ to %.*s\n"));
+            ret_type = operand->ret_type;
+        } break;
+        case TokenType_MinusMinus: {
+            P_Bind(parser, operand, list_operator_arithmetic, list_operator_arithmetic_count, str_lit("Cannot apply unary operator -- to %.*s\n"));
             ret_type = operand->ret_type;
         } break;
     }
@@ -2410,8 +2433,8 @@ P_ParseRule parse_rules[] = {
     [TokenType_ShiftLeft]          = { nullptr,     P_ExprBinary, Prec_None,  Prec_Factor },
     [TokenType_ShiftRight]         = { nullptr,     P_ExprBinary, Prec_None,  Prec_Factor },
     [TokenType_Percent]            = { nullptr,     P_ExprBinary, Prec_None,  Prec_Factor },
-    [TokenType_PlusPlus]           = { nullptr, P_ExprIncrement, Prec_None, Prec_Unary },
-    [TokenType_MinusMinus]         = { nullptr, P_ExprDecrement, Prec_None, Prec_Unary },
+    [TokenType_PlusPlus]           = { P_ExprUnary, P_ExprIncrement, Prec_Unary, Prec_Unary },
+    [TokenType_MinusMinus]         = { P_ExprUnary, P_ExprDecrement, Prec_Unary, Prec_Unary },
     [TokenType_Backslash]          = { nullptr, nullptr, Prec_None, Prec_None },
     [TokenType_Hat]                = { P_ExprLambda, P_ExprBinary, Prec_Primary, Prec_BitXor },
     [TokenType_Ampersand]          = { P_ExprAddr,   P_ExprBinary, Prec_Unary,   Prec_BitAnd },
@@ -2794,7 +2817,7 @@ static P_Stmt* P_StmtOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has_a
             }
             
             default: {
-                report_error(parser, str_lit("Cannot overload operator %.*s\n"), L__get_string_from_type__(parser->previous.type));
+                report_error(parser, str_lit("Cannot overload operator %.*s\n"), str_expand(L__get_string_from_type__(parser->previous.type)));
             }
         }
     }
@@ -3873,7 +3896,7 @@ static P_PreStmt* P_PreOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has
         }
         
         default: {
-            report_error(parser, str_lit("Cannot overload operator %.*s\n"), L__get_string_from_type__(parser->previous.type));
+            report_error(parser, str_lit("Cannot overload operator %.*s\n"), str_expand(L__get_string_from_type__(parser->previous.type)));
         }
     }
     return P_MakePreNothingNode(parser);
