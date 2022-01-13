@@ -6,6 +6,10 @@ struct just_a_struct {
     int beta;
 }
 
+just_a_struct operator+(just_a_struct a, just_a_struct b) {
+    return (just_a_struct) { .alpha = a.alpha + b.alpha, .beta = a.beta + b.beta };
+}
+
 int main() {
     //just_a_struct s = (just_a_struct) { .alpha = 10, .beta = 20 };
     //just_a_struct t = (just_a_struct) { .alpha = 1, .beta = 2 };
