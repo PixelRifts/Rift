@@ -1,30 +1,18 @@
-native void  printf(cstring format, ... rest);
-native void* malloc(long size);
-native void* calloc(int count, int elem_size);
-native void* memset(void* block, int ch, int size);
-native void  memcpy(void* to, void* from, int size);
-native void  memmove(void* to, void* from, int size);
-native void  free(void* buffer);
+import "standard/io.rf";
 
 struct just_a_struct {
     int alpha;
     int beta;
 }
 
+just_a_struct operator+(just_a_struct a, just_a_struct b) {
+    return (just_a_struct) { .alpha = a.alpha + b.alpha, .beta = a.beta + b.beta };
+}
+
 int main() {
-    //just_a_struct s = (just_a_struct) { .alpha = 10, .beta = 20 };
-    //just_a_struct t = (just_a_struct) { .alpha = 1, .beta = 2 };
-    //s += t;
-    
-    int i = 0;
-    i += 1;
-    i -= 4;
-    i *= 2;
-    i /= 6;
-    --i;
-    ++i;
-    
-    printf("%d\n", i);
-    
+    just_a_struct a = (just_a_struct) { .alpha = 2, .beta = 3 };
+    just_a_struct b = (just_a_struct) { .alpha = 3, .beta = 2 };
+    just_a_struct c = a + b;
+    printf("Alpha: %d, Beta: %d\n", c.alpha, c.beta);
     return 0;
 }

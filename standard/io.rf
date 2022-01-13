@@ -1,7 +1,9 @@
-native struct FILE;
-
-native FILE *stdout;
-native FILE *stderr;
+namespace std {
+    native struct FILE;
+    
+    native FILE *stdout;
+    native FILE *stderr;
+}
 
 native void printf(cstring format, ... rest);
-native void fprintf(FILE *out, cstring format, ... rest);
+native void fprintf(std.FILE *out, cstring format, ... rest);

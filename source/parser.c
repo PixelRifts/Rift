@@ -511,8 +511,21 @@ static P_ValueType type_heirarchy[] = {
 };
 u32 type_heirarchy_length = 5;
 
+b8 check_mods(P_ValueTypeMod* modsA, P_ValueTypeMod* modsB, u32 mod_ct) {
+    for (u32 k = 0; k < mod_ct; k++) {
+        if (modsA[k].type != modsB[k].type)
+            return false;
+    }
+    return true;
+}
+
 b8 type_check(P_ValueType a, P_ValueType expected) {
-    if (str_eq(a.full_type, expected.full_type) && str_eq(a.base_type, expected.base_type)) return true;
+    if (str_eq(a.base_type, expected.base_type)) {
+        if (a.mod_ct == expected.mod_ct) {
+            if (check_mods(a.mods, expected.mods, a.mod_ct))
+                return true;
+        }
+    }
     
     if ((a.type == ValueTypeType_FuncPointer) && (expected.type == ValueTypeType_FuncPointer)) {
         if (!type_check(*a.op.func_ptr.ret_type, *expected.op.func_ptr.ret_type))
@@ -573,7 +586,6 @@ b8 type_check(P_ValueType a, P_ValueType expected) {
             }
         }
     }
-    
     
     // Array testing [ any[] -> any* ]
     if (is_array(&a)) {
@@ -1610,17 +1622,18 @@ static P_Expr* P_ExprArray(P_Parser* parser) {
     
     expr_array arr = {0};
     P_Expr* curr = P_Expression(parser);
-    P_ValueType array_type = curr->ret_type;
     while (curr != nullptr) {
+        P_ValueType array_type = curr->ret_type;
         expr_array_add(&parser->arena, &arr, curr);
         if (P_Match(parser, TokenType_CloseBrace)) break;
         P_Consume(parser, TokenType_Comma, str_lit("Expected , or }\n"));
         curr = P_Expression(parser);
         if (!type_check(curr->ret_type, array_type))
             report_error(parser, str_lit("Arrays cannot contain expressions of multiple types.\n"));
+        array_type = P_PushArrayType(parser, array_type, arr.count);
+        return P_MakeArrayLiteralNode(parser, array_type, arr);
     }
-    array_type = P_PushArrayType(parser, array_type, arr.count);
-    return P_MakeArrayLiteralNode(parser, array_type, arr);
+    return nullptr;
 }
 
 
@@ -2002,7 +2015,9 @@ static P_Expr* P_ExprGroup(P_Parser* parser) {
     P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected )\n"));
     
     if (in->type == ExprType_Typename) {
-        P_Container* type = type_array_get_in_namespace(parser, in->op.typename.op.basic.nmspc, in->op.typename.full_type, parser->scope_depth);
+        P_Container* type = nullptr;
+        if (in->op.typename.op.basic.nmspc != nullptr)
+            type = type_array_get_in_namespace(parser, in->op.typename.op.basic.nmspc, in->op.typename.full_type, parser->scope_depth);
         
         if (type != nullptr && parser->current.type == TokenType_OpenBrace && (parser->next.type == TokenType_Dot || parser->next.type == TokenType_CloseBrace)) {
             // Compound Literal
@@ -3554,6 +3569,7 @@ static P_Stmt* P_StmtDoWhile(P_Parser* parser) {
 
 static P_Stmt* P_StmtExpression(P_Parser* parser) {
     P_Expr* expr = P_Expression(parser);
+    if (expr == nullptr) return nullptr;
     P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after expression\n"));
     return P_MakeExpressionStmtNode(parser, expr);
 }
