@@ -6,7 +6,7 @@
 // All types will go through this map
 static void type_map(E_Emitter* emitter, P_ValueType* type) {
     type->base_type = str_replace_all(&emitter->parser.arena, type->base_type, str_lit("long"), str_lit("long long"));
-    type->base_type = str_replace_all(&emitter->parser.arena, type->base_type, str_lit("string"), str_lit("const char *"));
+    type->base_type = str_replace_all(&emitter->parser.arena, type->base_type, str_lit("cstring"), str_lit("const char *"));
 }
 
 static void E_Write(E_Emitter* emitter, const char* text) {

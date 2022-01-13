@@ -1,12 +1,7 @@
 // string.rf idea using c allocation instead of an arena
 
-native void* malloc(long size);
-native void* realloc(void* block, long size);
-native void* calloc(int count, int elem_size);
-native void* memset(void* block, int ch, int size);
-native void  memcpy(void* to, void* from, int size);
-native void  memmove(void* to, void* from, int size);
-native void  free(void* buffer);
+import "memory.rf";
+import "assert.rf";
 
 namespace std {
     struct string {
@@ -15,52 +10,98 @@ namespace std {
         // NOTE(EVERYONE): the implementation of length does not include the '\0' at the end
     }
 
-    static void alloc_str(string *str, int length) {
+    void str_alloc(string *str, int length) {
         str->data = (char *) malloc(length * sizeof(char));
     }
 
-    static void realloc_str(string *str, int length) {
-        str->data = (char *) realloc(str, length * sizeof(char));
+    void str_realloc(string *str, int length) {
+        str->data = (char *) realloc(str->data, length * sizeof(char));
     }
 
-    char *get_cstr(string str) {
-        return str->data;
+    char *str_get_cstr(string str) {
+        return str.data;
     }
 
     // it's really best if you use this; empty_string could segfault
-    string get_str(cstring data) {
-        string ret = { .data = nullptr; .length = 0; };
-        while (data[ret.length]) {
+    string str_get(cstring data) {
+        string ret = (string) { .data = nullptr, .length = 0 };
+        while (((char *) data) [ret.length] != '\0') {
             ret.length++;
         }
 
-        alloc_str(&ret, ret.length + 1);
+        str_alloc(&ret, ret.length + 1);
         memcpy(ret.data, data, ret.length + 1);
 
         return ret;
     }
 
-    void set_str(string *str, char *data) {
+    void str_set(string *str, char *data) {
         str->length = 0;
-        while (data[str->length]) {
+        while (((char *) data) [str->length] != '\0') {
             str->length++;
         }
 
-        realloc_str(str, str->length + 1);
-        memcpy(ret.data, data, ret.length + 1);
+        str_realloc(str, str->length);
+        memcpy(str->data, data, str->length);
     }
 
-    void set_str(string *str_dest, string *str_src) {
+    void str_set(string *str_dest, string *str_src) {
         str_dest->length = str_src->length;
 
-        realloc_str(str, str->length + 1);
-        memcpy(ret.data, str_src->data, ret.length + 1);
+        str_realloc(str_dest, str_dest->length);
+        memcpy(str_dest->data, str_src->data, str_src->length);
     }
 
     // i call it empty and not free bc the 10-12 bytes making the cstring itself aren't being freed
     // but the data is; it's up to the developer to manage alloc'ed cstring instances themselves
-    void empty_string(string *str) {
+    void str_empty(string *str) {
         free(str->data);
         str->length = 0;
+    }
+
+    void str_concat(string *str_dest, string *str_src) {
+        long old_length = str_dest->length;
+        str_dest->length += str_src->length;
+
+        str_realloc(str_dest, str_dest->length);
+        memcpy(str_dest->data + old_length, str_src->data, str_src->length);
+    }
+
+    void str_append(string *str, char c) {
+        str->length++;
+
+        str_realloc(str, str->length);
+        // -1 because of the '\0'
+        memcpy(str->data + str->length - 1, &c, sizeof(char));
+    }
+
+    string operator+(cstring a, cstring b) {
+        string ret = (string) { .data = nullptr, .length = 0 };
+
+        int i = 0;
+        int offset_one = 0;
+        while (((char *) a) [i] != '\0') {
+            ret.length++;
+            i++;
+            offset_one++;
+        }
+        i = 0;
+        while (((char *) b) [i] != '\0') {
+            ret.length++;
+            i++;
+        }
+
+        str_alloc(&ret, ret.length);
+
+        memcpy(ret.data, a, offset_one);
+        memcpy(ret.data + offset_one, b, ret.length - offset_one);
+
+        return ret;
+    }
+
+    char operator[](string str, int index) {
+        assert((str.length > index), "String of length %d indexed for element %d.\n", str.length, index);
+
+        return str.data[index];
     }
 }

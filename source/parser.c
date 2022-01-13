@@ -648,6 +648,7 @@ static string P_FuncNameMangle(P_Parser* parser, string name, u32 arity, value_t
                                        str_from_format(&parser->arena, "%.*s", str_expand(curr->type.full_type)),
                                        str_lit("*"), str_lit("ptr"));
         fixed = str_replace_all(&parser->arena, fixed, str_lit("&"), str_lit("ref"));
+        fixed = str_replace_all(&parser->arena, fixed, str_lit(" "), str_lit("_")); // this occurs in fn decls with ptr parameters 
         
         string_list_push(&parser->arena, &sl, fixed);
         curr = curr->next;
@@ -2579,6 +2580,16 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
             
             P_Consume(parser, TokenType_CloseParenthesis, str_lit("Varargs can only be the last argument for a function\n"));
             arity++;
+
+            if (!native) {
+                var_entry_key key = (var_entry_key) { .name = varargs_name, .depth = parser->scope_depth };
+                var_entry_val test;
+                var_entry_val set = (var_entry_val) { .mangled_name = varargs_name, .type = value_type_abs("...") };
+                if (!var_hash_table_get(&parser->current_namespace->variables, key, &test))
+                    var_hash_table_set(&parser->current_namespace->variables, key, set);
+                else
+                    report_error(parser, str_lit("Multiple Parameters with the same name\n"));
+            }
             break;
         }
         
