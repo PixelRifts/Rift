@@ -1,10 +1,5 @@
-native void  printf(cstring format, ... rest);
-native void* malloc(long size);
-native void* calloc(int count, int elem_size);
-native void* memset(void* block, int ch, int size);
-native void  memcpy(void* to, void* from, int size);
-native void  memmove(void* to, void* from, int size);
-native void  free(void* buffer);
+import "standard/string.rf";
+import "standard/io.rf";
 
 struct just_a_struct {
     int alpha;
@@ -16,15 +11,9 @@ int main() {
     //just_a_struct t = (just_a_struct) { .alpha = 1, .beta = 2 };
     //s += t;
     
-    int i = 0;
-    i += 1;
-    i -= 4;
-    i *= 2;
-    i /= 6;
-    --i;
-    ++i;
-    
-    printf("%d\n", i);
+    std.string foo = std.get_str("this is a test");
+
+    printf("%s\n", std.get_cstr(foo));
     
     return 0;
 }
