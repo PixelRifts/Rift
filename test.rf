@@ -1,4 +1,3 @@
-import "standard/string.rf";
 import "standard/io.rf";
 
 struct just_a_struct {
@@ -11,13 +10,9 @@ just_a_struct operator+(just_a_struct a, just_a_struct b) {
 }
 
 int main() {
-    //just_a_struct s = (just_a_struct) { .alpha = 10, .beta = 20 };
-    //just_a_struct t = (just_a_struct) { .alpha = 1, .beta = 2 };
-    //s += t;
-    
-    std.string foo = std.get_str("this is a test");
-
-    printf("%s\n", std.get_cstr(foo));
-    
+    just_a_struct a = (just_a_struct) { .alpha = 2, .beta = 3 };
+    just_a_struct b = (just_a_struct) { .alpha = 3, .beta = 2 };
+    just_a_struct c = a + b;
+    printf("Alpha: %d, Beta: %d\n", c.alpha, c.beta);
     return 0;
 }
