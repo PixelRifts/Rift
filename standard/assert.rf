@@ -1,0 +1,12 @@
+import "io.rf";
+
+native void exit(int status);
+
+namespace std {
+    void assert(bool condition, cstring what, ... rest) {
+        if (!condition) {
+            fprintf(std.stderr, what, rest);
+            exit(1);
+        }
+    }
+}

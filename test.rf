@@ -1,3 +1,4 @@
+import "standard/string.rf";
 import "standard/io.rf";
 
 struct just_a_struct {
@@ -14,5 +15,18 @@ int main() {
     just_a_struct b = (just_a_struct) { .alpha = 3, .beta = 2 };
     just_a_struct c = a + b;
     printf("Alpha: %d, Beta: %d\n", c.alpha, c.beta);
+
+    std.string s1 = std.str_get("foo");
+    std.string s2 = std.str_get("bar");
+
+    std.str_append(&s1, 'd');
+
+    std.str_concat(&s1, &s2);
+
+    std.string s3 = "foo" + "baz";
+
+    printf("%s\n", std.str_get_cstr(s1));
+    printf("%s\n", std.str_get_cstr(s3));
+
     return 0;
 }
