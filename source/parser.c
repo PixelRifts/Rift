@@ -241,11 +241,13 @@ static b8 P_IsTypeToken(P_Parser* parser) {
 }
 
 static P_ValueType P_ReduceType(P_ValueType in) {
-    if (in.mod_ct == 0) return in;
+    if (in.mod_ct == 0) {
+        if (str_eq(in.base_type, ValueType_Cstring.base_type))
+            return ValueType_Char;
+        
+        return in;
+    }
     in.mod_ct--;
-    
-    if (str_eq(in.base_type, ValueType_Cstring.base_type))
-        return ValueType_Char;
     
     switch (in.mods[in.mod_ct].type) {
         case ValueTypeModType_Pointer: {
@@ -1954,6 +1956,15 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
             if (!(P_CheckValueType(ValueTypeCollection_Number, left->ret_type) || P_CheckValueType(ValueTypeCollection_Number, xpr->ret_type))) {
                 report_error(parser, str_lit("Cannot use %.*s operator on %.*s\n"), str_expand(L__get_string_from_type__(op_type)), str_expand(left->ret_type.full_type));
             }
+        } else {
+            opoverload_entry_key key = {
+                .type = left->ret_type
+            };
+            opoverload_entry_val* val;
+            
+            if (opoverload_hash_table_get(&op_overloads, key, op_type, (P_ValueType) {0}, &val)) {
+                return P_MakeFuncCallNode(parser, val->mangled_name, val->ret_type, &xpr, 1);
+            }
         }
         
         if (is_ref(&left->ret_type)) {
@@ -2580,7 +2591,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
             
             P_Consume(parser, TokenType_CloseParenthesis, str_lit("Varargs can only be the last argument for a function\n"));
             arity++;
-
+            
             if (!native) {
                 var_entry_key key = (var_entry_key) { .name = varargs_name, .depth = parser->scope_depth };
                 var_entry_val test;
@@ -2768,6 +2779,31 @@ static void P_FuncDeclTwoParams(P_Parser* parser, P_ValueType* left, P_ValueType
     P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after second parameter\n"));
 }
 
+static void P_FuncDeclOneParam(P_Parser* parser, P_ValueType* v, string_list* param_names) {
+    P_Consume(parser, TokenType_OpenParenthesis, str_lit("Expected ( after operator\n"));
+    
+    {
+        P_ValueType param_type = P_ConsumeType(parser, str_lit("This Operator Overload Expects 1 param\n"));
+        if (is_array(&param_type))
+            report_error(parser, str_lit("Cannot Pass Array type as parameter\n"));
+        *v = param_type;
+        
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected Identifier after type\n"));
+        string param_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        string_list_push(&parser->arena, param_names, param_name);
+        
+        var_entry_key key = (var_entry_key) { .name = param_name, .depth = parser->scope_depth };
+        var_entry_val test;
+        var_entry_val set = (var_entry_val) { .mangled_name = param_name, .type = param_type };
+        
+        if (!var_hash_table_get(&parser->current_namespace->variables, key, &test))
+            var_hash_table_set(&parser->current_namespace->variables, key, set);
+        else report_error(parser, str_lit("Multiple Parameters with the same name\n"));
+    }
+    
+    P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after parameter\n"));
+}
+
 static void P_ParseFunctionBody(P_Parser* parser, P_Stmt* func, string mangled) {
     P_Consume(parser, TokenType_OpenBrace, str_lit("Expected {\n"));
     
@@ -2808,6 +2844,24 @@ static P_Stmt* P_StmtOpOverloadBinary(P_Parser* parser, P_ValueType type, b8 has
     return func;
 }
 
+static P_Stmt* P_StmtOpOverloadAssign(P_Parser* parser, P_ValueType type, b8 has_all_tags, string name) {
+    P_ScopeContext* scope_context = P_OpOverloadBeginScope(parser, type);
+    
+    P_ValueType value;
+    value_type_list params = {0};
+    string_list param_names = {0};
+    
+    P_FuncDeclOneParam(parser, &value, &param_names);
+    value_type_list_push(&parser->arena, &params, value);
+    string mangled = P_FuncNameMangle(parser, name, 1, params, str_lit("overload"));
+    
+    P_Stmt* func = P_MakeFuncStmtNode(parser, type, mangled, 1, params, param_names, false);
+    P_ParseFunctionBody(parser, func, mangled);
+    P_OpOverloadEndScope(parser, scope_context);
+    
+    return func;
+}
+
 static P_Stmt* P_StmtOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has_all_tags) {
     P_Advance(parser);
     
@@ -2819,7 +2873,7 @@ static P_Stmt* P_StmtOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has_a
             case TokenType_Minus: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opminus"));
             case TokenType_Star: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opstar"));
             case TokenType_Slash: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opslash"));
-            case TokenType_Percent: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opprecent"));
+            case TokenType_Percent: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_oppercent"));
             case TokenType_Hat: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_ophat"));
             case TokenType_Ampersand: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opampersand"));
             case TokenType_Pipe: return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_oppipe"));
@@ -2841,6 +2895,8 @@ static P_Stmt* P_StmtOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has_a
                 P_Consume(parser, TokenType_CloseBracket, str_lit("Expected ] after [\n"));
                 return P_StmtOpOverloadBinary(parser, type, has_all_tags, str_lit("_opindex"));
             }
+            case TokenType_Equal:
+            return P_StmtOpOverloadAssign(parser, type, has_all_tags, str_lit("_opassign"));
             
             default: {
                 report_error(parser, str_lit("Cannot overload operator %.*s\n"), str_expand(L__get_string_from_type__(parser->previous.type)));
@@ -2870,13 +2926,21 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8
         
         if (is_ref(&type)) {
             if (!value->can_assign)
-                report_error(parser, str_lit("Cannot pass a reference to a non assignable field\n"));
+                report_error(parser, str_lit("Cannot pass a non assignable field to a reference variable\n"));
             P_ValueType m = P_ReduceType(type);
             
-            if (type_check(value->ret_type, m)) {
+            opoverload_entry_key key = { .type = value->ret_type };
+            opoverload_entry_val* val;
+            if (opoverload_hash_table_get(&op_overloads, key, TokenType_Equal, (P_ValueType) {0}, &val)) {
                 P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
-                //if (is_constant) B_SetVariable(&interp, new_name, value);
-                return P_MakeVarDeclAssignStmtNode(parser, type, name, P_MakeAddrNode(parser, m, value));
+                report_error(parser, str_lit("Cannot take a reference from overloaded assignment operator result\n"));
+                return nullptr;
+            } else {
+                if (type_check(value->ret_type, m)) {
+                    P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
+                    
+                    return P_MakeVarDeclAssignStmtNode(parser, type, name, P_MakeAddrNode(parser, m, value));
+                }
             }
         }
         
@@ -2899,6 +2963,16 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8
                         if (is_constant) report_error(parser, str_lit("Function Pointer constants not supported"));
                         
                         P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
+                        
+                        opoverload_entry_key key = { .type = value->ret_type };
+                        opoverload_entry_val* val;
+                        if (opoverload_hash_table_get(&op_overloads, key, TokenType_Equal, (P_ValueType) {0}, &val)) {
+                            P_Expr** packed = arena_alloc(&parser->arena, sizeof(P_Expr*) * 1);
+                            packed[0] = value;
+                            
+                            return P_MakeVarDeclAssignStmtNode(parser, type, name, P_MakeFuncCallNode(parser, val->mangled_name, val->ret_type, packed, 1));
+                        }
+                        
                         return P_MakeVarDeclAssignStmtNode(parser, type, new_name, value);
                     }
                     
@@ -2907,34 +2981,53 @@ static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8
                 report_error(parser, str_lit("No overload for function %.*s takes the appropriate parameters\n"), str_expand(start_name));
                 
             } else if (value->ret_type.type == ValueTypeType_FuncPointer) {
-                
-                if (!type_check(value->ret_type, type)) {
-                    report_error(parser, str_lit("Incompatible function pointer types\n"));
-                } else {
+                opoverload_entry_key key = { .type = value->ret_type };
+                opoverload_entry_val* val;
+                if (opoverload_hash_table_get(&op_overloads, key, TokenType_Equal, (P_ValueType) {0}, &val)) {
                     P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
-                    
-                    if (is_constant) report_error(parser, str_lit("Function Pointer constants not supported"));
-                    
-                    return P_MakeVarDeclAssignStmtNode(parser, type, new_name, value);
+                    P_Expr** packed = arena_alloc(&parser->arena, sizeof(P_Expr*) * 1);
+                    packed[0] = value;
+                    return P_MakeVarDeclAssignStmtNode(parser, type, name, P_MakeFuncCallNode(parser, val->mangled_name, val->ret_type, packed, 1));
+                } else {
+                    if (!type_check(value->ret_type, type)) {
+                        report_error(parser, str_lit("Incompatible function pointer types\n"));
+                    } else {
+                        P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
+                        
+                        if (is_constant) report_error(parser, str_lit("Function Pointer constants not supported\n"));
+                        
+                        return P_MakeVarDeclAssignStmtNode(parser, type, new_name, value);
+                    }
                 }
             } else {
                 report_error(parser, str_lit("Expected function pointer\n"));
             }
         } else {
-            if (!type_check(value->ret_type, type))
-                report_error(parser, str_lit("Cannot Assign Value of Type %.*s to variable of type %.*s\n"), str_expand(value->ret_type.full_type), str_expand(type.full_type));
-            
-            if (is_array(&type)) {
-                if (is_array(&value->ret_type)) {
-                    if (type.mods[type.mod_ct - 1].op.array_expr->type == ExprType_Nullptr) {
-                        type = value->ret_type;
+            opoverload_entry_key key = { .type = value->ret_type };
+            opoverload_entry_val* val;
+            if (opoverload_hash_table_get(&op_overloads, key, TokenType_Equal, (P_ValueType) {0}, &val)) {
+                P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
+                P_Expr** packed = arena_alloc(&parser->arena, sizeof(P_Expr*) * 1);
+                packed[0] = value;
+                return P_MakeVarDeclAssignStmtNode(parser, type, name, P_MakeFuncCallNode(parser, val->mangled_name, val->ret_type, packed, 1));
+            } else {
+                
+                if (!type_check(value->ret_type, type))
+                    report_error(parser, str_lit("Cannot Assign Value of Type %.*s to variable of type %.*s\n"), str_expand(value->ret_type.full_type), str_expand(type.full_type));
+                
+                if (is_array(&type)) {
+                    if (is_array(&value->ret_type)) {
+                        if (type.mods[type.mod_ct - 1].op.array_expr->type == ExprType_Nullptr) {
+                            type = value->ret_type;
+                        }
                     }
                 }
+                
+                P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
+                
+                return P_MakeVarDeclAssignStmtNode(parser, type, new_name, value);
             }
             
-            //if (is_constant) B_SetVariable(&interp, new_name, value);
-            P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
-            return P_MakeVarDeclAssignStmtNode(parser, type, new_name, value);
         }
     }
     
@@ -3839,6 +3932,24 @@ static void P_PreFuncDeclTwoParams(P_Parser* parser, P_ValueType* left, P_ValueT
     P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after second parameter\n"));
 }
 
+static void P_PreFuncDeclOneParam(P_Parser* parser, P_ValueType* v, string_list* param_names) {
+    P_Consume(parser, TokenType_OpenParenthesis, str_lit("Expected ( after operator\n"));
+    
+    {
+        P_ValueType param_type = P_ConsumeType(parser, str_lit("This Operator Overload Expects 1 parameter\n"));
+        if (is_array(&param_type))
+            report_error(parser, str_lit("Cannot Pass Array type as parameter\n"));
+        *v = param_type;
+        
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected Identifier after type\n"));
+        string left_name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        string_list_push(&parser->arena, param_names, left_name);
+    }
+    
+    
+    P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected ) after parameter\n"));
+}
+
 
 static void P_PreParseFunctionBody(P_Parser* parser) {
     u32 init = parser->scope_depth;
@@ -3864,6 +3975,8 @@ static void P_PreParseFunctionBody(P_Parser* parser) {
 }
 
 static P_PreStmt* P_PreStmtOpOverloadBinary(P_Parser* parser, P_ValueType type, b8 has_all_tags, string op, string name, L_TokenType tokentype) {
+    P_PreStmt* func = nullptr;
+    
     P_ValueType left, right;
     value_type_list params = {0};
     string_list param_names = {0};
@@ -3873,22 +3986,53 @@ static P_PreStmt* P_PreStmtOpOverloadBinary(P_Parser* parser, P_ValueType type, 
     value_type_list_push(&parser->arena, &params, right);
     string mangled = P_FuncNameMangle(parser, name, 2, params, str_lit("overload"));
     
-    opoverload_entry_key key = { .type = left };
-    opoverload_entry_val* val = arena_alloc(&parser->arena, sizeof(opoverload_entry_val));
-    val->operator = tokentype;
-    val->right = right;
-    val->ret_type = type;
-    val->mangled_name = mangled;
-    opoverload_entry_val* test;
-    if (!opoverload_hash_table_get(&op_overloads, key, tokentype, right, &test)) {
-        opoverload_hash_table_set(&op_overloads, key, val);
-    } else report_error(parser, str_lit("Operator %.*s already overloaded for types %.*s and %.*s\n"), str_expand(op), left.full_type, right.full_type);
+    if (has_all_tags) {
+        opoverload_entry_key key = { .type = left };
+        opoverload_entry_val* val = arena_alloc(&parser->arena, sizeof(opoverload_entry_val));
+        val->operator = tokentype;
+        val->right = right;
+        val->ret_type = type;
+        val->mangled_name = mangled;
+        opoverload_entry_val* test;
+        if (!opoverload_hash_table_get(&op_overloads, key, tokentype, right, &test)) {
+            opoverload_hash_table_set(&op_overloads, key, val);
+        } else report_error(parser, str_lit("Operator %.*s already overloaded for types %.*s and %.*s\n"), str_expand(op), left.full_type, right.full_type);
+        
+        func = P_MakePreFuncStmtNode(parser, type, mangled, 2, params, param_names);
+    }
     
-    P_PreStmt* func = P_MakePreFuncStmtNode(parser, type, mangled, 2, params, param_names);
     P_PreParseFunctionBody(parser);
-    
     return func;
 }
+
+static P_PreStmt* P_PreStmtOpOverloadAssign(P_Parser* parser, P_ValueType type, b8 has_all_tags, string op, string name, L_TokenType tokentype) {
+    P_PreStmt* func = nullptr;
+    P_ValueType value;
+    value_type_list params = {0};
+    string_list param_names = {0};
+    
+    P_FuncDeclOneParam(parser, &value, &param_names);
+    value_type_list_push(&parser->arena, &params, value);
+    string mangled = P_FuncNameMangle(parser, name, 1, params, str_lit("overload"));
+    
+    if (has_all_tags) {
+        opoverload_entry_key key = { .type = value };
+        opoverload_entry_val* val = arena_alloc(&parser->arena, sizeof(opoverload_entry_val));
+        val->operator = tokentype;
+        val->right = (P_ValueType) {0};
+        val->ret_type = type;
+        val->mangled_name = mangled;
+        opoverload_entry_val* test;
+        if (!opoverload_hash_table_get(&op_overloads, key, tokentype, (P_ValueType) {0}, &test)) {
+            opoverload_hash_table_set(&op_overloads, key, val);
+        } else report_error(parser, str_lit("Operator %.*s already overloaded for types %.*s\n"), str_expand(op), value.full_type);
+        func = P_MakePreFuncStmtNode(parser, type, mangled, 1, params, param_names);
+    }
+    
+    P_PreParseFunctionBody(parser);
+    return func;
+}
+
 
 static P_PreStmt* P_PreOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has_all_tags) {
     P_Advance(parser);
@@ -3921,6 +4065,8 @@ static P_PreStmt* P_PreOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has
             P_Consume(parser, TokenType_CloseBracket, str_lit("Expected ] after [\n"));
             return P_PreStmtOpOverloadBinary(parser, type, has_all_tags, str_lit("[]"), str_lit("_opindex"), TokenType_OpenBracket);
         }
+        case TokenType_Equal:
+        return P_PreStmtOpOverloadAssign(parser, type, has_all_tags, str_lit("="), str_lit("_opassign"), TokenType_Equal);
         
         default: {
             report_error(parser, str_lit("Cannot overload operator %.*s\n"), str_expand(L__get_string_from_type__(parser->previous.type)));
