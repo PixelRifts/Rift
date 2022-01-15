@@ -1,32 +1,49 @@
-import "standard/string.rf";
+import "standard/gl.rf";
+import "standard/glfw.rf";
 import "standard/io.rf";
 
-struct just_a_struct {
-    int alpha;
-    int beta;
-}
-
-just_a_struct operator+(just_a_struct a, just_a_struct b) {
-    return (just_a_struct) { .alpha = a.alpha + b.alpha, .beta = a.beta + b.beta };
-}
-
 int main() {
-    just_a_struct a = (just_a_struct) { .alpha = 2, .beta = 3 };
-    just_a_struct b = (just_a_struct) { .alpha = 3, .beta = 2 };
-    just_a_struct c = a + b;
-    printf("Alpha: %d, Beta: %d\n", c.alpha, c.beta);
+    using GLFW;
+    using GL;
     
-    std.string s1 = "foo";
-    std.string s2 = "bar";
+    glfwInit();
     
-    std.str_append(&s1, 'd');
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     
-    std.str_concat(&s1, &s2);
+    GLFWwindow* window = glfwCreateWindow(1080, 720, "Boo", nullptr, nullptr);
     
-    std.string s3 = "foo" + "baz";
+    glfwMakeContextCurrent(window);
+    gladLoadGL();
+    glClearColor(0.2f, 0.3f, 0.8f, 1.0f);
     
-    printf("%s\n", std.str_get_cstr(s1));
-    printf("%s\n", std.str_get_cstr(s3));
+    GLuint vao;
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
     
+    float[] data = {
+        -0.5f, -0.5f,
+        0.5f, -0.5f,
+        0.0f, 0.5f
+    };
+    
+    GLuint vbo;
+    glGenBuffers(1, &vbo);
+    glBindBuffer(BufferTarget.GL_ARRAY_BUFFER, vbo);
+    glBufferData(BufferTarget.GL_ARRAY_BUFFER, sizeof(data), data, BufferUsageHint.GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, Datatype.GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    
+    while (!glfwWindowShouldClose(window)) {
+        glfwPollEvents();
+        
+        glClear(BufferBits.GL_COLOR_BUFFER_BIT);
+        glDrawArrays(Primitive.GL_TRIANGLES, 0, 3);
+        
+        glfwSwapBuffers(window);
+    }
+    
+    glfwDestroyWindow(window);
+    glfwTerminate();
     return 0;
 }

@@ -35,7 +35,7 @@ command_list =
 		.out = "*compilation*",
 		.footer_panel = true,
 		.save_dirty_files = true,
-		.cursor_at_end = false,
+		.cursor_at_end = true,
 		.cmd =
 		{
 			{ "build.bat", .os = "win" },
@@ -46,10 +46,21 @@ command_list =
 		.out = "*compilation*",
 		.footer_panel = true,
 		.save_dirty_files = true,
-		.cursor_at_end = false,
+		.cursor_at_end = true,
 		.cmd =
 		{
-			{ "del /f ./generated.c & bin\rift.exe ./test.rf", .os = "win" },
+			{ "bin\rift.exe ./test.rf", .os = "win" },
+		},
+	},
+	{
+		.name = "example",
+		.out = "*compilation*",
+		.footer_panel = true,
+		.save_dirty_files = true,
+		.cursor_at_end = true,
+		.cmd =
+		{
+			{ "example.bat", .os = "win" },
 		},
 	},
 	{
@@ -57,7 +68,7 @@ command_list =
 		.out = "*compilation*",
 		.footer_panel = true,
 		.save_dirty_files = true,
-		.cursor_at_end = false,
+		.cursor_at_end = true,
 		.cmd =
 		{
 			{ "clang generated.c -Wno-parentheses-equality -o generated.exe", .os = "win" },
@@ -67,4 +78,5 @@ command_list =
 
 fkey_command[1] = "build";
 fkey_command[2] = "run";
+fkey_command[4] = "example";
 fkey_command[5] = "generated";

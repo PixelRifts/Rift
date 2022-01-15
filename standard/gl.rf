@@ -1,3 +1,47 @@
+// Assumes project structure. this is bad
+cinclude "glad/glad.h";
+
+native void gladLoadGL();
+
+// glBufferData without vbo param works for some bizarre reason
+
 namespace GL {
+    native enum BufferBits {
+        GL_COLOR_BUFFER_BIT,
+        GL_DEPTH_BUFFER_BIT,
+        GL_STENCIL_BUFFER_BIT,
+    }
     
+    native enum BufferTarget {
+        GL_ARRAY_BUFFER,
+        GL_ELEMENT_ARRAY_BUFFER,
+    }
+    
+    native enum BufferUsageHint {
+        GL_STATIC_DRAW,
+    }
+    
+    native enum Datatype {
+        GL_FLOAT,
+    }
+    
+    native enum Primitive {
+        GL_TRIANGLES,
+    }
+    
+    native int GL_TRUE;
+    native int GL_FALSE;
+    
+    native void glClearColor(float r, float g, float b, float a);
+    native void glClear(int bit);
+    
+    native void glGenVertexArrays(int count, GLuint* dest);
+    native void glBindVertexArray(GLuint vao);
+    native void glVertexAttribPointer(int index, int size, int type, int normalized, int stride, void* offset);
+    native void glEnableVertexAttribArray(int index);
+    
+    native void glGenBuffers(int count, GLuint* dest);
+    native void glBindBuffer(int target, GLuint vbo);
+    native void glBufferData(int target, int size, void* data, int usage);
+    native void glDrawArrays(int primitive, int start, int count);
 }

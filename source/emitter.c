@@ -123,12 +123,12 @@ static void E_EmitTypeAndName(E_Emitter* emitter, P_ValueType* type, string name
         P_ValueType emit = *type;
         type_map(emitter, &emit);
         
-        E_WriteF(emitter, "%.*s", str_expand(emit.base_type));
+        E_WriteF(emitter, "%.*s ", str_expand(emit.base_type));
         
         if (type->mod_ct != 0) {
             E_EmitTypeMods_Recursive(emitter, emit.mods, emit.mod_ct - 1, name, emit.mod_ct == 1);
         } else {
-            if (name.size) E_WriteF(emitter, " %.*s", str_expand(name));
+            E_WriteF(emitter, "%.*s", str_expand(name));
         }
     }
 }
@@ -298,12 +298,12 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
             E_EmitExpression(emitter, expr->op.unary.operand);
             E_Write(emitter, ")");
         } break;
-
+        
         case ExprType_Increment: {
             E_EmitExpression(emitter, expr->op.increment.left);
             E_Write(emitter, "++");
         } break;
-
+        
         case ExprType_Decrement: {
             E_EmitExpression(emitter, expr->op.decrement.left);
             E_Write(emitter, "--");

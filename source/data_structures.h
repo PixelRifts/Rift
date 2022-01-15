@@ -125,6 +125,7 @@ typedef struct typedef_entry_key {
 
 typedef struct typedef_entry_val {
     P_ValueType type;
+    b8 native;
 } typedef_entry_val;
 
 typedef struct typedef_table_entry {

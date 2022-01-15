@@ -1,20 +1,26 @@
 // Is this good?
+// I guess...
 cinclude "GLFW/glfw3.h";
 
-namespace std { // i'm debating whether or not this goes in std
 namespace GLFW {
     native struct GLFWwindow;
     native struct GLFWmonitor;
     
+    native int GLFW_CLIENT_API;
+    native int GLFW_CONTEXT_VERSION_MAJOR;
+    native int GLFW_CONTEXT_VERSION_MINOR;
+    
+    native typedef GLuint;
+    
     native bool glfwInit();
-    native void glfwTerminate();
-    native void glfwInitHint(int hint, int value);
+    native bool glfwMakeContextCurrent(GLFWwindow* window);
+    native void glfwWindowHint(int hint, int value);
     native void glfwGetVersion(int* major, int* minor, int* rev);
     
-    native GLFWwindow* glfwCreateWindow(int width, int height, cstring name, GLFWmonitor* moniotr, GLFWwindow* share);
+    native GLFWwindow* glfwCreateWindow(int width, int height, cstring name, GLFWmonitor* monitor, GLFWwindow* share);
     native bool glfwWindowShouldClose(GLFWwindow* window);
-    native void glfwSwapBuffers(GLFWwindow* window);
     native void glfwPollEvents();
+    native void glfwSwapBuffers(GLFWwindow* window);
     native void glfwDestroyWindow(GLFWwindow* window);
-}
+    native void glfwTerminate();
 }

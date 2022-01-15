@@ -110,6 +110,9 @@ enum {
     Opcode_LessEqual, Opcode_GreaterEqual,
     Opcode_AmpersandAmpersand, Opcode_PipePipe,
     Opcode_ShiftLeft, Opcode_ShiftRight,
+    
+    Opcode_Positive, Opcode_Negative, Opcode_Not, Opcode_Complement,
+    Opcode_Preinc, Opcode_Predec
 };
 
 // Not allocated within an arena.

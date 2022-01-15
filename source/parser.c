@@ -1190,7 +1190,7 @@ static P_Expr* P_MakeTypenameNode(P_Parser* parser, P_ValueType name) {
     expr->type = ExprType_Typename;
     expr->ret_type = ValueType_Invalid;
     expr->can_assign = true;
-    expr->is_constant = true;
+    expr->is_constant = false;
     expr->op.typename = name;
     return expr;
 }
@@ -1200,7 +1200,7 @@ static P_Expr* P_MakeFuncnameNode(P_Parser* parser, P_ValueType type, string nam
     expr->type = ExprType_Funcname;
     expr->ret_type = type;
     expr->can_assign = false;
-    expr->is_constant = true;
+    expr->is_constant = false;
     expr->op.funcname.name = name;
     expr->op.funcname.namespace = nmspc;
     return expr;
@@ -1625,18 +1625,17 @@ static P_Expr* P_ExprArray(P_Parser* parser) {
     
     expr_array arr = {0};
     P_Expr* curr = P_Expression(parser);
+    P_ValueType array_type = curr->ret_type;
     while (curr != nullptr) {
-        P_ValueType array_type = curr->ret_type;
         expr_array_add(&parser->arena, &arr, curr);
         if (P_Match(parser, TokenType_CloseBrace)) break;
         P_Consume(parser, TokenType_Comma, str_lit("Expected , or }\n"));
         curr = P_Expression(parser);
         if (!type_check(curr->ret_type, array_type))
             report_error(parser, str_lit("Arrays cannot contain expressions of multiple types.\n"));
-        array_type = P_PushArrayType(parser, array_type, arr.count);
-        return P_MakeArrayLiteralNode(parser, array_type, arr);
     }
-    return nullptr;
+    array_type = P_PushArrayType(parser, array_type, arr.count);
+    return P_MakeArrayLiteralNode(parser, array_type, arr);
 }
 
 
@@ -2022,14 +2021,12 @@ static P_Expr* P_ExprAssign(P_Parser* parser, P_Expr* left) {
 
 // Could be Group, Could be Explicit Cast, Could be Compound Literal
 static P_Expr* P_ExprGroup(P_Parser* parser) {
-    P_Expr* in = P_Expression(parser);
-    if (in == nullptr) return nullptr;
-    P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected )\n"));
-    
-    if (in->type == ExprType_Typename) {
+    if (P_IsTypeToken(parser)) {
+        P_ValueType t = P_ConsumeType(parser, str_lit("Parser Error (P_ExprGroup)\n"));
+        P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected )\n"));
         P_Container* type = nullptr;
-        if (in->op.typename.op.basic.nmspc != nullptr)
-            type = type_array_get_in_namespace(parser, in->op.typename.op.basic.nmspc, in->op.typename.full_type, parser->scope_depth);
+        if (t.op.basic.nmspc != nullptr)
+            type = type_array_get_in_namespace(parser, t.op.basic.nmspc, t.full_type, parser->scope_depth);
         
         if (type != nullptr && parser->current.type == TokenType_OpenBrace && (parser->next.type == TokenType_Dot || parser->next.type == TokenType_CloseBrace)) {
             // Compound Literal
@@ -2042,7 +2039,7 @@ static P_Expr* P_ExprGroup(P_Parser* parser) {
                 string name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
                 
                 if (!member_exists(type, name))
-                    report_error(parser, str_lit("Member %.*s doesn't exist in type %.*s\n"), str_expand(name), str_expand(in->op.typename.full_type));
+                    report_error(parser, str_lit("Member %.*s doesn't exist in type %.*s\n"), str_expand(name), str_expand(t.full_type));
                 
                 string_list_push(&parser->arena, &names, name);
                 P_Consume(parser, TokenType_Equal, str_lit("Expected = after member name\n"));
@@ -2055,49 +2052,61 @@ static P_Expr* P_ExprGroup(P_Parser* parser) {
                 }
             }
             
-            return P_MakeCompoundLitNode(parser, in->op.typename, names, exprs.elements, exprs.count, parser->scope_depth != 0);
+            return P_MakeCompoundLitNode(parser, t, names, exprs.elements, exprs.count, parser->scope_depth != 0);
             
         } else {
             // Explicit Cast syntax
             P_Expr* to_be_casted = P_Expression(parser);
             
             b8 allowed_cast = false;
-            if (!type_check(to_be_casted->ret_type, in->op.typename)) {
-                {
-                    i32 perm = -1;
-                    for (u32 i = 0; i < type_heirarchy_length; i++) {
-                        if (str_eq(type_heirarchy[i].base_type, in->op.typename.full_type)) {
-                            perm = i;
-                            break;
-                        }
-                    }
-                    if (perm != -1) {
-                        i32 other = -1;
-                        for (u32 i = 0; i < type_heirarchy_length; i++) {
-                            if (str_eq(type_heirarchy[i].base_type, to_be_casted->ret_type.full_type)) {
-                                other = i;
-                                break;
-                            }
-                        }
-                        allowed_cast = other != -1;
+            if (!type_check(to_be_casted->ret_type, t)) {
+                i32 perm = -1;
+                for (u32 i = 0; i < type_heirarchy_length; i++) {
+                    if (str_eq(type_heirarchy[i].base_type, t.full_type)) {
+                        perm = i;
+                        break;
                     }
                 }
                 
-                if (is_ptr(&in->op.typename)) {
-                    if (is_ptr(&to_be_casted->ret_type))
-                        allowed_cast = true;
+                i32 other = -1;
+                for (u32 i = 0; i < type_heirarchy_length; i++) {
+                    if (str_eq(type_heirarchy[i].base_type, to_be_casted->ret_type.full_type)) {
+                        other = i;
+                        break;
+                    }
                 }
+                allowed_cast = perm != -1 && other != -1;
+                
+                if (!allowed_cast) {
+                    if (perm == -1) {
+                        if (str_eq(t.full_type, ValueType_VoidPointer.full_type)) {
+                            if (other != -1)
+                                allowed_cast = true;
+                        }
+                    }
+                    
+                    if (is_ptr(&t)) {
+                        if (is_ptr(&to_be_casted->ret_type))
+                            allowed_cast = true;
+                    }
+                }
+                
             } else allowed_cast = true;
             
             if (allowed_cast)
-                return P_MakeCastNode(parser, in->op.typename, to_be_casted);
+                return P_MakeCastNode(parser, t, to_be_casted);
             
-            report_error(parser, str_lit("Cannot cast from %.*s to %.*s\n"), str_expand(to_be_casted->ret_type.full_type), str_expand(in->op.typename.full_type));
+            report_error(parser, str_lit("Cannot cast from %.*s to %.*s\n"), str_expand(to_be_casted->ret_type.full_type), str_expand(t.full_type));
             return nullptr;
         }
+        
+    } else {
+        P_Expr* in = P_Expression(parser);
+        if (in == nullptr) return nullptr;
+        P_Consume(parser, TokenType_CloseParenthesis, str_lit("Expected )\n"));
+        return in;
     }
-    
-    return in;
+    return nullptr;
 }
 
 static P_Expr* P_ExprIndex(P_Parser* parser, P_Expr* left) {
@@ -2543,7 +2552,6 @@ static P_Expr* P_ExprPrecedence(P_Parser* parser, P_Precedence precedence) {
     if (e != nullptr)
         if (e->is_constant && 
             (e->type == ExprType_Binary
-             || e->type == ExprType_Unary
              || e->type == ExprType_Variable)) e = B_EvaluateExpr(&interp, e);
     return e;
 }
@@ -2908,13 +2916,23 @@ static P_Stmt* P_StmtOpOverloadDecl(P_Parser* parser, P_ValueType type, b8 has_a
 }
 //- Op Overloading subsection end 
 
-static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8 is_constant, b8 has_all_tags) {
+static P_Stmt* P_StmtVarDecl(P_Parser* parser, P_ValueType type, string name, b8 is_constant, b8 is_native, b8 has_all_tags) {
     if (!(is_constant && parser->scope_depth == 0)) P_NamespaceCheckRedefinition(parser, name, false, false);
+    
+    if (!has_all_tags) {
+        P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
+        return P_MakeNothingNode(parser);
+    }
     
     string new_name = parser->scope_depth == 0 ? str_cat(&parser->arena, parser->current_namespace->flatname, name) : name;
     var_entry_key key = { .name = name, .depth = parser->scope_depth };
-    var_entry_val set = { .mangled_name = new_name, .type = type, .constant = is_constant };
+    var_entry_val set = { .mangled_name = is_native ? name : new_name, .type = type, .constant = is_constant };
     var_hash_table_set(&parser->current_namespace->variables, key, set);
+    
+    if (is_native) {
+        P_Consume(parser, TokenType_Semicolon, str_lit("Expected semicolon\n"));
+        return P_MakeNothingNode(parser);
+    }
     
     if (type_check(type, ValueType_Void))
         report_error(parser, str_lit("Cannot declare variable of type: void\n"));
@@ -3304,10 +3322,15 @@ static P_Stmt* P_StmtCinsert(P_Parser* parser, b8 has_all_tags) {
     return P_MakeNothingNode(parser);
 }
 
-static P_Stmt* P_StmtTypedef(P_Parser* parser, b8 has_all_tags) {
-    P_ConsumeType(parser, str_lit("Expected Type after 'typedef'\n"));
-    P_Consume(parser, TokenType_Identifier, str_lit("Expected identifier after type\n"));
-    P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after Identifier\n"));
+static P_Stmt* P_StmtTypedef(P_Parser* parser, b8 has_all_tags, b8 is_native) {
+    if (is_native) {
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected identifier after 'typedef'\n"));
+        P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after type name\n"));
+    } else {
+        P_ConsumeType(parser, str_lit("Expected Type after 'typedef'\n"));
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected identifier after type\n"));
+        P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after Identifier\n"));
+    }
     return P_MakeNothingNode(parser);
 }
 
@@ -3761,7 +3784,7 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
             if (P_Match(parser, TokenType_OpenParenthesis)) {
                 s = P_StmtFuncDecl(parser, type, name, native, has_all_tags);
             } else {
-                s = P_StmtVarDecl(parser, type, name, constant, has_all_tags);
+                s = P_StmtVarDecl(parser, type, name, constant, native, has_all_tags);
             }
         }
         
@@ -3778,7 +3801,7 @@ static P_Stmt* P_Declaration(P_Parser* parser) {
     } else if (P_Match(parser, TokenType_Cinsert)) {
         s = P_StmtCinsert(parser, has_all_tags);
     } else if (P_Match(parser, TokenType_Typedef)) {
-        s = P_StmtTypedef(parser, has_all_tags);
+        s = P_StmtTypedef(parser, has_all_tags, native);
     } else if (P_Match(parser, TokenType_Cinclude)) {
         if (parser->scope_depth == 0)
             s = P_StmtCinclude(parser, has_all_tags);
@@ -4098,18 +4121,45 @@ static string read_file(M_Arena* arena, const char* path, b8* file_exists) {
 
 static P_PreStmt* P_PreDeclaration(P_Parser* parser);
 
-static P_PreStmt* P_PreTypedef(P_Parser* parser) {
-    P_ValueType type = P_ConsumeType(parser, str_lit("Expected Type after identifier"));
-    P_Consume(parser, TokenType_Identifier, str_lit("Expected identifier after 'typedef'\n"));
-    string name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
-    
-    P_NamespaceCheckRedefinition(parser, name, false, false);
-    
-    typedef_entry_key tk = { .name = name, .depth = parser->scope_depth };
-    typedef_entry_val tv = { .type = type };
-    typedef_hash_table_set(&typedefs, tk, tv);
-    
-    P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after Identifier\n"));
+static P_PreStmt* P_PreTypedef(P_Parser* parser, b8 is_native, b8 has_all_tags) {
+    if (is_native) {
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected identifier after 'typedef'\n"));
+        string name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        
+        P_ValueType type = {
+            .type = ValueTypeType_Basic,
+            .base_type = name,
+            .full_type = name,
+            .mods = nullptr,
+            .mod_ct = 0,
+            .op.basic.no_nmspc_name = name,
+            .op.basic.nmspc = &global_namespace
+        };
+        
+        if (has_all_tags) {
+            P_NamespaceCheckRedefinition(parser, name, false, false);
+            
+            typedef_entry_key tk = { .name = name, .depth = parser->scope_depth };
+            typedef_entry_val tv = { .type = type, .native = is_native };
+            typedef_hash_table_set(&typedefs, tk, tv);
+        }
+        
+        P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after Identifier\n"));
+    } else {
+        P_ValueType type = P_ConsumeType(parser, str_lit("Expected Type after identifier"));
+        P_Consume(parser, TokenType_Identifier, str_lit("Expected identifier after 'typedef'\n"));
+        string name = (string) { .str = (u8*)parser->previous.start, .size = parser->previous.length };
+        
+        if (has_all_tags) {
+            P_NamespaceCheckRedefinition(parser, name, false, false);
+            
+            typedef_entry_key tk = { .name = name, .depth = parser->scope_depth };
+            typedef_entry_val tv = { .type = type, .native = is_native };
+            typedef_hash_table_set(&typedefs, tk, tv);
+        }
+        
+        P_Consume(parser, TokenType_Semicolon, str_lit("Expected ; after Identifier\n"));
+    }
     return P_MakePreNothingNode(parser);
 }
 
@@ -4619,21 +4669,39 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
             report_error(parser, str_lit("Cannot add tags to native functions\n"));
         
         if (P_IsTypeToken(parser)) {
-            while (!P_Match(parser, TokenType_CloseParenthesis)) {
-                if (P_Match(parser, TokenType_EOF)) {
-                    s = nullptr;
-                    break;
+            P_ConsumeType(parser, str_lit("This is an error in the Parser. (native P_PreDeclaration)\n"));
+            
+            P_Consume(parser, TokenType_Identifier, str_lit("Expected identifier after type\n"));
+            
+            if (P_Match(parser, TokenType_OpenParenthesis)) {
+                while (!P_Match(parser, TokenType_CloseParenthesis)) {
+                    if (P_Match(parser, TokenType_EOF)) {
+                        s = nullptr;
+                        break;
+                    }
+                    P_Advance(parser);
                 }
-                P_Advance(parser);
+            } else {
+                while (parser->current.type != TokenType_Semicolon) {
+                    if (P_Match(parser, TokenType_EOF)) {
+                        s = nullptr;
+                        break;
+                    }
+                    P_Advance(parser);
+                }
             }
+            
         } else if (P_Match(parser, TokenType_Struct)) {
             s = P_PreStmtStructureDecl(parser, true, has_all_tags);
         } else if (P_Match(parser, TokenType_Union)) {
             s = P_PreStmtUnionDecl(parser, true, has_all_tags);
         } else if (P_Match(parser, TokenType_Enum)) {
             s = P_PreStmtEnumerationDecl(parser, true, has_all_tags);
-        } else if (P_Match(parser, TokenType_FlagEnum))
+        } else if (P_Match(parser, TokenType_FlagEnum)) {
             s = P_PreStmtFlagEnumerationDecl(parser, true, has_all_tags);
+        } else if (P_Match(parser, TokenType_Typedef)) {
+            s = P_PreTypedef(parser, true, has_all_tags);
+        }
     } else if (P_IsTypeToken(parser)) {
         P_ValueType type = P_ConsumeType(parser, str_lit("This is an error in the Parser. (P_PreDeclaration)\n"));
         
@@ -4649,7 +4717,7 @@ static P_PreStmt* P_PreDeclaration(P_Parser* parser) {
         }
         
     } else if (P_Match(parser, TokenType_Typedef)) {
-        s = P_PreTypedef(parser);
+        s = P_PreTypedef(parser, false, has_all_tags);
     } else if (P_Match(parser, TokenType_Namespace)) {
         s = P_PreNamespace(parser);
     } else if (P_Match(parser, TokenType_Struct)) {

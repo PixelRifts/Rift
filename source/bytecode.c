@@ -190,7 +190,15 @@ static void B_WriteExprToChunk(B_Interpreter* interp, B_Chunk* chunk, P_Expr* ex
         
         case ExprType_Unary: {
             B_WriteExprToChunk(interp, chunk, expr->op.unary.operand);
-            B_WriteChunk(chunk, expr->op.unary.operator);
+            
+            switch (expr->op.unary.operator) {
+                case TokenType_Plus: B_WriteChunk(chunk, Opcode_Positive);
+                case TokenType_Minus: B_WriteChunk(chunk, Opcode_Negative);
+                case TokenType_Tilde: B_WriteChunk(chunk, Opcode_Bang);
+                case TokenType_Bang: B_WriteChunk(chunk, Opcode_Not);
+                case TokenType_PlusPlus: B_WriteChunk(chunk, Opcode_Preinc);
+                case TokenType_MinusMinus: B_WriteChunk(chunk, Opcode_Predec);
+            }
         } break;
         
         case ExprType_Variable: {
@@ -303,6 +311,16 @@ case ValueKind_Long: B_ValueStackPush(&stack, LONG_VAL(a.long_val op b.long_val)
 } break;\
 }\
 } while (0)
+#define B_ValueMake(type, val, dest) \
+do {\
+switch(type) {\
+case ValueKind_Char: *dest = CHAR_VAL(val); break;\
+case ValueKind_Integer: *dest = INT_VAL(val); break;\
+case ValueKind_Long: *dest = LONG_VAL(val); break;\
+case ValueKind_Float: *dest = FLOAT_VAL(val); break;\
+case ValueKind_Double: *dest = DOUBLE_VAL(val); break;\
+}\
+} while(0)\
 
 static B_Value B_RunChunk(B_Chunk* chunk) {
     B_ValueStack stack = {0};
@@ -434,16 +452,40 @@ static B_Value B_RunChunk(B_Chunk* chunk) {
                 B_ValueStackPush(&stack, BOOL_VAL(left.bool_val || right.bool_val));
             } break;
             
-            case Opcode_Tilde: {
+            case Opcode_Positive: {
+                // Do nothing
+            } break;
+            
+            case Opcode_Negative: {
+                B_Value a;
+                B_ValueStackPop(&stack, &a);
+                B_ValueUnaryOp_NoFloat(a, -);
+            } break;
+            
+            case Opcode_Complement: {
                 B_Value a;
                 B_ValueStackPop(&stack, &a);
                 B_ValueUnaryOp_NoFloat(a, ~);
             } break;
             
-            case Opcode_Bang: {
+            case Opcode_Not: {
                 B_Value a;
                 B_ValueStackPop(&stack, &a);
                 B_ValueStackPush(&stack, BOOL_VAL(!a.bool_val));
+            } break;
+            
+            case Opcode_Preinc: {
+                B_Value a, b;
+                B_ValueStackPop(&stack, &a);
+                B_ValueMake(a.type, 1, &b);
+                B_ValueBinaryOp(a, b, +);
+            } break;
+            
+            case Opcode_Predec: {
+                B_Value a, b;
+                B_ValueStackPop(&stack, &a);
+                B_ValueMake(a.type, 1, &b);
+                B_ValueBinaryOp(a, b, -);
             } break;
         }
     }
