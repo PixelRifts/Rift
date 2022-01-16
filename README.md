@@ -1,5 +1,6 @@
 # Rift
 Rift - A Language Transpiler
+Meant to be C-Like with some helpful features.
 - Syntax is similar to C
 - Transpiles to C code
 
@@ -12,14 +13,28 @@ Rift - A Language Transpiler
 4) To run the example:
     a) On Linux, run `./run.sh`.
 
+## Features
+- A lot of stuff carried over from C
+- Nested Comment blocks
+- A better syntax for function pointers
+- Lambdas
+- Function overloading
+- Match-Case statements (so people like me who forget writing breaks after swiuch cases. don't have to)
+- Operator overloading
+- Namespaces (Like C++)
+- Simple References (Like C++)
+- A Tags system that replaces #define and #ifdef/#ifndef
+- Flag Enums (for nicer bitfield declarations)
+- Imports and "Modules"
+- Transpiles to a single compilation unit.
+
 ## NOTES
 - This project is currently windows and linux only.
 - You can build the project with llvm clang on windows or gcc on linux.
 
 ## TODOS
-- Nested Comment Blocks
 - Exponential notation
 - Enums should be Types (Explicitly castable to int)
-- Inline struct initializers
-- Standard Library
-- Preprocessor stuff 
+- Standard Library (WIP)
+- LLVM Backend
+- Maybe x64 Backend
