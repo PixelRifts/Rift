@@ -1,0 +1,4 @@
+cinclude "Windows.h";
+
+native struct HINSTANCE {}
+native struct LPSTR {}

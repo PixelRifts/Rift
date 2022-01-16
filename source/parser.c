@@ -4810,11 +4810,67 @@ void P_Parse(P_Parser* parser) {
     
     // Only check for main function if it is the entry point
     if (parser->parent == nullptr) {
-        u32 subset_match = 1024;
+        u32 _ = 1024;
         func_entry_val* v = nullptr;
         value_type_list noargs = (value_type_list){0};
-        if (!func_hash_table_get(&global_namespace.functions, (func_entry_key) { .name = str_lit("main"), .depth = 0 }, &noargs, &v, &subset_match, true)) {
-            report_error(parser, str_lit("No main function definition found\n"));
+        value_type_list cvargs = (value_type_list){0};
+        
+        P_ValueTypeMod ptr[] = {
+            { .type = ValueTypeModType_Pointer }
+        };
+        P_ValueType cstring_ptr = {
+            .type = ValueTypeType_Basic,
+            .base_type = str_lit("cstring"),
+            .full_type = str_lit("cstring*"),
+            .mods = ptr,
+            .mod_ct = 1,
+            .op.basic.no_nmspc_name = str_lit("cstring"),
+            .op.basic.nmspc = &global_namespace,
+        };
+        value_type_list_push(&global_arena, &cvargs, ValueType_Integer);
+        value_type_list_push(&global_arena, &cvargs, cstring_ptr);
+        
+        func_entry_key main_k = { .name = str_lit("main"), .depth = 0 };
+        func_entry_key winmain_k = { .name = str_lit("WinMain"), .depth = 0 };
+        if (!(
+              func_hash_table_get(&global_namespace.functions, main_k, &noargs, &v, &_, true) ||
+              func_hash_table_get(&global_namespace.functions, main_k, &cvargs, &v, &_, true)
+              )) {
+            
+            value_type_list winmainargs = (value_type_list){0};
+            
+            P_ValueType hinst = {
+                .type = ValueTypeType_Basic,
+                .base_type = str_lit("HINSTANCE"),
+                .full_type = str_lit("HINSTANCE"),
+                .mods = nullptr, .mod_ct = 0,
+                .op.basic.no_nmspc_name = str_lit("HINSTANCE"),
+                .op.basic.nmspc = &global_namespace,
+            };
+            P_ValueType lpstr = {
+                .type = ValueTypeType_Basic,
+                .base_type = str_lit("LPSTR"),
+                .full_type = str_lit("LPSTR"),
+                .mods = nullptr, .mod_ct = 0,
+                .op.basic.no_nmspc_name = str_lit("LPSTR"),
+                .op.basic.nmspc = &global_namespace,
+            };
+            value_type_list_push(&global_arena, &winmainargs, hinst);
+            value_type_list_push(&global_arena, &winmainargs, hinst);
+            value_type_list_push(&global_arena, &winmainargs, lpstr);
+            value_type_list_push(&global_arena, &winmainargs, ValueType_Integer);
+            
+            b8 gottem = false;
+            if (!func_hash_table_get(&global_namespace.functions, winmain_k, &winmainargs, &v, &_, true)) {
+                report_error(parser, str_lit("No main function definition found\n"));
+            } else gottem = true;
+            if (gottem) {
+                if (!str_eq(v->value.full_type, ValueType_Integer.full_type)) {
+                    report_error(parser, str_lit("No main function definition found\n"));
+                }
+            } else {
+                report_error(parser, str_lit("No main function definition found\n"));
+            }
         }
     }
 }
