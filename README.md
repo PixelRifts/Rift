@@ -15,6 +15,7 @@ Meant to be C-Like with some helpful features.
 
 ## Features
 - A lot of stuff carried over from C
+- Nested Comment blocks
 - A better syntax for function pointers
 - Lambdas
 - Function overloading
