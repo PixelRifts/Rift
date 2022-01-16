@@ -199,13 +199,7 @@ void func_hash_table_free(func_hash_table* table) {
     table->entries = nullptr;
 }
 
-
-
 b8 func_hash_table_get(func_hash_table* table, func_entry_key key, value_type_list* param_types, func_entry_val** value, u32* subset_match, b8 absolute_check) {
-    return func_hash_table_get_absp(table, key, param_types, value, subset_match, absolute_check, false);
-}
-
-b8 func_hash_table_get_absp(func_hash_table* table, func_entry_key key, value_type_list* param_types, func_entry_val** value, u32* subset_match, b8 absolute_check, b8 no_varargs) {
     if (table->count == 0) return false;
     func_table_entry* entry = find_func_entry(table->entries, table->capacity, key);
     if (entry->key.name.size == 0) return false;
@@ -215,7 +209,7 @@ b8 func_hash_table_get_absp(func_hash_table* table, func_entry_key key, value_ty
     b8 found = false;
     while (c != nullptr) {
         // If it wants more parameters than currently provided, just continue;
-        if (no_varargs) {
+        if (c->param_types.node_count == 0 || !str_eq(c->param_types.last->type.full_type, str_lit("..."))) {
             if (c->param_types.node_count != param_types->node_count) {
                 c = c->next;
                 continue;
@@ -229,7 +223,7 @@ b8 func_hash_table_get_absp(func_hash_table* table, func_entry_key key, value_ty
         // Check string_list equals. (can be a subset, so not using string_list_equals)
         value_type_list_node* curr_test = c->param_types.first;
         value_type_list_node* curr = param_types->first;
-        while (!(curr_test == nullptr || curr == nullptr)) {
+        while (!(curr_test == nullptr && curr == nullptr)) {
             
             if (!str_eq(str_lit("..."), curr_test->type.full_type)) {
                 if (absolute_check) {
@@ -240,13 +234,15 @@ b8 func_hash_table_get_absp(func_hash_table* table, func_entry_key key, value_ty
                 curr_test = curr_test->next;
                 curr = curr->next;
             } else {
-                curr = curr->next;
+                if (curr == nullptr)
+                    curr_test = curr_test->next;
+                else curr = curr->next;
             }
             
         }
         
         // If the while loop exited normally, we found a type match
-        if (curr_test == nullptr || curr == nullptr) {
+        if (curr_test == nullptr && curr == nullptr) {
             found = true;
             break;
         }
