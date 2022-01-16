@@ -17,9 +17,6 @@ Rift - A Language Transpiler
 - You can build the project with llvm clang on windows or gcc on linux.
 
 ## TODOS
-- Nested Comment Blocks
 - Exponential notation
 - Enums should be Types (Explicitly castable to int)
-- Inline struct initializers
-- Standard Library
-- Preprocessor stuff 
+- Standard Library (WIP)
