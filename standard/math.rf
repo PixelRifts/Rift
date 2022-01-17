@@ -1,6 +1,7 @@
 cinclude "math.h";
 
 native double tan(double __x);
+native double sqrt(double __x);
 
 namespace std {
     struct vec2 { float x; float y; }
@@ -42,6 +43,30 @@ namespace std {
         if (index == 1) return a.y;
         return 0;
     }
+
+    vec2 v_normal(vec2 v) {
+        float inv_dist = 1 / (float) sqrt(v.x*v.x + v.y*v.y);
+
+        return v * inv_dist;
+    }
+
+    void v_normal(vec2 *v) {
+        float inv_dist = 1 / (float) sqrt(v->x*v->x + v->y*v->y);
+        
+        vec2 tmp = (vec2) { .x = v->x * inv_dist, .y = v->y * inv_dist };
+
+        v->x = tmp.x;
+        v->y = tmp.y;
+    }
+
+    float v_dot(vec2 a, vec2 b) {
+        float ret = 0;
+        for (int i = 0; i < 2; i++) {
+            ret += a[i] * b[i];
+        }
+
+        return ret;
+    }
     
     bool operator==(vec3 a, vec3 b) { return a.x == b.x && a.y == b.y && a.z == b.z; }
     
@@ -82,6 +107,37 @@ namespace std {
         if (index == 1) return a.y;
         if (index == 2) return a.z;
         return 0;
+    }
+
+    vec3 v_normal(vec3 v) {
+        float inv_dist = 1 / (float) sqrt(v.x*v.x + v.y*v.y + v.x*v.x);
+
+        return v * inv_dist;
+    }
+
+    void v_normal(vec3 *v) {
+        float inv_dist = 1 / (float) sqrt(v->x*v->x + v->y*v->y + v->z*v->z);
+
+        vec3 tmp = (vec3) { .x = v->x * inv_dist, .y = v->y * inv_dist, .z = v->z * inv_dist };
+
+        v->x = tmp.x;
+        v->y = tmp.y;
+        v->z = tmp.z;
+    }
+
+    float v_dot(vec3 a, vec3 b) {
+        float ret = 0;
+        for (int i = 0; i < 3; i++) {
+            ret += a[i] * b[i];
+        }
+
+        return ret;
+    }
+
+    vec3 v_cross(vec3 a, vec3 b) {
+        return (vec3) { .x = a.y*b.z - a.z*b.y,
+                        .y = a.z*b.x - a.x*b.z,
+                        .z = a.x*b.y - a.y*b.x };
     }
     
     bool operator==(vec4 a, vec4 b) { return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w; }
@@ -129,6 +185,32 @@ namespace std {
         if (index == 3) return a.w;
         return 0;
     }
+
+    vec4 v_normal(vec4 v) {
+        float inv_dist = 1 / (float) sqrt(v.x*v.x + v.y*v.y + v.x*v.x + v.w*v.w);
+
+        return v * inv_dist;
+    }
+
+    void v_normal(vec4 *v) {
+        float inv_dist = 1 / (float) sqrt(v->x*v->x + v->y*v->y + v->z*v->z + v->w*v->w);
+
+        vec4 tmp = (vec4) { .x = v->x * inv_dist, .y = v->y * inv_dist, .z = v->z * inv_dist, .w = v->w * inv_dist };
+
+        v->x = tmp.x;
+        v->y = tmp.y;
+        v->z = tmp.z;
+        v->w = tmp.w;
+    }
+
+    float v_dot(vec4 a, vec4 b) {
+        float ret = 0;
+        for (int i = 0; i < 4; i++) {
+            ret += a[i] * b[i];
+        }
+
+        return ret;
+    }
     
     // matrices are stored in row-major order:
     // 
@@ -147,6 +229,7 @@ namespace std {
     flagenum mat_flags {
         M_PERSPECTIVE,
         M_ORTHO,
+        M_VIEW,
         M_STANDARD
         // more to come
     }
@@ -457,7 +540,7 @@ namespace std {
         }
     }
 
-    mat4 ortho(float right, float left, float top, float bottom, float far, float near, bool forOpengl) {
+    mat4 m_ortho(float right, float left, float top, float bottom, float far, float near, bool forOpengl) {
         mat4 ret;
         m_identity(&ret);
 
@@ -473,15 +556,13 @@ namespace std {
         ret.m[7] = (top + bottom) * -i_tminusb;
         ret.m[11] = (far + near) * -1 * i_fminusn;
 
-        ret.flags &= ~mat_flags.M_STANDARD;
-        ret.flags &= ~mat_flags.M_PERSPECTIVE;
-        ret.flags |= mat_flags.M_ORTHO;
+        ret.flags = mat_flags.M_ORTHO;
 
         return ret;
     }
 
     // thanks to glm for reference
-    mat4 perspective(float fov, float aspect, float far, float near) {
+    mat4 m_perspective(float fov, float aspect, float far, float near) {
         mat4 ret;
         m_identity(&ret);
 
@@ -495,9 +576,7 @@ namespace std {
         // this is buggy
         //ret.flags &= ~(mat_flags.M_ORTHO + mat_flags.M_STANDARD);
 
-        ret.flags &= ~mat_flags.M_STANDARD;
-        ret.flags &= ~mat_flags.M_ORTHO;
-        ret.flags |= mat_flags.M_PERSPECTIVE;
+        ret.flags = mat_flags.M_PERSPECTIVE;
 
         return ret;
     }
@@ -564,5 +643,26 @@ namespace std {
         return m_cofactor * i_mdeterminant;
     }
 
-    // TODO(HilbertCurve): view matrix
+    mat4 m_lookat(vec3 center, vec3 eye, vec3 up, bool is_rh) {
+        mat4 ret;
+
+        vec3 zaxis = v_normal(center - eye);
+        vec3 xaxis = v_normal(v_cross(up, zaxis));
+        // I am not sure if this is what right-handedness implies; use at your own risk! (default to is_rh = true)
+        if (!is_rh) {
+            xaxis = xaxis * -1;
+        }
+        vec3 yaxis = v_cross(zaxis, xaxis);
+
+        ret.m = (float[16]) {
+            xaxis.x, yaxis.x, zaxis.x, 0.0f,
+            xaxis.y, yaxis.y, zaxis.y, 0.0f,
+            xaxis.z, yaxis.z, zaxis.z, 0.0f,
+            -v_dot(xaxis, eye), -v_dot(yaxis, eye), -v_dot(zaxis, eye), 1.0f
+        };
+
+        ret.flags = mat_flags.M_VIEW;
+
+        return ret;
+    }
 }
