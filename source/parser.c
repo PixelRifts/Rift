@@ -4588,7 +4588,7 @@ static P_PreStmt* P_PreStmtConstVar(P_Parser* parser, b8 has_all_tags) {
     P_Consume(parser, TokenType_Equal, str_lit("Expected = after variable name\n"));
     P_Expr* expr = P_Expression(parser);
     if (!expr->is_constant) report_error(parser, str_lit("Cannot have a native const variable\n"));
-    B_SetVariable(&interp, name, expr);
+    B_SetVariable(&interp, actual, expr);
     
     var_entry_key k = { .name = name, .depth = parser->scope_depth };
     var_entry_val v = { .mangled_name = actual, .type = expr->ret_type, .constant = true };
