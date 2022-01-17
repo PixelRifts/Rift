@@ -177,6 +177,9 @@ static b8 P_IsTypeToken(P_Parser* parser) {
         parser->current.type == TokenType_Char   ||
         parser->current.type == TokenType_Bool   ||
         parser->current.type == TokenType_Void   ||
+        parser->current.type == TokenType_Uchar  ||
+        parser->current.type == TokenType_Uint   ||
+        parser->current.type == TokenType_Ulong  || 
         parser->current.type == TokenType_Cstring) return true;
     
     if (parser->current.type == TokenType_Hat) {
@@ -351,7 +354,8 @@ static b8 P_MatchType(P_Parser* parser, P_ValueType* rettype, string* custom_err
         parser->current.type == TokenType_Float || parser->current.type == TokenType_Double ||
         parser->current.type == TokenType_Bool || parser->current.type == TokenType_Char ||
         parser->current.type == TokenType_Void || parser->current.type == TokenType_Cstring ||
-        parser->current.type == TokenType_Identifier) {
+        parser->current.type == TokenType_Uchar || parser->current.type == TokenType_Uint ||
+        parser->current.type == TokenType_Ulong || parser->current.type == TokenType_Identifier) {
         string with_nmspc = {0};
         P_Namespace* nmspc = nullptr;
         if (parser->current.type == TokenType_Identifier) {
@@ -507,11 +511,14 @@ static P_ValueType P_ConsumeType(P_Parser* parser, string message) {
 static P_ValueType type_heirarchy[] = {
     value_type_abs_nc("double"),
     value_type_abs_nc("float"),
+    value_type_abs_nc("ulong"),
     value_type_abs_nc("long"),
+    value_type_abs_nc("uint"),
     value_type_abs_nc("int"),
+    value_type_abs_nc("uchar"),
     value_type_abs_nc("char"),
 };
-u32 type_heirarchy_length = 5;
+u32 type_heirarchy_length = 8;
 
 b8 check_mods(P_ValueTypeMod* modsA, P_ValueTypeMod* modsB, u32 mod_ct) {
     for (u32 k = 0; k < mod_ct; k++) {
@@ -785,17 +792,17 @@ void P_ApplySnapshot(P_Parser* parser, P_ParserSnap snap) {
 //~ Binding
 static b8 P_CheckValueType(P_ValueTypeCollection expected, P_ValueType type) {
     if (expected == ValueTypeCollection_Number) {
-        return (type_check(type, ValueType_Integer) || type_check(type, ValueType_Long) || type_check(type, ValueType_Float) || type_check(type, ValueType_Double));
+        return (type_check(type, ValueType_Char) || type_check(type, ValueType_Integer) || type_check(type, ValueType_Long) || type_check(type, ValueType_Float) || type_check(type, ValueType_Double)  || type_check(type, ValueType_UnsignedChar) || type_check(type, ValueType_UnsignedInteger) || type_check(type, ValueType_UnsignedLong));
     } else if (expected == ValueTypeCollection_Pointer) {
         return is_ptr(&type);
     } else if (expected == ValueTypeCollection_WholeNumber) {
-        return type_check(type, ValueType_Integer) || type_check(type, ValueType_Long);
+        return type_check(type, ValueType_Char) || type_check(type, ValueType_Integer) || type_check(type, ValueType_Long) || type_check(type, ValueType_UnsignedChar) || type_check(type, ValueType_UnsignedInteger) || type_check(type, ValueType_UnsignedLong);
     } else if (expected == ValueTypeCollection_DecimalNumber) {
         return type_check(type, ValueType_Double) || type_check(type, ValueType_Float);
     } else if (expected == ValueTypeCollection_Cstring) {
         return type_check(type, ValueType_Cstring);
     } else if (expected == ValueTypeCollection_Char) {
-        return type_check(type, ValueType_Char);
+        return type_check(type, ValueType_Char) || type_check(type, ValueType_UnsignedChar);
     } else if (expected == ValueTypeCollection_Bool) {
         return type_check(type, ValueType_Bool);
     }
@@ -2523,7 +2530,10 @@ P_ParseRule parse_rules[] = {
     [TokenType_Bool]               = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
     [TokenType_Double]             = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
     [TokenType_Char]               = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
-    [TokenType_Cstring]             = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
+    [TokenType_Uchar]              = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
+    [TokenType_Uint]               = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
+    [TokenType_Ulong]              = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
+    [TokenType_Cstring]            = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
     [TokenType_Long]               = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
     [TokenType_Void]               = { nullptr, nullptr, Prec_None, Prec_None },
     [TokenType_Sizeof ]            = { P_ExprSizeof,   nullptr, Prec_Call, Prec_None },

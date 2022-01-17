@@ -84,6 +84,9 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_Double: return str_lit("Double");
         case TokenType_Char: return str_lit("Char");
         case TokenType_Long: return str_lit("Long");
+        case TokenType_Uchar: return str_lit("Uchar");
+        case TokenType_Uint: return str_lit("Uint");
+        case TokenType_Ulong: return str_lit("Ulong");
         case TokenType_Cstring: return str_lit("Null-Terminated String");
         case TokenType_Native: return str_lit("Native");
         case TokenType_Namespace: return str_lit("Namespace");
@@ -242,6 +245,9 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
         case 'u': {
             switch (lexer->start[1]) {
                 case 's': return L_MatchType(lexer, 2, str_lit("ing"), TokenType_Using);
+                case 'c': return L_MatchType(lexer, 2, str_lit("har"), TokenType_Uchar);
+                case 'i': return L_MatchType(lexer, 2, str_lit("nt"),  TokenType_Uint);
+                case 'l': return L_MatchType(lexer, 2, str_lit("ong"), TokenType_Ulong);
                 case 'n': return L_MatchType(lexer, 2, str_lit("ion"), TokenType_Union);
             }
         }
