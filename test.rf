@@ -2,5 +2,7 @@ import "standard/windows.rf";
 import "standard/io.rf";
 
 int WinMain(HINSTANCE hinst, HINSTANCE prev, LPSTR cmdline, int showCmd) {
+    int **[4]* f;
+    
     return 0;
 }

@@ -2653,7 +2653,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     
     string mangled = {0};
     if (parser->scope_depth == 1) {
-        mangled = native || str_eq(str_lit("main"), name)
+        mangled = native || str_eq(str_lit("main"), name) || str_eq(str_lit("WinMain"), name)
             ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, additional);
     } else {
         // Function in a scope...
