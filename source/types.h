@@ -71,13 +71,16 @@ typedef struct value_type_list {
 extern const P_ValueType ValueType_Invalid;
 
 extern const P_ValueType ValueType_Any;
+extern const P_ValueType ValueType_Char;
 extern const P_ValueType ValueType_Integer;
 extern const P_ValueType ValueType_Long;
 extern const P_ValueType ValueType_Float;
 extern const P_ValueType ValueType_Double;
+extern const P_ValueType ValueType_UnsignedChar;
+extern const P_ValueType ValueType_UnsignedInteger;
+extern const P_ValueType ValueType_UnsignedLong;
 
 extern const P_ValueType ValueType_Cstring;
-extern const P_ValueType ValueType_Char;
 extern const P_ValueType ValueType_Bool;
 extern const P_ValueType ValueType_Void;
 extern const P_ValueType ValueType_Tombstone;

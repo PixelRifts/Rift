@@ -424,11 +424,6 @@ static void E_EmitExpression(E_Emitter* emitter, P_Expr* expr) {
     }
 }
 
-static void E_WriteIndent(E_Emitter* emitter, u32 indent) {
-    for (int i = 0; i < indent; i++)
-        E_Write(emitter, "\t");
-}
-
 static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
     switch (stmt->type) {
         case StmtType_Expression: {
@@ -445,7 +440,6 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
         case StmtType_Block: {
             E_WriteLine(emitter, "{");
             E_EmitStatementChain(emitter, stmt->op.block, indent + 1);
-            E_WriteIndent(emitter, indent);
             E_WriteLine(emitter, "}");
         } break;
         
@@ -481,7 +475,6 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
                     E_WriteLineF(emitter, "va_end(%.*s);", str_expand(varargs));
                 
                 if (stmt->op.func_decl.block->type != StmtType_Block) {
-                    E_WriteIndent(emitter, indent);
                     E_WriteLine(emitter, "}");
                 }
             } else {
@@ -510,8 +503,6 @@ static void E_EmitStatement(E_Emitter* emitter, P_Stmt* stmt, u32 indent) {
             string_list_node* curr_name = stmt->op.union_decl.member_names.first;
             value_type_list_node* curr_type = stmt->op.union_decl.member_types.first;
             for (u32 i = 0; i < stmt->op.union_decl.member_count; i++) {
-                for (u32 idt = 0; idt < indent + 1; idt++)
-                    E_Write(emitter, "\t");
                 E_EmitTypeAndName(emitter, &curr_type->type, (string) { .str = curr_name->str, .size = curr_name->size });
                 E_WriteLine(emitter, ";");
                 

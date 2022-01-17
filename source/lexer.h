@@ -45,6 +45,7 @@ enum {
     TokenType_Namespace, TokenType_Using,
     TokenType_Int, TokenType_Cstring, TokenType_Float, TokenType_Bool,
     TokenType_Double, TokenType_Char, TokenType_Long, TokenType_Void,
+    TokenType_Uchar, TokenType_Uint, TokenType_Ulong,
     
     TokenType_Tag, TokenType_Sizeof, TokenType_Offsetof, TokenType_Cinclude,
     TokenType_Cinsert, TokenType_Operator, TokenType_Typedef,

@@ -177,6 +177,9 @@ static b8 P_IsTypeToken(P_Parser* parser) {
         parser->current.type == TokenType_Char   ||
         parser->current.type == TokenType_Bool   ||
         parser->current.type == TokenType_Void   ||
+        parser->current.type == TokenType_Uchar  ||
+        parser->current.type == TokenType_Uint   ||
+        parser->current.type == TokenType_Ulong  || 
         parser->current.type == TokenType_Cstring) return true;
     
     if (parser->current.type == TokenType_Hat) {
@@ -351,7 +354,8 @@ static b8 P_MatchType(P_Parser* parser, P_ValueType* rettype, string* custom_err
         parser->current.type == TokenType_Float || parser->current.type == TokenType_Double ||
         parser->current.type == TokenType_Bool || parser->current.type == TokenType_Char ||
         parser->current.type == TokenType_Void || parser->current.type == TokenType_Cstring ||
-        parser->current.type == TokenType_Identifier) {
+        parser->current.type == TokenType_Uchar || parser->current.type == TokenType_Uint ||
+        parser->current.type == TokenType_Ulong || parser->current.type == TokenType_Identifier) {
         string with_nmspc = {0};
         P_Namespace* nmspc = nullptr;
         if (parser->current.type == TokenType_Identifier) {
@@ -507,11 +511,14 @@ static P_ValueType P_ConsumeType(P_Parser* parser, string message) {
 static P_ValueType type_heirarchy[] = {
     value_type_abs_nc("double"),
     value_type_abs_nc("float"),
+    value_type_abs_nc("ulong"),
     value_type_abs_nc("long"),
+    value_type_abs_nc("uint"),
     value_type_abs_nc("int"),
+    value_type_abs_nc("uchar"),
     value_type_abs_nc("char"),
 };
-u32 type_heirarchy_length = 5;
+u32 type_heirarchy_length = 8;
 
 b8 check_mods(P_ValueTypeMod* modsA, P_ValueTypeMod* modsB, u32 mod_ct) {
     for (u32 k = 0; k < mod_ct; k++) {
@@ -785,17 +792,17 @@ void P_ApplySnapshot(P_Parser* parser, P_ParserSnap snap) {
 //~ Binding
 static b8 P_CheckValueType(P_ValueTypeCollection expected, P_ValueType type) {
     if (expected == ValueTypeCollection_Number) {
-        return (type_check(type, ValueType_Integer) || type_check(type, ValueType_Long) || type_check(type, ValueType_Float) || type_check(type, ValueType_Double));
+        return (type_check(type, ValueType_Char) || type_check(type, ValueType_Integer) || type_check(type, ValueType_Long) || type_check(type, ValueType_Float) || type_check(type, ValueType_Double)  || type_check(type, ValueType_UnsignedChar) || type_check(type, ValueType_UnsignedInteger) || type_check(type, ValueType_UnsignedLong));
     } else if (expected == ValueTypeCollection_Pointer) {
         return is_ptr(&type);
     } else if (expected == ValueTypeCollection_WholeNumber) {
-        return type_check(type, ValueType_Integer) || type_check(type, ValueType_Long);
+        return type_check(type, ValueType_Char) || type_check(type, ValueType_Integer) || type_check(type, ValueType_Long) || type_check(type, ValueType_UnsignedChar) || type_check(type, ValueType_UnsignedInteger) || type_check(type, ValueType_UnsignedLong);
     } else if (expected == ValueTypeCollection_DecimalNumber) {
         return type_check(type, ValueType_Double) || type_check(type, ValueType_Float);
     } else if (expected == ValueTypeCollection_Cstring) {
         return type_check(type, ValueType_Cstring);
     } else if (expected == ValueTypeCollection_Char) {
-        return type_check(type, ValueType_Char);
+        return type_check(type, ValueType_Char) || type_check(type, ValueType_UnsignedChar);
     } else if (expected == ValueTypeCollection_Bool) {
         return type_check(type, ValueType_Bool);
     }
@@ -2523,7 +2530,10 @@ P_ParseRule parse_rules[] = {
     [TokenType_Bool]               = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
     [TokenType_Double]             = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
     [TokenType_Char]               = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
-    [TokenType_Cstring]             = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
+    [TokenType_Uchar]              = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
+    [TokenType_Uint]               = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
+    [TokenType_Ulong]              = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
+    [TokenType_Cstring]            = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
     [TokenType_Long]               = { P_ExprPrimitiveTypename, nullptr, Prec_None, Prec_None },
     [TokenType_Void]               = { nullptr, nullptr, Prec_None, Prec_None },
     [TokenType_Sizeof ]            = { P_ExprSizeof,   nullptr, Prec_Call, Prec_None },
@@ -2643,7 +2653,7 @@ static P_Stmt* P_StmtFuncDecl(P_Parser* parser, P_ValueType type, string name, b
     
     string mangled = {0};
     if (parser->scope_depth == 1) {
-        mangled = native || str_eq(str_lit("main"), name)
+        mangled = native || str_eq(str_lit("main"), name) || str_eq(str_lit("WinMain"), name)
             ? name : P_FuncNameMangle(parser, name, varargs ? arity - 1 : arity, params, additional);
     } else {
         // Function in a scope...
@@ -4578,7 +4588,7 @@ static P_PreStmt* P_PreStmtConstVar(P_Parser* parser, b8 has_all_tags) {
     P_Consume(parser, TokenType_Equal, str_lit("Expected = after variable name\n"));
     P_Expr* expr = P_Expression(parser);
     if (!expr->is_constant) report_error(parser, str_lit("Cannot have a native const variable\n"));
-    B_SetVariable(&interp, name, expr);
+    B_SetVariable(&interp, actual, expr);
     
     var_entry_key k = { .name = name, .depth = parser->scope_depth };
     var_entry_val v = { .mangled_name = actual, .type = expr->ret_type, .constant = true };
@@ -4810,11 +4820,67 @@ void P_Parse(P_Parser* parser) {
     
     // Only check for main function if it is the entry point
     if (parser->parent == nullptr) {
-        u32 subset_match = 1024;
+        u32 _ = 1024;
         func_entry_val* v = nullptr;
         value_type_list noargs = (value_type_list){0};
-        if (!func_hash_table_get(&global_namespace.functions, (func_entry_key) { .name = str_lit("main"), .depth = 0 }, &noargs, &v, &subset_match, true)) {
-            report_error(parser, str_lit("No main function definition found\n"));
+        value_type_list cvargs = (value_type_list){0};
+        
+        P_ValueTypeMod ptr[] = {
+            { .type = ValueTypeModType_Pointer }
+        };
+        P_ValueType cstring_ptr = {
+            .type = ValueTypeType_Basic,
+            .base_type = str_lit("cstring"),
+            .full_type = str_lit("cstring*"),
+            .mods = ptr,
+            .mod_ct = 1,
+            .op.basic.no_nmspc_name = str_lit("cstring"),
+            .op.basic.nmspc = &global_namespace,
+        };
+        value_type_list_push(&global_arena, &cvargs, ValueType_Integer);
+        value_type_list_push(&global_arena, &cvargs, cstring_ptr);
+        
+        func_entry_key main_k = { .name = str_lit("main"), .depth = 0 };
+        func_entry_key winmain_k = { .name = str_lit("WinMain"), .depth = 0 };
+        if (!(
+              func_hash_table_get(&global_namespace.functions, main_k, &noargs, &v, &_, true) ||
+              func_hash_table_get(&global_namespace.functions, main_k, &cvargs, &v, &_, true)
+              )) {
+            
+            value_type_list winmainargs = (value_type_list){0};
+            
+            P_ValueType hinst = {
+                .type = ValueTypeType_Basic,
+                .base_type = str_lit("HINSTANCE"),
+                .full_type = str_lit("HINSTANCE"),
+                .mods = nullptr, .mod_ct = 0,
+                .op.basic.no_nmspc_name = str_lit("HINSTANCE"),
+                .op.basic.nmspc = &global_namespace,
+            };
+            P_ValueType lpstr = {
+                .type = ValueTypeType_Basic,
+                .base_type = str_lit("LPSTR"),
+                .full_type = str_lit("LPSTR"),
+                .mods = nullptr, .mod_ct = 0,
+                .op.basic.no_nmspc_name = str_lit("LPSTR"),
+                .op.basic.nmspc = &global_namespace,
+            };
+            value_type_list_push(&global_arena, &winmainargs, hinst);
+            value_type_list_push(&global_arena, &winmainargs, hinst);
+            value_type_list_push(&global_arena, &winmainargs, lpstr);
+            value_type_list_push(&global_arena, &winmainargs, ValueType_Integer);
+            
+            b8 gottem = false;
+            if (!func_hash_table_get(&global_namespace.functions, winmain_k, &winmainargs, &v, &_, true)) {
+                report_error(parser, str_lit("No main function definition found\n"));
+            } else gottem = true;
+            if (gottem) {
+                if (!str_eq(v->value.full_type, ValueType_Integer.full_type)) {
+                    report_error(parser, str_lit("No main function definition found\n"));
+                }
+            } else {
+                report_error(parser, str_lit("No main function definition found\n"));
+            }
         }
     }
 }

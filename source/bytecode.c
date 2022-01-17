@@ -192,12 +192,12 @@ static void B_WriteExprToChunk(B_Interpreter* interp, B_Chunk* chunk, P_Expr* ex
             B_WriteExprToChunk(interp, chunk, expr->op.unary.operand);
             
             switch (expr->op.unary.operator) {
-                case TokenType_Plus: B_WriteChunk(chunk, Opcode_Positive);
-                case TokenType_Minus: B_WriteChunk(chunk, Opcode_Negative);
-                case TokenType_Tilde: B_WriteChunk(chunk, Opcode_Bang);
-                case TokenType_Bang: B_WriteChunk(chunk, Opcode_Not);
-                case TokenType_PlusPlus: B_WriteChunk(chunk, Opcode_Preinc);
-                case TokenType_MinusMinus: B_WriteChunk(chunk, Opcode_Predec);
+                case TokenType_Plus: B_WriteChunk(chunk, Opcode_Positive); break;
+                case TokenType_Minus: B_WriteChunk(chunk, Opcode_Negative); break;
+                case TokenType_Tilde: B_WriteChunk(chunk, Opcode_Bang); break;
+                case TokenType_Bang: B_WriteChunk(chunk, Opcode_Not); break;
+                case TokenType_PlusPlus: B_WriteChunk(chunk, Opcode_Preinc); break;
+                case TokenType_MinusMinus: B_WriteChunk(chunk, Opcode_Predec); break;
             }
         } break;
         

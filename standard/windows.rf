@@ -1,0 +1,8 @@
+cinclude "Windows.h";
+
+native struct HINSTANCE {}
+native struct HWND {}
+native struct LPSTR {}
+
+native typedef WPARAM;
+native typedef LPARAM;

@@ -3,13 +3,16 @@
 const P_ValueType ValueType_Invalid = { .base_type = str_lit("INVALID"), .full_type = str_lit("INVALID"), .mods = nullptr };
 
 const P_ValueType ValueType_Any = value_type_abs_nc("any");
+const P_ValueType ValueType_Char = value_type_abs_nc("char");
 const P_ValueType ValueType_Integer = value_type_abs_nc("int");
 const P_ValueType ValueType_Long = value_type_abs_nc("long");
 const P_ValueType ValueType_Float = value_type_abs_nc("float");
 const P_ValueType ValueType_Double = value_type_abs_nc("double");
+const P_ValueType ValueType_UnsignedChar = value_type_abs_nc("uchar");
+const P_ValueType ValueType_UnsignedInteger = value_type_abs_nc("uint");
+const P_ValueType ValueType_UnsignedLong = value_type_abs_nc("ulong");
 
 const P_ValueType ValueType_Cstring = value_type_abs_nc("cstring");
-const P_ValueType ValueType_Char = value_type_abs_nc("char");
 const P_ValueType ValueType_Bool = value_type_abs_nc("bool");
 const P_ValueType ValueType_Void = value_type_abs_nc("void");
 const P_ValueType ValueType_Tombstone = value_type_abs_nc("tombstone");

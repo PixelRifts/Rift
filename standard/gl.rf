@@ -3,7 +3,10 @@ cinclude "glad/glad.h";
 
 native void gladLoadGL();
 
-// glBufferData without vbo param works for some bizarre reason
+/* Boo
+     * /* */
+* /* /* */ */
+*/
 
 namespace GL {
     native enum BufferBits {
