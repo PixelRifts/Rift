@@ -1,13 +1,19 @@
 cinclude "math.h";
+// bug: I can't include "io.rf" due to parser issue, so just include "math.rf" after including "io.rf"
 
 native double tan(double __x);
 native double sqrt(double __x);
 
 namespace std {
+namespace Math {
     struct vec2 { float x; float y; }
     struct vec3 { float x; float y; float z; }
     struct vec4 { float x; float y; float z; float w; }
     
+    ///////////////////
+    // 2 float Vector
+    ///////////////////
+
     bool operator==(vec2 a, vec2 b) { return a.x == b.x && a.y == b.y; }
     
     vec2 operator+(vec2 a, vec2 b) {
@@ -67,6 +73,20 @@ namespace std {
 
         return ret;
     }
+
+    float v_cross(vec2 a, vec2 b) {
+        return a.x*b.y - a.y*b.x;
+    }
+
+    void v_print(vec2 v) {
+        printf("2 float Vector: {\n");
+        printf("    %f, %f\n", v.x, v.y);
+        printf("}\n");
+    }
+
+    ///////////////////
+    // 3 float Vector
+    ///////////////////
     
     bool operator==(vec3 a, vec3 b) { return a.x == b.x && a.y == b.y && a.z == b.z; }
     
@@ -140,6 +160,16 @@ namespace std {
                         .z = a.x*b.y - a.y*b.x };
     }
     
+    void v_print(vec3 v) {
+        printf("3 float Vector: {\n");
+        printf("    %f, %f, %f\n", v.x, v.y, v.z);
+        printf("}\n");
+    }
+
+    ///////////////////
+    // 4 float Vector
+    ///////////////////
+
     bool operator==(vec4 a, vec4 b) { return a.x == b.x && a.y == b.y && a.z == b.z && a.w == b.w; }
     
     vec4 operator+(vec4 a, vec4 b) {
@@ -210,6 +240,12 @@ namespace std {
         }
 
         return ret;
+    }
+
+    void v_print(vec4 v) {
+        printf("4 float Vector: {\n");
+        printf("    %f, %f, %f, %f\n", v.x, v.y, v.z, v.w);
+        printf("}\n");
     }
     
     // matrices are stored in row-major order:
@@ -314,6 +350,61 @@ namespace std {
         m->flags = mat_flags.M_STANDARD;
     }
 
+    // could do for static keyword; maybe later
+    mat2 m_identity_mat2() {
+        mat2 ret;
+        m_identity(&ret);
+
+        return ret;
+    }
+
+    mat2 m_transpose(mat2 m) {
+        mat2 ret;
+
+        ret.m = (float[4]) {
+            m.m[0], m.m[2],
+            m.m[1], m.m[3]
+        };
+
+        ret.flags = m.flags;
+        
+        return ret;
+    }
+
+    void m_transpose(mat2 *m) {
+        // just swap the top right and bottom left corners
+        float tmp = m->m[1];
+        m->m[1] = m->m[2];
+        m->m[2] = tmp;
+    }
+
+    float m_determinant(mat2 m) {
+        return m.m[0] * m.m[3] - m.m[2] * m.m[1];
+    }
+
+    mat2 m_inverse(mat2 m) {
+        mat2 ret;
+
+        float i_mdeterminant = 1.0f / m_determinant(m);
+
+        ret.m = (float[4]) {
+            m.m[3] * i_mdeterminant, -m.m[1] * i_mdeterminant,
+            -m.m[2] * i_mdeterminant, m.m[0] * i_mdeterminant
+        };
+
+        ret.flags = m.flags;
+
+        return ret;
+    }
+
+    void m_print(mat2 m) {
+        printf("2x2 Matrix {\n");
+        for (int i = 0; i < 2; i++) {
+            printf("%f, %f,\n", m.m[i*2+0], m.m[i*2+1]);
+        }
+        printf("}\n");
+    }
+
     ///////////////////
     // 3x3 Matrix
     ///////////////////
@@ -400,6 +491,72 @@ namespace std {
             else ret.m[i] = 0;
         }
         return ret;
+    }
+
+    mat3 m_transpose(mat3 m) {
+        mat3 ret;
+
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                ret.m[i + j * 3] = m.m[i * 3 + j];
+            }
+        }
+        
+        return ret;
+    }
+
+    void m_transpose(mat3 *m) {
+        mat3 temp;
+
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                temp.m[i + j * 3] = m->m[i * 3 + j];
+            }
+        }
+
+        for (int i = 0; i < 9; i++) {
+            m->m[i] = temp.m[i];
+        }
+    }
+
+    mat2 m_minor(mat3 m, int row, int col) {
+        mat2 ret = m_identity_mat2();
+        int m2index = 0;
+
+        ret.flags = mat_flags.M_STANDARD;
+        
+        for (int i = 0; i < 3; i++) {
+            if (i == col) continue;
+            for (int j = 0; j < 3; j++) {
+                if (j == row) continue;
+
+                ret.m[m2index] = m.m[i * 3 + j];
+                m2index++;
+            }
+        }
+
+        return ret;
+    }
+
+    mat3 m_inverse(mat3 m) {
+        float mdeterminant = m_determinant(m);
+
+        if (mdeterminant == 0.0f) return m_identity_mat3();
+
+        float i_mdeterminant = 1.0f / mdeterminant;
+
+        mat3 m_cofactor;
+
+        m_cofactor.flags = m.flags;
+
+        for (int i = 0; i < 9; i++) {
+            m_cofactor.m[i] = m_determinant(m_minor(m, (int) (i / 3), i % 3));
+
+            if ((i % 2) == 1) m_cofactor.m[i] *= -1; // a grid pattern of negatives
+            if ((i / 4) % 2 == 1) m_cofactor.m[i] *= -1; // there's probably a better way to do this
+        }
+
+        return m_cofactor * i_mdeterminant;
     }
 
     float m_determinant(mat3 m) {
@@ -614,14 +771,6 @@ namespace std {
         return ret;
     }
 
-    void m_print(mat4 m) {
-        printf("4x4 Matrix {\n");
-        for (int i = 0; i < 4; i++) {
-            printf("    %f, %f, %f, %f,\n", m.m[i*4+0], m.m[i*4+1], m.m[i*4+2], m.m[i*4+3]);
-        }
-        printf("}\n");
-    }
-
     mat4 m_inverse(mat4 m) {
         float mdeterminant = m_determinant(m);
 
@@ -665,4 +814,13 @@ namespace std {
 
         return ret;
     }
+
+    void m_print(mat4 m) {
+        printf("4x4 Matrix {\n");
+        for (int i = 0; i < 4; i++) {
+            printf("    %f, %f, %f, %f,\n", m.m[i*4+0], m.m[i*4+1], m.m[i*4+2], m.m[i*4+3]);
+        }
+        printf("}\n");
+    }
+}
 }
