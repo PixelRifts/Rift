@@ -1,0 +1,156 @@
+cinclude "math.h";
+
+namespace std {
+    /*
+        Functions
+        @author: Mr. Hecker (Stolen from the C standard library)
+    */
+    native double acos(double x);
+    native float acosf(float x);
+    native double acosh(double x);
+    native float acoshf(float x);
+    native double asin(double x);
+    native float asinf(float x);
+    native double asinh(double x);
+    native float asinhf(float x);
+    native double atan(double x);
+    native double atan2(double x, double y);
+    native float atan2f(float x, float y);
+    native float atanf(float x);
+    native double atanh(double x);
+    native float atanhf(float x);
+    native double cbrt(double x);
+    native float cbrtf(float x);
+    native double ceil(double x);
+    native float ceilf(float x);
+    native double copysign(double x, double y);
+    native float copysignf(float x, float y);
+    native double cos(double x);
+    native float cosf(float x);
+    native double cosh(double x);
+    native float coshf(float x);
+    native double erf(double x);
+    native double erfc(double x);
+    native float erfcf(float x);
+    native float erff(float x);
+    native double exp(double x);
+    native double exp2(double x);
+    native float exp2f(float x);
+    native float expf(float x);
+    native double expm1(double x);
+    native float expm1f(float x);
+    native double fabs(double x);
+    native float fabsf(float x);
+    native double fdim(double x, double y);
+    native float fdimf(float x, float y);
+    native double floor(double x);
+    native float floorf(float x);
+    native double fma(double x, double y, double z);
+    native float fmaf(float x, float y, float z);
+    native double fmax(double x, double y);
+    native float fmaxf(float x, float y);
+    native double fmin(double x, double y);
+    native float fminf(float x, float y);
+    native double fmod(double x, double y);
+    native float fmodf(float x, float y);
+    native double frexp(double x, int* y);
+    native float frexpf(float x, int* y);
+    native double hypot(double x, double y);
+    native float hypotf(float x, float y);
+    native int ilogb(double x);
+    native int ilogbf(float x);
+    native double ldexp(double x, int y);
+    native float ldexpf(float x, int y);
+    native double lgamma(double x);
+    native float lgammaf(float x);
+    native long lrint(double x);
+    native long lrintf(float x);
+    native long lround(double x);
+    native long lroundf(float x);
+    native double log(double x);
+    native double log10(double x);
+    native float log10f(float x);
+    native double log1p(double x);
+    native float log1pf(float x);
+    native double log2(double x);
+    native float log2f(float x);
+    native double logb(double x);
+    native float logbf(float x);
+    native double modf(double x, double* y);
+    native float modff(float x, float* y);
+    native double nan(cstring x);
+    native float nanf(cstring x);
+    native double nearbyint(double x);
+    native float nearbyintf(float x);
+    native double nextafter(double x, double y);
+    native float nextafterf(float x, float y);
+    native double pow(double x, double y);
+    native float powf(float x, float y);
+    native double remainder(double x, double y);
+    native float remainderf(float x, float y);
+    native double remquo(double x, double y, int* z);
+    native float remquof(float x, float y, int* z);
+    native double rint(double x);
+    native float rintf(float x);
+    native double round(double x);
+    native float roundf(float x);
+    native double scalbln(double x, long y);
+    native float scalblnf(float x, long y);
+    native double scalbn(double x, int y);
+    native float scalbnf(float x, int y);
+    native double sin(double x);
+    native float sinf(float x);
+    native double sinh(double x);
+    native float sinhf(float x);
+    native double sqrt(double x);
+    native float sqrtf(float x);
+    native double tan(double x);
+    native float tanf(float x);
+    native double tanh(double x);
+    native float tanhf(float x);
+    native double tgamma(double x);
+    native float tgammaf(float x);
+    native double trunc(double x);
+    native float truncf(float x);
+
+    /*
+        useful mathematical constants
+        @author: Mr. Hecker
+    */
+    const double M_E = 2.71828182845904523536028747135266249775724709369995;        // e
+    const double M_LOG2E = 1.44269504088896340735992468100189213742664595415298;    // log2(e)
+    const double M_LOG10E = 0.43429448190325182765112891891660508229439700580366;   // log10(e)
+    const double M_LN2 = 0.69314718055994530941723212145817656807550013436026;      // ln(2)
+    const double M_LN10 = 2.3025850929940456840179914546843642076011014886288;      // ln(10)
+    const double M_PI = 3.1415926535897932384626433832795028841971693993751;        // pi
+    const double M_PI_2 = 1.5707963267948966192313216916397514420985846996876;      // pi/2
+    const double M_PI_4 = 0.78539816339744830961566084581987572104929234984378;     // pi/4
+    const double M_1_PI = 0.31830988618379067153776752674502872406891929148091;     // 1/pi
+    const double M_2_PI = 0.63661977236758134307553505349005744813783858296182;     // 2/pi
+    const double M_2_SQRTPI = 1.1283791670955125738961589031215451716881012586580;  // 2/sqrt(pi)
+    const double M_SQRT2 = 1.4142135623730950488016887242096980785696718753769;     // sqrt(2)
+    const double M_SQRT1_2 = 0.70710678118654752440084436210484903928483593768845;  // 1/sqrt(2)
+
+    native float INFINITY;         // ((float)(_HUGE_ENUF * _HUGE_ENUF)) Positive infinity
+    native double HUGE_VAL;        // ((double)INFINITY)
+    native float HUGE_VALF;        // ((float)INFINITY)
+    native float NAN;              // ((float)(INFINITY * 0.0F)) Not a number
+
+    int _DENORM = (-2);            // IEEE 754: "denormalized"
+    int _FINITE = (-1);            // IEEE 754: "finite"
+    int _INFCODE = 1;              // IEEE 754: "infinite"
+    int _NANCODE = 2;              // IEEE 754: "NaN"
+
+    int FP_INFINITE = 1;           // fpclassify() and isinf()
+    int FP_NAN = 2;                // fpclassify() and isnan()
+    int FP_NORMAL = (-1);          // fpclassify() and isnormal()
+    int FP_SUBNORMAL = (-2);       // fpclassify() and isfinite()
+    int FP_ZERO = 0;               // fpclassify() and iszero()
+
+    int FP_ILOGB0 = (2147483647 - 1);
+    int FP_ILOGBNAN = 2147483647;
+
+    int MATH_ERRNO = 1;
+    int MATH_ERREXCEPT = 2;
+    int math_errhandling = 1;
+}
