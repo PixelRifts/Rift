@@ -1,15 +1,6 @@
 import "standard/windows.rf";
-import "standard/io.rf";
+//import "standard/io.rf";
 import "standard/math.rf";
-
-namespace std {
-    const int _DENORM = -2;
-    const int _FINITE = -1;
-    const int _INFCODE = 1;
-    const int _NANCODE = 2;
-    
-    const int FP_INFINITE = _INFCODE;
-}
 
 int WinMain(HINSTANCE hinst, HINSTANCE prev, LPSTR cmdline, int showCmd) {
     return 0;
