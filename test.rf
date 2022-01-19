@@ -3,5 +3,10 @@ import "standard/windows.rf";
 import "standard/math.rf";
 
 int WinMain(HINSTANCE hinst, HINSTANCE prev, LPSTR cmdline, int showCmd) {
+    char* k = nullptr;
+    if (k != nullptr) {
+        return 1;
+    }
+    
     return 0;
 }
