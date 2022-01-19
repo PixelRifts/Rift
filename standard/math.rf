@@ -1,11 +1,64 @@
 cinclude "math.h";
-// bug: I can't include "io.rf" due to parser issue, so just include "math.rf" after including "io.rf"
-
-native double tan(double __x);
-native double sqrt(double __x);
+import "io.rf";
+import "memory.rf";
 
 namespace std {
 namespace Math {
+    native double sin(double __x);
+    native double cos(double __x);
+    native double tan(double __x);
+    native double sqrt(double __x);
+
+    native int floor(double __x);
+    native int ceil(double __x);
+
+    /* rng */
+    long __seed;
+    long __seed_prev;
+
+    void seed(long s) {
+        __seed_prev = __seed;
+        __seed = s;
+    }
+
+    long randint() {
+        __seed_prev = __seed;
+        __seed = (2147483648 * __seed_prev + 203984) % 715827882;
+        return __seed;
+    }
+
+    // start is inclusive, end is exclusive
+    long randint(long start, long end) {
+        long ret = randint() % (end-start);
+        return ret + start;
+    }
+
+    double rand() {
+        return randint() / 715827882;
+    }
+
+    //@linux // I get an error when including this tag:
+    //     Error:test.rf:20: At 'pure_rand_linux' Undefined variable pure_rand_linux
+    // even though i'm running ubuntu 20.05...
+    long pure_rand_linux() {
+        long ret;
+
+        FILE *f = fopen("/dev/random", "r");
+        fread(&ret, sizeof(long), 1, f);
+        fclose(f);
+
+        return ret;
+    }
+    
+    //@linux
+    void pure_rand_linux(void *data, long size) {
+        FILE *f = fopen("/dev/random", "r");
+        fread(&data, size, 1, f);
+        fclose(f);
+    }
+
+    /* linear algebra */
+
     struct vec2 { float x; float y; }
     struct vec3 { float x; float y; float z; }
     struct vec4 { float x; float y; float z; float w; }
@@ -361,10 +414,12 @@ namespace Math {
     mat2 m_transpose(mat2 m) {
         mat2 ret;
 
-        ret.m = (float[4]) {
+        float[4] fs = {
             m.m[0], m.m[2],
             m.m[1], m.m[3]
         };
+
+        memcpy(&ret.m, &fs, 4 * sizeof(float));
 
         ret.flags = m.flags;
         
@@ -387,10 +442,12 @@ namespace Math {
 
         float i_mdeterminant = 1.0f / m_determinant(m);
 
-        ret.m = (float[4]) {
+        float[4] fs = {
             m.m[3] * i_mdeterminant, -m.m[1] * i_mdeterminant,
             -m.m[2] * i_mdeterminant, m.m[0] * i_mdeterminant
         };
+
+        memcpy(&ret.m, &fs, 4 * sizeof(float));
 
         ret.flags = m.flags;
 
@@ -803,12 +860,14 @@ namespace Math {
         }
         vec3 yaxis = v_cross(zaxis, xaxis);
 
-        ret.m = (float[16]) {
+        float[16] fs = {
             xaxis.x, yaxis.x, zaxis.x, 0.0f,
             xaxis.y, yaxis.y, zaxis.y, 0.0f,
             xaxis.z, yaxis.z, zaxis.z, 0.0f,
             -v_dot(xaxis, eye), -v_dot(yaxis, eye), -v_dot(zaxis, eye), 1.0f
         };
+
+        memcpy(&ret.m, &fs, 16 * sizeof(float));
 
         ret.flags = mat_flags.M_VIEW;
 

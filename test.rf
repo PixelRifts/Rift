@@ -1,4 +1,4 @@
-import "standard/windows.rf";
+//import "standard/windows.rf";
 import "standard/io.rf";
 import "standard/math.rf";
 
@@ -11,6 +11,14 @@ namespace std {
     const int FP_INFINITE = _INFCODE;
 }
 
-int WinMain(HINSTANCE hinst, HINSTANCE prev, LPSTR cmdline, int showCmd) {
+//int WinMain(HINSTANCE hinst, HINSTANCE prev, LPSTR cmdline, int showCmd) {
+//    return 0;
+//}
+
+int main() {
+    for (int i = 0; i < 32; i++) {
+        printf("%lld\n", std.Math.pure_rand_linux());
+    }
+
     return 0;
 }
