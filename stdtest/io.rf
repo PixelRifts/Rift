@@ -1,0 +1,32 @@
+import "../standard/io.rf";
+
+native void exit(int code);
+
+int main() {
+    using std;
+    cstring str;
+
+    printf("[ printf ]: Printing to stdout without formatting.\n");
+    printf("[ printf ]: Printing to stdout with formatting, string: `%s`, int: %d, float: %f.\n", "This string text is inserted through formatting", 69, 420.69);
+    fprintf(stdout, "[ fprintf ]: Printing to stdout for testing `fprintf`.\n");
+    fprintf(stdin, "[ fprintf ]: Printing to stdin for testing `fprintf` (Altough you might not see it lol and if you can see this then... bro wtf).\n");
+    fprintf(stderr, "[ fprintf ]: Printing to stderr for testing `fprintf`.\n");
+    printf("[ printf ]: For testing scanf type something: ");
+    scanf("%[^\n]", str);
+    printf("[ scanf ]: You typed: %s\n", str);
+    printf("---- FILE IO ----\n");
+    FILE *FileWritePtr = fopen("fileIOWriteTest.txt", "w");
+    FILE *FileReadPtr = fopen("fileIOReadTest.txt", "r");
+
+    if (FileWritePtr == nullptr) {
+        printf("Could not open file `fileIOWriteTest.txt`.");
+        exit(1);
+    } else if (FileReadPtr == nullptr) {
+        printf("Could not open file `fileIOReadTest.txt` maybe it does not exist lol.");
+    }
+
+    fprintf(FileWritePtr, "This is write test to `FileWritePtr` stream in file `fileIOTest`.");
+    fprintf(stdout, "[ fprintf ]: Wrote to file stream of `fileIOWriteTest.txt`.\n");
+    fprintf(stdout, "[ fprintf ]: Reading from file: `fileIOReadTest.txt` it says: `%s`.\n", fgets(str, 100, FileReadPtr));
+    return 0;
+}
