@@ -4,11 +4,6 @@
 //#define OUT_TO_CONSOLE
 
 // All types will go through this map
-static void type_map(E_Emitter* emitter, P_ValueType* type) {
-    type->base_type = str_replace_all(&emitter->parser.arena, type->base_type, str_lit("long"), str_lit("long long"));
-    type->base_type = str_replace_all(&emitter->parser.arena, type->base_type, str_lit("cstring"), str_lit("const char *"));
-}
-
 static void E_Write(E_Emitter* emitter, const char* text) {
 #ifdef OUT_TO_CONSOLE
     printf(text);
@@ -121,7 +116,9 @@ static void E_EmitTypeAndName(E_Emitter* emitter, P_ValueType* type, string name
     } else {
         // Make local copy to not destroy the types
         P_ValueType emit = *type;
-        type_map(emitter, &emit);
+        
+        if (str_eq(emit.base_type, ValueType_Long.base_type))
+            emit.base_type = str_lit("long long");
         
         E_WriteF(emitter, "%.*s ", str_expand(emit.base_type));
         
@@ -232,6 +229,12 @@ static void E_BeginEmitting(E_Emitter* emitter) {
     E_WriteLine(emitter, "#include <stdarg.h>");
     E_WriteLine(emitter, "#include <stdlib.h>");
     E_WriteLine(emitter, "#include <string.h>");
+    E_WriteLine(emitter, "");
+    E_WriteLine(emitter, "typedef const char* cstring;");
+    E_WriteLine(emitter, "typedef unsigned long ulong;");
+    E_WriteLine(emitter, "typedef unsigned int uint;");
+    E_WriteLine(emitter, "typedef unsigned short ushort;");
+    E_WriteLine(emitter, "typedef unsigned char uchar;");
     E_WriteLine(emitter, "");
 }
 

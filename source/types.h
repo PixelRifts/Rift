@@ -72,11 +72,13 @@ extern const P_ValueType ValueType_Invalid;
 
 extern const P_ValueType ValueType_Any;
 extern const P_ValueType ValueType_Char;
+extern const P_ValueType ValueType_Short;
 extern const P_ValueType ValueType_Integer;
 extern const P_ValueType ValueType_Long;
 extern const P_ValueType ValueType_Float;
 extern const P_ValueType ValueType_Double;
 extern const P_ValueType ValueType_UnsignedChar;
+extern const P_ValueType ValueType_UnsignedShort;
 extern const P_ValueType ValueType_UnsignedInteger;
 extern const P_ValueType ValueType_UnsignedLong;
 
