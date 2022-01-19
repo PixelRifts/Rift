@@ -362,7 +362,8 @@ namespace std {
         mat2 m_transpose(mat2 m) {
             mat2 ret;
             
-            ret.m = (float[4]) {
+            // @Hilbert_Curve this doesn't transpile correctly. you'd have to manually set each index
+            ret.m = {
                 m.m[0], m.m[2],
                 m.m[1], m.m[3]
             };
@@ -388,7 +389,7 @@ namespace std {
             
             float i_mdeterminant = 1.0f / m_determinant(m);
             
-            ret.m = (float[4]) {
+            ret.m = {
                 m.m[3] * i_mdeterminant, -m.m[1] * i_mdeterminant,
                 -m.m[2] * i_mdeterminant, m.m[0] * i_mdeterminant
             };
@@ -804,7 +805,7 @@ namespace std {
             }
             vec3 yaxis = v_cross(zaxis, xaxis);
             
-            ret.m = (float[16]) {
+            ret.m = {
                 xaxis.x, yaxis.x, zaxis.x, 0.0f,
                 xaxis.y, yaxis.y, zaxis.y, 0.0f,
                 xaxis.z, yaxis.z, zaxis.z, 0.0f,

@@ -1,4 +1,4 @@
-native void printf(string format, ... rest);
+native void printf(cstring format, ... rest);
 native void* malloc(int size);
 native void* memset(void* block, int ch, int size);
 native void* calloc(int count, int elem_size);

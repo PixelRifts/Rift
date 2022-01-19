@@ -80,11 +80,13 @@ string L__get_string_from_type__(L_TokenType type) {
         case TokenType_False: return str_lit("False");
         case TokenType_Void: return str_lit("Void");
         case TokenType_Int: return str_lit("Int");
+        case TokenType_Short: return str_lit("Short");
         case TokenType_Bool: return str_lit("Bool");
         case TokenType_Double: return str_lit("Double");
         case TokenType_Char: return str_lit("Char");
         case TokenType_Long: return str_lit("Long");
         case TokenType_Uchar: return str_lit("Uchar");
+        case TokenType_Ushort: return str_lit("Ushort");
         case TokenType_Uint: return str_lit("Uint");
         case TokenType_Ulong: return str_lit("Ulong");
         case TokenType_Cstring: return str_lit("Null-Terminated String");
@@ -244,7 +246,12 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
         
         case 'u': {
             switch (lexer->start[1]) {
-                case 's': return L_MatchType(lexer, 2, str_lit("ing"), TokenType_Using);
+                case 's': {
+                    switch (lexer->start[2]) {
+                        case 'i': return L_MatchType(lexer, 3, str_lit("ng"), TokenType_Using);
+                        case 'h': return L_MatchType(lexer, 3, str_lit("ort"), TokenType_Ushort);
+                    }
+                }
                 case 'c': return L_MatchType(lexer, 2, str_lit("har"), TokenType_Uchar);
                 case 'i': return L_MatchType(lexer, 2, str_lit("nt"),  TokenType_Uint);
                 case 'l': return L_MatchType(lexer, 2, str_lit("ong"), TokenType_Ulong);
@@ -289,6 +296,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                 case 't': return L_MatchType(lexer, 2, str_lit("ruct"), TokenType_Struct);
                 case 'w': return L_MatchType(lexer, 2, str_lit("itch"), TokenType_Switch);
                 case 'i': return L_MatchType(lexer, 2, str_lit("zeof"), TokenType_Sizeof);
+                case 'h': return L_MatchType(lexer, 2, str_lit("ort"),  TokenType_Short);
             }
         }
         
