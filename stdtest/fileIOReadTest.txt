@@ -1,1 +1,1 @@
-Read test from file.
+Read test from file. This can also work for testing function(s): `clearerr`, `fgetpos`

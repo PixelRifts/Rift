@@ -1,0 +1,1 @@
+This is write test to `FileWritePtr` stream in file `fileIOTest`.

@@ -1,5 +1,9 @@
+import "stdint.rf";
+
 namespace std {
-    native typedef va_list;
+    typedef cstring va_list;
+    // TODO: Change to int64_t
+    typedef ulong fpos_t;
 
     /*
         Only declared importent functions and constants
@@ -30,13 +34,13 @@ namespace std {
     native int *ctermid(cstring s);
     native FILE *cuserid(cstring s);
     native int fclose(FILE *stream);
-    native FILE *fdopen(int fd, char *mode);
+    native FILE *fdopen(int fd, cstring mode);
     native int feof(FILE *stream);
     native int ferror(FILE *stream);
     native int fflush(FILE *stream);
     native int fgetc(FILE *stream);
     native int fgetpos(FILE *stream, int *pos);
-    native char *fgets(cstring s, int size, FILE *stream);
+    native cstring fgets(cstring s, int size, FILE *stream);
     native int fileno(FILE *stream);
     native int flockfile(FILE *stream);
     native FILE *fopen(cstring filename, cstring mode);
@@ -58,7 +62,7 @@ namespace std {
     native int getchar();
     native int getc_unlocked(FILE *stream);
     native int getchar_unlocked();
-    native int getopt(int argc, cstring *argv, char *optstring); // WARNING: LEGACY FUNCTION
+    native int getopt(int argc, cstring *argv, cstring optstring); // WARNING: LEGACY FUNCTION
     native int gets(cstring s);
     native int getw(FILE *stream);
     native int pclose(FILE *stream);
@@ -80,9 +84,9 @@ namespace std {
     native int snprintf(cstring s, ulong n, cstring format, ... rest);
     native int sprintf(cstring s, cstring format, ... rest);
     native int sscanf(cstring s, cstring format, ... rest);
-    native char *tempnam(cstring dir, cstring pfx);
+    native cstring tempnam(cstring dir, cstring pfx);
     native FILE *tmpfile();
-    native char *tmpnam(cstring s);
+    native cstring tmpnam(cstring s);
     native int vfprintf(FILE *stream, cstring format, va_list arg);
     native int vprintf(cstring format, va_list arg);
     native int vsnprintf(cstring s, ulong n, cstring format, va_list arg);
