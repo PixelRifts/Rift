@@ -19,7 +19,7 @@ Meant to be C-Like with some helpful features.
 - A better syntax for function pointers
 - Lambdas
 - Function overloading
-- Match-Case statements (so people like me who forget writing breaks after swiuch cases. don't have to)
+- Match-Case statements (so people like me who forget writing breaks after switch cases, don't have to)
 - Operator overloading
 - Namespaces (Like C++)
 - Simple References (Like C++)
