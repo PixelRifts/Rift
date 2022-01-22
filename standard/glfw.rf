@@ -1,7 +1,7 @@
 import "stdint.rf";
 
 // Assumes project structure. this is bad
-cinclude "glad/glad.h";
+cinclude "GLFW/glfw3.h";
 
 native int GLFW_VERSION_MAJOR;
 native int GLFW_VERSION_MINOR;
