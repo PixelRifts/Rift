@@ -7,3 +7,6 @@ namespace std {
 
 native void printf(cstring format, ... rest);
 native void fprintf(std.FILE *out, cstring format, ... rest);
+native std.FILE *fopen(cstring file, cstring ops);
+native long fread(void *ptr, long size, long nmemb, std.FILE *s);
+native void fclose(std.FILE *f);

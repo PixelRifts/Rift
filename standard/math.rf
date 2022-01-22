@@ -1,15 +1,116 @@
 cinclude "math.h";
 import "io.rf";
-// bug: I can't include "io.rf" due to parser issue, so just include "math.rf" after including "io.rf"
-
-native double tan(double __x);
-native double sqrt(double __x);
+import "memory.rf";
 
 namespace std {
-    namespace Math {
-        struct vec2 { float x; float y; }
-        struct vec3 { float x; float y; float z; }
-        struct vec4 { float x; float y; float z; float w; }
+namespace Math {
+    native double sin(double __x);
+    native double cos(double __x);
+    native double tan(double __x);
+    native double sqrt(double __x);
+
+    native int floor(double __x);
+    native int ceil(double __x);
+
+    /* rng */
+    long __seed;
+    long __seed_prev;
+
+    void seed(long s) {
+        __seed_prev = __seed;
+        __seed = s;
+    }
+
+    long randint() {
+        __seed_prev = __seed;
+        __seed = (2147483648 * __seed_prev + 203984) % 715827882;
+        return __seed;
+    }
+
+    // start is inclusive, end is exclusive
+    long randint(long start, long end) {
+        long ret = randint() % (end-start);
+        return ret + start;
+    }
+
+    double rand() {
+        return randint() / 715827882;
+    }
+
+    //@linux // I get an error when including this tag:
+    //     Error:test.rf:20: At 'pure_rand_linux' Undefined variable pure_rand_linux
+    // even though i'm running ubuntu 20.05...
+    long pure_rand_linux() {
+        long ret;
+
+        FILE *f = fopen("/dev/random", "r");
+        fread(&ret, sizeof(long), 1, f);
+        fclose(f);
+
+        return ret;
+    }
+    
+    //@linux
+    void pure_rand_linux(void *data, long size) {
+        FILE *f = fopen("/dev/random", "r");
+        fread(&data, size, 1, f);
+        fclose(f);
+    }
+
+    /* linear algebra */
+
+    struct vec2 { float x; float y; }
+    struct vec3 { float x; float y; float z; }
+    struct vec4 { float x; float y; float z; float w; }
+    
+    ///////////////////
+    // 2 float Vector
+    ///////////////////
+
+    bool operator==(vec2 a, vec2 b) { return a.x == b.x && a.y == b.y; }
+    
+    vec2 operator+(vec2 a, vec2 b) {
+        vec2 r;
+        r.x = a.x + b.x;
+        r.y = a.y + b.y;
+        return r;
+    }
+    
+    vec2 operator-(vec2 a, vec2 b) {
+        vec2 r;
+        r.x = a.x - b.x;
+        r.y = a.y - b.y;
+        return r;
+    }
+    
+    vec2 operator*(vec2 a, float s) {
+        vec2 r;
+        r.x = a.x * s;
+        r.y = a.y * s;
+        return r;
+    }
+    
+    vec2 operator/(vec2 a, float s) {
+        vec2 r;
+        r.x = a.x / s;
+        r.y = a.y / s;
+        return r;
+    }
+    
+    float operator[](vec2 a, int index) {
+        if (index == 0) return a.x;
+        if (index == 1) return a.y;
+        return 0;
+    }
+
+    vec2 v_normal(vec2 v) {
+        float inv_dist = 1 / (float) sqrt(v.x*v.x + v.y*v.y);
+
+        return v * inv_dist;
+    }
+
+    void v_normal(vec2 *v) {
+        float inv_dist = 1 / (float) sqrt(v->x*v->x + v->y*v->y);
         
         ///////////////////
         // 2 float Vector
@@ -65,6 +166,93 @@ namespace std {
             v->x = tmp.x;
             v->y = tmp.y;
         }
+        return m;
+    }
+    
+    vec2 operator*(mat2 m, vec2 v) {
+        return (vec2) { .x = m.m[0] * v.x + m.m[1] * v.y, 
+                        .y = m.m[2] * v.x + m.m[3] * v.y };
+    }
+
+    mat2 operator*(mat2 a, mat2 b) {
+        mat2 ret;
+        vec2 temp = (vec2) { .x = b.m[0], .y = b.m[2] };
+        vec2 col0 = a * temp;
+        ret.m[0] = col0.x;
+        ret.m[1] = col0.y;
+
+        temp = (vec2) { .x = b.m[1], .y = b.m[3] };
+        vec2 col1 = a * temp;
+        ret.m[2] = col1.x;
+        ret.m[3] = col1.y;
+
+        return ret;
+    }
+
+    void m_identity(mat2 *m) {
+        m->m[0] = 1;
+        m->m[1] = 0;
+        m->m[2] = 0;
+        m->m[3] = 1;
+
+        m->flags = mat_flags.M_STANDARD;
+    }
+
+    // could do for static keyword; maybe later
+    mat2 m_identity_mat2() {
+        mat2 ret;
+        m_identity(&ret);
+
+        return ret;
+    }
+
+    mat2 m_transpose(mat2 m) {
+        mat2 ret;
+
+        float[4] fs = {
+            m.m[0], m.m[2],
+            m.m[1], m.m[3]
+        };
+
+        memcpy(&ret.m, &fs, 4 * sizeof(float));
+
+        ret.flags = m.flags;
+        
+        return ret;
+    }
+
+    void m_transpose(mat2 *m) {
+        // just swap the top right and bottom left corners
+        float tmp = m->m[1];
+        m->m[1] = m->m[2];
+        m->m[2] = tmp;
+    }
+
+    float m_determinant(mat2 m) {
+        return m.m[0] * m.m[3] - m.m[2] * m.m[1];
+    }
+
+    mat2 m_inverse(mat2 m) {
+        mat2 ret;
+
+        float i_mdeterminant = 1.0f / m_determinant(m);
+
+        float[4] fs = {
+            m.m[3] * i_mdeterminant, -m.m[1] * i_mdeterminant,
+            -m.m[2] * i_mdeterminant, m.m[0] * i_mdeterminant
+        };
+
+        memcpy(&ret.m, &fs, 4 * sizeof(float));
+
+        ret.flags = m.flags;
+
+        return ret;
+    }
+
+    void m_print(mat2 m) {
+        printf("2x2 Matrix {\n");
+        for (int i = 0; i < 2; i++) {
+            printf("%f, %f,\n", m.m[i*2+0], m.m[i*2+1]);
         
         float v_dot(vec2 a, vec2 b) {
             float ret = 0;
@@ -816,13 +1004,26 @@ namespace std {
             
             return ret;
         }
-        
-        void m_print(mat4 m) {
-            printf("4x4 Matrix {\n");
-            for (int i = 0; i < 4; i++) {
-                printf("    %f, %f, %f, %f,\n", m.m[i*4+0], m.m[i*4+1], m.m[i*4+2], m.m[i*4+3]);
-            }
-            printf("}\n");
+        vec3 yaxis = v_cross(zaxis, xaxis);
+
+        float[16] fs = {
+            xaxis.x, yaxis.x, zaxis.x, 0.0f,
+            xaxis.y, yaxis.y, zaxis.y, 0.0f,
+            xaxis.z, yaxis.z, zaxis.z, 0.0f,
+            -v_dot(xaxis, eye), -v_dot(yaxis, eye), -v_dot(zaxis, eye), 1.0f
+        };
+
+        memcpy(&ret.m, &fs, 16 * sizeof(float));
+
+        ret.flags = mat_flags.M_VIEW;
+
+        return ret;
+    }
+
+    void m_print(mat4 m) {
+        printf("4x4 Matrix {\n");
+        for (int i = 0; i < 4; i++) {
+            printf("    %f, %f, %f, %f,\n", m.m[i*4+0], m.m[i*4+1], m.m[i*4+2], m.m[i*4+3]);
         }
     }
 }
