@@ -688,7 +688,7 @@ static b8 P_HasTag(string_list* list, string_list_node* tagname) {
     while (curr != nullptr) {
         if (curr->size == tagname->size) {
             if (memcmp(curr->str, tagname->str, tagname->size) == 0)
-                return !ret;
+                return ret;
         }
         curr = curr->next;
     }
@@ -1855,6 +1855,8 @@ static P_Expr* P_ExprLambda(P_Parser* parser) {
 }
 
 static P_Expr* P_ExprCall(P_Parser* parser, P_Expr* left) {
+    if (left == nullptr) return nullptr;
+
     if (left->ret_type.type != ValueTypeType_FuncPointer) {
         report_error(parser, str_lit("Cannot call a non function pointer type\n"));
         return nullptr;
@@ -4046,7 +4048,7 @@ static P_PreStmt* P_PreStmtOpOverloadBinary(P_Parser* parser, P_ValueType type, 
         opoverload_entry_val* test;
         if (!opoverload_hash_table_get(&op_overloads, key, tokentype, right, &test)) {
             opoverload_hash_table_set(&op_overloads, key, val);
-        } else report_error(parser, str_lit("Operator %.*s already overloaded for types %.*s and %.*s\n"), str_expand(op), left.full_type, right.full_type);
+        } else report_error(parser, str_lit("Operator %.*s already overloaded for types %.*s and %.*s\n"), str_expand(op), str_expand(left.full_type), str_expand(right.full_type));
         
         func = P_MakePreFuncStmtNode(parser, type, mangled, 2, params, param_names);
     }

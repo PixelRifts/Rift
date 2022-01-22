@@ -40,8 +40,7 @@ int main(int argc, char **argv) {
         
 #ifdef CPCOM_WIN
         string_list_push(&scratch, &tags, str_lit("windows"));
-#endif
-#ifdef CPCOM_LINUX
+#elif defined(CPCOM_LINUX)
         string_list_push(&scratch, &tags, str_lit("linux"));
 #endif
         

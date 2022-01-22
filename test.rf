@@ -1,10 +1,7 @@
 import "standard/io.rf";
+import "standard/math.rf";
 
 int main() {
-    printf("Foo");
-    ulong k;
-    long l;
-    ushort s;
-    short f;
+    pure_rand_linux();
     return 0;
 }
