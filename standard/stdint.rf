@@ -1,0 +1,163 @@
+namespace std {
+    typedef char         int8_t;
+    typedef short        int16_t;
+    typedef int          int32_t;
+    typedef long         int64_t;
+    typedef uchar        uint8_t;
+    typedef ushort       uint16_t;
+    typedef uint         uint32_t;
+    typedef ulong        uint64_t;
+
+    typedef char         int_least8_t;
+    typedef short        int_least16_t;
+    typedef int          int_least32_t;
+    typedef long         int_least64_t;
+    typedef uchar        uint_least8_t;
+    typedef ushort       uint_least16_t;
+    typedef uint         uint_least32_t;
+    typedef ulong        uint_least64_t;
+
+    typedef char         int_fast8_t;
+    typedef short        int_fast16_t;
+    typedef int          int_fast32_t;
+    typedef long         int_fast64_t;
+    typedef uchar        uint_fast8_t;
+    typedef ushort       uint_fast16_t;
+    typedef uint         uint_fast32_t;
+    typedef ulong        uint_fast64_t;
+
+    typedef long         intmax_t;
+    typedef ulong        uintmax_t;
+
+    int8_t   INT8_MIN               = (int8_t)-128;
+    int8_t   INT8_MAX               = (int8_t)127;
+    int16_t  INT16_MIN              = (int16_t)-32768;
+    int16_t  INT16_MAX              = (int16_t)32767;
+    int32_t  INT32_MIN              = (int32_t)-2147483648;
+    int32_t  INT32_MAX              = (int32_t)2147483647;
+    int64_t  INT64_MIN              = (int64_t)-9223372036854775808;
+    int64_t  INT64_MAX              = (int64_t)9223372036854775807;
+    uint8_t  UINT8_MAX              = (uint8_t)255;
+    uint16_t UINT16_MAX             = (uint16_t)65535;
+    uint32_t UINT32_MAX             = (uint32_t)4294967295;
+    uint64_t UINT64_MAX             = (uint64_t)18446744073709551615;
+
+    int_least8_t INT_LEAST8_MIN     = (int_least8_t)-128;
+    int_least8_t INT_LEAST8_MAX     = (int_least8_t)127;
+    int_least16_t INT_LEAST16_MIN   = (int_least16_t)-32768;
+    int_least16_t INT_LEAST16_MAX   = (int_least16_t)32767;
+    int_least32_t INT_LEAST32_MIN   = (int_least32_t)-2147483648;
+    int_least32_t INT_LEAST32_MAX   = (int_least32_t)2147483647;
+    int_least64_t INT_LEAST64_MIN   = (int_least64_t)-9223372036854775808;
+    int_least64_t INT_LEAST64_MAX   = (int_least64_t)9223372036854775807;
+    uint_least8_t UINT_LEAST8_MAX   = (uint_least8_t)255;
+    uint_least16_t UINT_LEAST16_MAX = (uint_least16_t)65535;
+    uint_least32_t UINT_LEAST32_MAX = (uint_least32_t)4294967295;
+    uint_least64_t UINT_LEAST64_MAX = (uint_least64_t)18446744073709551615;
+
+    int_fast8_t INT_FAST8_MIN       = (int_fast8_t)-128;
+    int_fast8_t INT_FAST8_MAX       = (int_fast8_t)127;
+    int_fast16_t INT_FAST16_MIN     = (int_fast16_t)-32768;
+    int_fast16_t INT_FAST16_MAX     = (int_fast16_t)32767;
+    int_fast32_t INT_FAST32_MIN     = (int_fast32_t)-2147483648;
+    int_fast32_t INT_FAST32_MAX     = (int_fast32_t)2147483647;
+    int_fast64_t INT_FAST64_MIN     = (int_fast64_t)-9223372036854775808;
+    int_fast64_t INT_FAST64_MAX     = (int_fast64_t)9223372036854775807;
+    uint_fast8_t UINT_FAST8_MAX     = (uint_fast8_t)255;
+    uint_fast16_t UINT_FAST16_MAX   = (uint_fast16_t)65535;
+    uint_fast32_t UINT_FAST32_MAX   = (uint_fast32_t)4294967295;
+    uint_fast64_t UINT_FAST64_MAX   = (uint_fast64_t)18446744073709551615;
+
+    // Only 64bit ptr size until feature of check for os bit size is implemented
+    int64_t INTPTR_MIN = (int64_t)-9223372036854775808;
+    int64_t INTPTR_MAX = (int64_t)9223372036854775807;
+    uint64_t UINTPTR_MAX= (uint64_t)18446744073709551615;
+
+    int64_t PTRDIFF_MIN = (int64_t)-9223372036854775808;
+    int64_t PTRDIFF_MAX = (int64_t)9223372036854775807;
+
+    // 64-bit
+    uint64_t SIZE_MAX = (uint64_t)18446744073709551615;
+
+    int32_t SIG_ATOMIC_MIN = (int32_t)-2147483648;;
+    int32_t SIG_ATOMIC_MAX = (int32_t)2147483647;
+
+    int32_t WCHAR_MIN = (int32_t)-2147483648;;
+    int32_t WCHAR_MAX = (int32_t)2147483647;
+
+    int64_t WINT_MIN = (int64_t)-9223372036854775808;
+    int64_t WINT_MAX = (int64_t)9223372036854775807;
+
+    int8_t int8(int8_t x) { return (int8_t)x; }
+    int8_t int8_16(int16_t x) { return (int8_t)x; }
+    int8_t int8_32(int32_t x) { return (int8_t)x; }
+    int8_t int8_64(int64_t x) { return (int8_t)x; }
+    int8_t int8_uint8(uint8_t x) { return (int8_t)x; }
+    int8_t int8_uint16(uint16_t x) { return (int8_t)x; }
+    int8_t int8_uint32(uint32_t x) { return (int8_t)x; }
+    int8_t int8_uint64(uint64_t x) { return (int8_t)x; }
+
+    int16_t int16_8(int8_t x) { return (int16_t)x; }
+    int16_t int16(int16_t x) { return (int16_t)x; }
+    int16_t int16_32(int32_t x) { return (int16_t)x; }
+    int16_t int16_64(int64_t x) { return (int16_t)x; }
+    int16_t int16_uint8(uint8_t x) { return (int16_t)x; }
+    int16_t int16_uint16(uint16_t x) { return (int16_t)x; }
+    int16_t int16_uint32(uint32_t x) { return (int16_t)x; }
+    int16_t int16_uint64(uint64_t x) { return (int16_t)x; }
+
+    int32_t int32_8(int8_t x) { return (int32_t)x; }
+    int32_t int32_16(int16_t x) { return (int32_t)x; }
+    int32_t int32(int32_t x) { return (int32_t)x; }
+    int32_t int32_64(int64_t x) { return (int32_t)x; }
+    int32_t int32_uint8(uint8_t x) { return (int32_t)x; }
+    int32_t int32_uint16(uint16_t x) { return (int32_t)x; }
+    int32_t int32_uint32(uint32_t x) { return (int32_t)x; }
+    int32_t int32_uint64(uint64_t x) { return (int32_t)x; }
+
+    int64_t int64_8(int8_t x) { return (int64_t)x; }
+    int64_t int64_16(int16_t x) { return (int64_t)x; }
+    int64_t int64_32(int32_t x) { return (int64_t)x; }
+    int64_t int64(int64_t x) { return (int64_t)x; }
+    int64_t int64_uint8(uint8_t x) { return (int64_t)x; }
+    int64_t int64_uint16(uint16_t x) { return (int64_t)x; }
+    int64_t int64_uint32(uint32_t x) { return (int64_t)x; }
+    int64_t int64_uint64(uint64_t x) { return (int64_t)x; }
+
+    uint8_t uint8_int8(int8_t x) { return (uint8_t)x; }
+    uint8_t uint8_int16(int16_t x) { return (uint8_t)x; }
+    uint8_t uint8_int32(int32_t x) { return (uint8_t)x; }
+    uint8_t uint8_int64(int64_t x) { return (uint8_t)x; }
+    uint8_t uint8(uint8_t x) { return (uint8_t)x; }
+    uint8_t uint8_16(uint16_t x) { return (uint8_t)x; }
+    uint8_t uint8_32(uint32_t x) { return (uint8_t)x; }
+    uint8_t uint8_64(uint64_t x) { return (uint8_t)x; }
+
+    uint16_t uint16_int8(int8_t x) { return (uint16_t)x; }
+    uint16_t uint16_int16(int16_t x) { return (uint16_t)x; }
+    uint16_t uint16_int32(int32_t x) { return (uint16_t)x; }
+    uint16_t uint16_int64(int64_t x) { return (uint16_t)x; }
+    uint16_t uint16(uint16_t x) { return (uint16_t)x; }
+    uint16_t uint16_8(uint8_t x) { return (uint16_t)x; }
+    uint16_t uint16_32(uint32_t x) { return (uint16_t)x; }
+    uint16_t uint16_64(uint64_t x) { return (uint16_t)x; }
+
+    uint32_t uint32_int8(int8_t x) { return (uint32_t)x; }
+    uint32_t uint32_int16(int16_t x) { return (uint32_t)x; }
+    uint32_t uint32_int32(int32_t x) { return (uint32_t)x; }
+    uint32_t uint32_int64(int64_t x) { return (uint32_t)x; }
+    uint32_t uint32(uint32_t x) { return (uint32_t)x; }
+    uint32_t uint32_8(uint8_t x) { return (uint32_t)x; }
+    uint32_t uint32_16(uint16_t x) { return (uint32_t)x; }
+    uint32_t uint32_64(uint64_t x) { return (uint32_t)x; }
+
+    uint64_t uint64_int8(int8_t x) { return (uint64_t)x; }
+    uint64_t uint64_int16(int16_t x) { return (uint64_t)x; }
+    uint64_t uint64_int32(int32_t x) { return (uint64_t)x; }
+    uint64_t uint64_int64(int64_t x) { return (uint64_t)x; }
+    uint64_t uint64(uint64_t x) { return (uint64_t)x; }
+    uint64_t uint64_8(uint8_t x) { return (uint64_t)x; }
+    uint64_t uint64_16(uint16_t x) { return (uint64_t)x; }
+    uint64_t uint64_32(uint32_t x) { return (uint64_t)x; }
+    uint64_t uint64_64(uint64_t x) { return (uint64_t)x; }
+}

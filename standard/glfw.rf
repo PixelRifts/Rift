@@ -1,26 +1,512 @@
-// Is this good?
-// I guess...
-cinclude "GLFW/glfw3.h";
+import "stdint.rf";
 
-namespace GLFW {
-    native struct GLFWwindow;
-    native struct GLFWmonitor;
-    
-    native int GLFW_CLIENT_API;
-    native int GLFW_CONTEXT_VERSION_MAJOR;
-    native int GLFW_CONTEXT_VERSION_MINOR;
-    
-    native typedef GLuint;
-    
-    native bool glfwInit();
-    native bool glfwMakeContextCurrent(GLFWwindow* window);
-    native void glfwWindowHint(int hint, int value);
-    native void glfwGetVersion(int* major, int* minor, int* rev);
-    
-    native GLFWwindow* glfwCreateWindow(int width, int height, cstring name, GLFWmonitor* monitor, GLFWwindow* share);
-    native bool glfwWindowShouldClose(GLFWwindow* window);
-    native void glfwPollEvents();
-    native void glfwSwapBuffers(GLFWwindow* window);
-    native void glfwDestroyWindow(GLFWwindow* window);
-    native void glfwTerminate();
-}
+// Assumes project structure. this is bad
+cinclude "glad/glad.h";
+
+native int GLFW_VERSION_MAJOR;
+native int GLFW_VERSION_MINOR;
+native int GLFW_VERSION_REVISION;
+
+native int GLFW_TRUE;
+native int GLFW_FALSE;
+
+native int GLFW_RELEASE;
+native int GLFW_PRESS;
+native int GLFW_REPEAT;
+
+native int GLFW_HAT_CENTERED;
+native int GLFW_HAT_UP;
+native int GLFW_HAT_RIGHT;
+native int GLFW_HAT_DOWN;
+native int GLFW_HAT_LEFT;
+native int GLFW_HAT_RIGHT_UP;
+native int GLFW_HAT_RIGHT_DOWN;
+native int GLFW_HAT_LEFT_UP;
+native int GLFW_HAT_LEFT_DOWN;
+
+// Unknown key
+native int GLFW_KEY_UNKNOWN;
+
+// Printable keys
+native int GLFW_KEY_SPACE;
+native int GLFW_KEY_APOSTROPHE; /* ' */
+native int GLFW_KEY_COMMA; /* , */
+native int GLFW_KEY_MINUS; /* - */
+native int GLFW_KEY_PERIOD; /* . */
+native int GLFW_KEY_SLASH; /* / */
+native int GLFW_KEY_0;
+native int GLFW_KEY_1;
+native int GLFW_KEY_2;
+native int GLFW_KEY_3;
+native int GLFW_KEY_4;
+native int GLFW_KEY_5;
+native int GLFW_KEY_6;
+native int GLFW_KEY_7;
+native int GLFW_KEY_8;
+native int GLFW_KEY_9;
+native int GLFW_KEY_SEMICOLON; /* ; */
+native int GLFW_KEY_EQUAL; /* = */
+native int GLFW_KEY_A;
+native int GLFW_KEY_B;
+native int GLFW_KEY_C;
+native int GLFW_KEY_D;
+native int GLFW_KEY_E;
+native int GLFW_KEY_F;
+native int GLFW_KEY_G;
+native int GLFW_KEY_H;
+native int GLFW_KEY_I;
+native int GLFW_KEY_J;
+native int GLFW_KEY_K;
+native int GLFW_KEY_L;
+native int GLFW_KEY_M;
+native int GLFW_KEY_N;
+native int GLFW_KEY_O;
+native int GLFW_KEY_P;
+native int GLFW_KEY_Q;
+native int GLFW_KEY_R;
+native int GLFW_KEY_S;
+native int GLFW_KEY_T;
+native int GLFW_KEY_U;
+native int GLFW_KEY_V;
+native int GLFW_KEY_W;
+native int GLFW_KEY_X;
+native int GLFW_KEY_Y;
+native int GLFW_KEY_Z;
+native int GLFW_KEY_LEFT_BRACKET; /* [ */
+native int GLFW_KEY_BACKSLASH; /* \ */
+native int GLFW_KEY_RIGHT_BRACKET; /* ] */
+native int GLFW_KEY_GRAVE_ACCENT; /* ` */
+native int GLFW_KEY_WORLD_1; /* non-US #1 */
+native int GLFW_KEY_WORLD_2; /* non-US #2 */
+
+// Function keys
+native int GLFW_KEY_ESCAPE;
+native int GLFW_KEY_ENTER;
+native int GLFW_KEY_TAB;
+native int GLFW_KEY_BACKSPACE;
+native int GLFW_KEY_INSERT;
+native int GLFW_KEY_DELETE;
+native int GLFW_KEY_RIGHT;
+native int GLFW_KEY_LEFT;
+native int GLFW_KEY_DOWN;
+native int GLFW_KEY_UP;
+native int GLFW_KEY_PAGE_UP;
+native int GLFW_KEY_PAGE_DOWN;
+native int GLFW_KEY_HOME;
+native int GLFW_KEY_END;
+native int GLFW_KEY_CAPS_LOCK;
+native int GLFW_KEY_SCROLL_LOCK;
+native int GLFW_KEY_NUM_LOCK;
+native int GLFW_KEY_PRINT_SCREEN;
+native int GLFW_KEY_PAUSE;
+native int GLFW_KEY_F1;
+native int GLFW_KEY_F2;
+native int GLFW_KEY_F3;
+native int GLFW_KEY_F4;
+native int GLFW_KEY_F5;
+native int GLFW_KEY_F6;
+native int GLFW_KEY_F7;
+native int GLFW_KEY_F8;
+native int GLFW_KEY_F9;
+native int GLFW_KEY_F10;
+native int GLFW_KEY_F11;
+native int GLFW_KEY_F12;
+native int GLFW_KEY_F13;
+native int GLFW_KEY_F14;
+native int GLFW_KEY_F15;
+native int GLFW_KEY_F16;
+native int GLFW_KEY_F17;
+native int GLFW_KEY_F18;
+native int GLFW_KEY_F19;
+native int GLFW_KEY_F20;
+native int GLFW_KEY_F21;
+native int GLFW_KEY_F22;
+native int GLFW_KEY_F23;
+native int GLFW_KEY_F24;
+native int GLFW_KEY_F25;
+native int GLFW_KEY_KP_0;
+native int GLFW_KEY_KP_1;
+native int GLFW_KEY_KP_2;
+native int GLFW_KEY_KP_3;
+native int GLFW_KEY_KP_4;
+native int GLFW_KEY_KP_5;
+native int GLFW_KEY_KP_6;
+native int GLFW_KEY_KP_7;
+native int GLFW_KEY_KP_8;
+native int GLFW_KEY_KP_9;
+native int GLFW_KEY_KP_DECIMAL;
+native int GLFW_KEY_KP_DIVIDE;
+native int GLFW_KEY_KP_MULTIPLY;
+native int GLFW_KEY_KP_SUBTRACT;
+native int GLFW_KEY_KP_ADD;
+native int GLFW_KEY_KP_ENTER;
+native int GLFW_KEY_KP_EQUAL;
+native int GLFW_KEY_LEFT_SHIFT;
+native int GLFW_KEY_LEFT_CONTROL;
+native int GLFW_KEY_LEFT_ALT;
+native int GLFW_KEY_LEFT_SUPER;
+native int GLFW_KEY_RIGHT_SHIFT;
+native int GLFW_KEY_RIGHT_CONTROL;
+native int GLFW_KEY_RIGHT_ALT;
+native int GLFW_KEY_RIGHT_SUPER;
+native int GLFW_KEY_MENU;
+
+native int GLFW_KEY_LAST;
+
+native int GLFW_MOD_SHIFT;
+native int GLFW_MOD_CONTROL;
+native int GLFW_MOD_ALT;
+native int GLFW_MOD_SUPER;
+native int GLFW_MOD_CAPS_LOCK;
+native int GLFW_MOD_NUM_LOCK;
+
+// Mouse buttons
+native int GLFW_MOUSE_BUTTON_1;
+native int GLFW_MOUSE_BUTTON_2;
+native int GLFW_MOUSE_BUTTON_3;
+native int GLFW_MOUSE_BUTTON_4;
+native int GLFW_MOUSE_BUTTON_5;
+native int GLFW_MOUSE_BUTTON_6;
+native int GLFW_MOUSE_BUTTON_7;
+native int GLFW_MOUSE_BUTTON_8;
+native int GLFW_MOUSE_BUTTON_LAST;
+native int GLFW_MOUSE_BUTTON_LEFT;
+native int GLFW_MOUSE_BUTTON_RIGHT;
+native int GLFW_MOUSE_BUTTON_MIDDLE;
+
+// Joystick
+native int GLFW_JOYSTICK_1;
+native int GLFW_JOYSTICK_2;
+native int GLFW_JOYSTICK_3;
+native int GLFW_JOYSTICK_4;
+native int GLFW_JOYSTICK_5;
+native int GLFW_JOYSTICK_6;
+native int GLFW_JOYSTICK_7;
+native int GLFW_JOYSTICK_8;
+native int GLFW_JOYSTICK_9;
+native int GLFW_JOYSTICK_10;
+native int GLFW_JOYSTICK_11;
+native int GLFW_JOYSTICK_12;
+native int GLFW_JOYSTICK_13;
+native int GLFW_JOYSTICK_14;
+native int GLFW_JOYSTICK_15;
+native int GLFW_JOYSTICK_16;
+native int GLFW_JOYSTICK_LAST;
+
+// Gamepad buttons
+native int GLFW_GAMEPAD_BUTTON_A;
+native int GLFW_GAMEPAD_BUTTON_B;
+native int GLFW_GAMEPAD_BUTTON_X;
+native int GLFW_GAMEPAD_BUTTON_Y;
+native int GLFW_GAMEPAD_BUTTON_LEFT_BUMPER;
+native int GLFW_GAMEPAD_BUTTON_RIGHT_BUMPER;
+native int GLFW_GAMEPAD_BUTTON_BACK;
+native int GLFW_GAMEPAD_BUTTON_START;
+native int GLFW_GAMEPAD_BUTTON_GUIDE;
+native int GLFW_GAMEPAD_BUTTON_LEFT_THUMB;
+native int GLFW_GAMEPAD_BUTTON_RIGHT_THUMB;
+native int GLFW_GAMEPAD_BUTTON_DPAD_UP;
+native int GLFW_GAMEPAD_BUTTON_DPAD_RIGHT;
+native int GLFW_GAMEPAD_BUTTON_DPAD_DOWN;
+native int GLFW_GAMEPAD_BUTTON_DPAD_LEFT;
+native int GLFW_GAMEPAD_BUTTON_LAST;
+
+native int GLFW_GAMEPAD_BUTTON_CROSS;
+native int GLFW_GAMEPAD_BUTTON_CIRCLE;
+native int GLFW_GAMEPAD_BUTTON_SQUARE;
+native int GLFW_GAMEPAD_BUTTON_TRIANGLE;
+
+// Gamepad axis
+native int GLFW_GAMEPAD_AXIS_LEFT_X;
+native int GLFW_GAMEPAD_AXIS_LEFT_Y;
+native int GLFW_GAMEPAD_AXIS_RIGHT_X;
+native int GLFW_GAMEPAD_AXIS_RIGHT_Y;
+native int GLFW_GAMEPAD_AXIS_LEFT_TRIGGER;
+native int GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER;
+native int GLFW_GAMEPAD_AXIS_LAST;
+
+// Error codes
+native int GLFW_NO_ERROR;
+native int GLFW_NOT_INITIALIZED;
+native int GLFW_NO_CURRENT_CONTEXT;
+native int GLFW_INVALID_ENUM;
+native int GLFW_INVALID_VALUE;
+native int GLFW_OUT_OF_MEMORY;
+native int GLFW_API_UNAVAILABLE;
+native int GLFW_VERSION_UNAVAILABLE;
+native int GLFW_PLATFORM_ERROR;
+native int GLFW_FORMAT_UNAVAILABLE;
+native int GLFW_NO_WINDOW_CONTEXT;
+native int GLFW_CURSOR_UNAVAILABLE;
+native int GLFW_FEATURE_UNAVAILABLE;
+native int GLFW_FEATURE_UNIMPLEMENTED;
+native int GLFW_PLATFORM_UNAVAILABLE;
+
+// Input focus, window hint and attribute
+native int GLFW_FOCUSED;
+native int GLFW_ICONIFIED;
+native int GLFW_RESIZABLE;
+native int GLFW_VISIBLE;
+native int GLFW_DECORATED;
+native int GLFW_AUTO_ICONIFY;
+native int GLFW_FLOATING;
+native int GLFW_MAXIMIZED;
+native int GLFW_CENTER_CURSOR;
+native int GLFW_TRANSPARENT_FRAMEBUFFER;
+native int GLFW_HOVERED;
+native int GLFW_RED_BITS;
+native int GLFW_GREEN_BITS;
+native int GLFW_BLUE_BITS;
+native int GLFW_ALPHA_BITS;
+native int GLFW_DEPTH_BITS;
+native int GLFW_STENCIL_BITS;
+native int GLFW_ACCUM_RED_BITS;
+native int GLFW_ACCUM_GREEN_BITS;
+native int GLFW_ACCUM_BLUE_BITS;
+native int GLFW_ACCUM_ALPHA_BITS;
+native int GLFW_AUX_BUFFERS;
+native int GLFW_STEREO;
+native int GLFW_SAMPLES;
+native int GLFW_SRGB_CAPABLE;
+native int GLFW_REFRESH_RATE;
+native int GLFW_CLIENT_API;
+native int GLFW_CONTEXT_VERSION_MAJOR;
+native int GLFW_CONTEXT_VERSION_MINOR;
+native int GLFW_CONTEXT_REVISION;
+native int GLFW_CONTEXT_ROBUSTNESS;
+native int GLFW_OPENGL_FORWARD_COMPAT;
+native int GLFW_OPENGL_DEBUG_CONTEXT;
+native int GLFW_OPENGL_PROFILE;
+native int GLFW_CONTEXT_RELEASE_BEHAVIOR;
+native int GLFW_CONTEXT_NO_ERROR;
+native int GLFW_CONTEXT_CREATION_API;
+native int GLFW_SCALE_TO_MONITOR;
+native int GLFW_COCOA_RETINA_FRAMEBUFFER;
+native int GLFW_COCOA_FRAME_NAME;
+native int GLFW_COCOA_GRAPHICS_SWITCHING;
+native int GLFW_X11_CLASS_NAME;
+native int GLFW_X11_INSTANCE_NAME;
+native int GLFW_WIN32_KEYBOARD_MENU;
+native int GLFW_NO_API;
+native int GLFW_OPENGL_API;
+native int GLFW_OPENGL_ES_API;
+native int GLFW_NO_ROBUSTNESS;
+native int GLFW_NO_RESET_NOTIFICATION;
+native int GLFW_LOSE_CONTEXT_ON_RESET;
+native int GLFW_OPENGL_ANY_PROFILE;
+native int GLFW_OPENGL_CORE_PROFILE;
+native int GLFW_OPENGL_COMPAT_PROFILE;
+native int GLFW_CURSOR;
+native int GLFW_STICKY_KEYS;
+native int GLFW_STICKY_MOUSE_BUTTONS;
+native int GLFW_LOCK_KEY_MODS;
+native int GLFW_RAW_MOUSE_MOTION;
+native int GLFW_CURSOR_NORMAL;
+native int GLFW_CURSOR_HIDDEN;
+native int GLFW_CURSOR_DISABLED;
+native int GLFW_ANY_RELEASE_BEHAVIOR;
+native int GLFW_RELEASE_BEHAVIOR_FLUSH;
+native int GLFW_RELEASE_BEHAVIOR_NONE;
+native int GLFW_NATIVE_CONTEXT_API;
+native int GLFW_EGL_CONTEXT_API;
+native int GLFW_OSMESA_CONTEXT_API;
+native int GLFW_ANGLE_PLATFORM_TYPE_NONE;
+native int GLFW_ANGLE_PLATFORM_TYPE_OPENGL;
+native int GLFW_ANGLE_PLATFORM_TYPE_OPENGLES;
+native int GLFW_ANGLE_PLATFORM_TYPE_D3D9;
+native int GLFW_ANGLE_PLATFORM_TYPE_D3D11;
+native int GLFW_ANGLE_PLATFORM_TYPE_VULKAN;
+native int GLFW_ANGLE_DEVICE_TYPE_METAL;
+
+// Standard system cursor shapes
+native int GLFW_ARROW_CURSOR;
+native int GLFW_IBEAM_CURSOR;
+native int GLFW_CROSSHAIR_CURSOR;
+native int GLFW_POINTING_HAND_CURSOR;
+native int GLFW_RESIZE_EW_CURSOR;
+native int GLFW_RESIZE_NS_CURSOR;
+native int GLFW_RESIZE_NWSE_CURSOR;
+native int GLFW_RESIZE_NESW_CURSOR;
+native int GLFW_RESIZE_ALL_CURSOR;
+native int GLFW_NOT_ALLOWED_CURSOR;
+native int GLFW_HRESIZE_CURSOR;
+native int GLFW_VRESIZE_CURSOR;
+native int GLFW_HAND_CURSOR;
+native int GLFW_CONNECTED;
+native int GLFW_DISCONNECTED;
+
+// Joystick hat buttons init hint
+native int GLFW_JOYSTICK_HAT_BUTTONS;
+native int GLFW_ANGLE_PLATFORM_TYPE;
+native int GLFW_PLATFORM;
+native int GLFW_COCOA_CHDIR_RESOURCES;
+native int GLFW_COCOA_MENUBAR;
+native int GLFW_X11_XCB_VULKAN_SURFACE;
+
+// Hint value that enables automatic platform selection
+native int GLFW_ANY_PLATFORM;
+native int GLFW_PLATFORM_WIN32;
+native int GLFW_PLATFORM_COCOA;
+native int GLFW_PLATFORM_WAYLAND;
+native int GLFW_PLATFORM_X11;
+native int GLFW_PLATFORM_NULL;
+
+native int GLFW_DONT_CARE;
+
+native typedef GLFWglproc;
+native typedef GLFWvkproc;
+native typedef GLFWwindow;
+native typedef GLFWmonitor;
+native typedef GLFWcursor;
+native typedef GLFWallocfun;
+native typedef GLFWreallocatefun;
+native typedef GLFWdeallocatefun;
+native typedef GLFWerrorfun;
+native typedef GLFWwindowposfun;
+native typedef GLFWwindowsizefun;
+native typedef GLFWwindowclosefun;
+native typedef GLFWwindowrefreshfun;
+native typedef GLFWwindowfocusfun;
+native typedef GLFWwindowiconifyfun;
+native typedef GLFWwindowmaximizefun;
+native typedef GLFWframebuffersizefun;
+native typedef GLFWwindowcontentscalefun;
+native typedef GLFWmousebuttonfun;
+native typedef GLFWcursorposfun;
+native typedef GLFWcursorenterfun;
+native typedef GLFWscrollfun;
+native typedef GLFWkeyfun;
+native typedef GLFWcharfun;
+native typedef GLFWcharmodsfun;
+native typedef GLFWdropfun;
+native typedef GLFWmonitorfun;
+native typedef GLFWjoystickfun;
+native typedef GLFWvidmode;
+native typedef GLFWgammaramp;
+native typedef GLFWimage;
+native typedef GLFWgamepadstate;
+native typedef GLFWallocator;
+
+native bool glfwInit();
+native void glfwTerminate();
+native void glfwInitHint(int hint, int value);
+native void glfwInitAllocator(GLFWallocator allocator);
+// natice void glfwInitVulkanLoader(PFN_vkGetInstanceProcAddr vkGetInstanceProcAddr);
+native void glfwGetVersion(int* major, int* minor, int* rev);
+native cstring glfwGetVersionString();
+native int glfwGetError(cstring* description);
+native GLFWerrorfun glfwSetErrorCallback(GLFWerrorfun callback);
+native int glfwGetPlatform();
+native bool glfwPlatformSupported(int platform);
+native GLFWmonitor** glfwGetMonitors(int* count);
+native GLFWmonitor* glfwGetPrimaryMonitor();
+native void glfwGetMonitorPos(GLFWmonitor* monitor, int* xpos, int* ypos);
+native void glfwGetMonitorWorkarea(GLFWmonitor* monitor, int* xpos, int* ypos, int* width, int* height);
+native void glfwGetMonitorPhysicalSize(GLFWmonitor* monitor, int* widthMM, int* heightMM);
+native void glfwGetMonitorContentScale(GLFWmonitor* monitor, float* xscale, float* yscale);
+native cstring glfwGetMonitorName(GLFWmonitor* monitor);
+native void glfwSetMonitorUserPointer(GLFWmonitor* monitor, void* pointer);
+native void* glfwGetMonitorUserPointer(GLFWmonitor* monitor);
+native GLFWmonitorfun glfwSetMonitorCallback(GLFWmonitorfun callback);
+native GLFWvidmode* glfwGetVideoModes(GLFWmonitor* monitor, GLFWvidmode** modes);
+native GLFWvidmode* glfwGetVideoMode(GLFWmonitor* monitor, GLFWvidmode* mode);
+native void glfwSetGamma(GLFWmonitor* monitor, float gamma);
+native void glfwGetGammaRamp(GLFWmonitor* monitor);
+native void glfwSetGammaRamp(GLFWmonitor* monitor, GLFWgammaramp* ramp);
+native void glfwDefaultWindowHints();
+native void glfwWindowHint(int hint, int value);
+native void glfwWindowHintString(int hint, cstring value);
+native GLFWwindow* glfwCreateWindow(int width, int height, cstring title, GLFWmonitor* monitor, GLFWwindow* share);
+native void glfwDestroyWindow(GLFWwindow* window);
+native bool glfwWindowShouldClose(GLFWwindow* window);
+native void glfwSetWindowShouldClose(GLFWwindow* window, bool value);
+native void glfwSetWindowTitle(GLFWwindow* window, cstring title);
+native void glfwSetWindowIcon(GLFWwindow* window, int count, GLFWimage* images);
+native void glfwGetWindowPos(GLFWwindow* window, int* xpos, int* ypos);
+native void glfwSetWindowPos(GLFWwindow* window, int xpos, int ypos);
+native void glfwGetWindowSize(GLFWwindow* window, int* width, int* height);
+native void glfwSetWindowSizeLimits(GLFWwindow* window, int minwidth, int minheight, int maxwidth, int maxheight);
+native void glfwSetWindowAspectRatio(GLFWwindow* window, int numer, int denom);
+native void glfwSetWindowSize(GLFWwindow* window, int width, int height);
+native void glfwGetFramebufferSize(GLFWwindow* window, int* width, int* height);
+native void glfwGetWindowFrameSize(GLFWwindow* window, int* left, int* top, int* right, int* bottom);
+native void glfwGetWindowContentScale(GLFWwindow* window, float* xscale, float* yscale);
+native float glfwGetWindowOpacity(GLFWwindow* window);
+native void glfwSetWindowOpacity(GLFWwindow* window, float opacity);
+native void glfwIconifyWindow(GLFWwindow* window);
+native void glfwRestoreWindow(GLFWwindow* window);
+native void glfwMaximizeWindow(GLFWwindow* window);
+native void glfwShowWindow(GLFWwindow* window);
+native void glfwHideWindow(GLFWwindow* window);
+native void glfwFocusWindow(GLFWwindow* window);
+native void glfwRequestWindowAttention(GLFWwindow* window);
+native GLFWmonitor* glfwGetWindowMonitor(GLFWwindow* window);
+native void glfwSetWindowMonitor(GLFWwindow* window, GLFWmonitor* monitor, int xpos, int ypos, int width, int height, int refreshRate);
+native int glfwGetWindowAttrib(GLFWwindow* window, int attrib);
+native void glfwSetWindowAttrib(GLFWwindow* window, int attrib, int value);
+native void glfwSetWindowUserPointer(GLFWwindow* window, void* pointer);
+native void* glfwGetWindowUserPointer(GLFWwindow* window);
+native GLFWwindowposfun glfwSetWindowPosCallback(GLFWwindow* window, GLFWwindowposfun callback);
+native GLFWwindowsizefun glfwSetWindowSizeCallback(GLFWwindow* window, GLFWwindowsizefun callback);
+native GLFWwindowclosefun glfwSetWindowCloseCallback(GLFWwindow* window, GLFWwindowclosefun callback);
+native GLFWwindowrefreshfun glfwSetWindowRefreshCallback(GLFWwindow* window, GLFWwindowrefreshfun callback);
+native GLFWwindowfocusfun glfwSetWindowFocusCallback(GLFWwindow* window, GLFWwindowfocusfun callback);
+native GLFWwindowiconifyfun glfwSetWindowIconifyCallback(GLFWwindow* window, GLFWwindowiconifyfun callback);
+native GLFWwindowmaximizefun glfwSetWindowMaximizeCallback(GLFWwindow* window, GLFWwindowmaximizefun callback);
+native GLFWframebuffersizefun glfwSetFramebufferSizeCallback(GLFWwindow* window, GLFWframebuffersizefun callback);
+native GLFWwindowcontentscalefun glfwSetWindowContentScaleCallback(GLFWwindow* window, GLFWwindowcontentscalefun callback);
+native void glfwPollEvents();
+native void glfwWaitEvents();
+native void glfwWaitEventsTimeout(double timeout);
+native void glfwPostEmptyEvent();
+native void glfwGetInputMode(GLFWwindow* window, int mode);
+native void glfwSetInputMode(GLFWwindow* window, int mode, int value);
+native bool glfwRawMouseMotionSupported();
+native cstring glfwGetKeyName(int key, int scancode);
+native int glfwGetKeyScancode(int key);
+native int glfwGetKey(GLFWwindow* window, int key);
+native int glfwGetMouseButton(GLFWwindow* window, int button);
+native void glfwGetCursorPos(GLFWwindow* window, double* xpos, double* ypos);
+native void glfwSetCursorPos(GLFWwindow* window, double xpos, double ypos);
+native GLFWcursor* glfwCreateCursor(GLFWimage* image, int xhot, int yhot);
+native GLFWcursor* glfwCreateStandardCursor(int shape);
+native void glfwDestroyCursor(GLFWcursor* cursor);
+native void glfwSetCursor(GLFWwindow* window, GLFWcursor* cursor);
+native GLFWkeyfun glfwSetKeyCallback(GLFWwindow* window, GLFWkeyfun callback);
+native GLFWcharfun glfwSetCharCallback(GLFWwindow* window, GLFWcharfun callback);
+native GLFWcharmodsfun glfwSetCharModsCallback(GLFWwindow* window, GLFWcharmodsfun callback);
+native GLFWmousebuttonfun glfwSetMouseButtonCallback(GLFWwindow* window, GLFWmousebuttonfun callback);
+native GLFWcursorposfun glfwSetCursorPosCallback(GLFWwindow* window, GLFWcursorposfun callback);
+native GLFWcursorenterfun glfwSetCursorEnterCallback(GLFWwindow* window, GLFWcursorenterfun callback);
+native GLFWscrollfun glfwSetScrollCallback(GLFWwindow* window, GLFWscrollfun callback);
+native GLFWdropfun glfwSetDropCallback(GLFWwindow* window, GLFWdropfun callback);
+native void glfwJoystickPresent(int jid);
+native float* glfwGetJoystickAxes(int jid, int* count);
+native uchar* glfwGetJoystickButtons(int jid, int* count);
+native uchar* glfwGetJoystickHats(int jid, int* count);
+native cstring glfwGetJoystickName(int jid);
+native cstring glfwGetJoystickGUID(int jid);
+native void glfwSetJoystickUserPointer(int jid, void* pointer);
+native void* glfwGetJoystickUserPointer(int jid);
+native bool glfwJoystickIsGamepad(int jid);
+native GLFWjoystickfun glfwSetJoystickCallback(GLFWjoystickfun callback);
+native bool glfwUpdateGamepadMappings(cstring string);
+native cstring glfwGetGamepadName(int jid);
+native bool glfwGetGamepadState(int jid, GLFWgamepadstate* state);
+native void glfwSetClipboardString(GLFWwindow* window, cstring string);
+native cstring glfwGetClipboardString(GLFWwindow* window);
+native double glfwGetTime();
+native void glfwSetTime(double time);
+native uint64_t glfwGetTimerValue();
+native uint64_t glfwGetTimerFrequency();
+native void glfwMakeContextCurrent(GLFWwindow* window);
+native GLFWwindow* glfwGetCurrentContext();
+native void glfwSwapBuffers(GLFWwindow* window);
+native void glfwSwapInterval(int interval);
+native bool glfwExtensionSupported(cstring extension);
+native GLFWglproc glfwGetProcAddress(cstring procname);
+native bool glfwVulkanSupported();
+native cstring* glfwGetRequiredInstanceExtensions(uint32_t* count);
+// native GLFWvkproc glfwGetInstanceProcAddress(VkInstance instance, cstring procname);
+// native bool glfwGetPhysicalDevicePresentationSupport(VkInstance instance, VkPhysicalDevice device, uint32_t queuefamily);
+// native VkResult glfwCreateWindowSurface(VkInstance instance, GLFWwindow* window, const VkAllocationCallbacks* allocator, VkSurfaceKHR* surface);
