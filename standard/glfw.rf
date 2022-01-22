@@ -1,4 +1,4 @@
-import "stdint.rf";
+import "int.rf";
 
 // Assumes project structure. this is bad
 cinclude "GLFW/glfw3.h";

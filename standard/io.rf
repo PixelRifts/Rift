@@ -1,4 +1,4 @@
-import "stdint.rf";
+import "int.rf";
 
 namespace std {
     typedef cstring va_list;
