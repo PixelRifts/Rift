@@ -9,8 +9,7 @@ except:
     print('Error: File not found.')
     exit(1)
 
-out.write("""
-cinclude "glad/glad.h";
+out.write("""cinclude "glad/glad.h";
 import "int.rf";
 
 typedef uint GLenum;
@@ -123,7 +122,8 @@ for i in range(len(lines)):
             func_param_list = []
         typedefs.append(Function(func_return_type, func_name, func_param_list))
         typedefFuncs.append(func_name)
-    else:
-        #print(f"ERROR at line {i}: {line}")
-        #exit()
+    elif(linesp[0] == "#define"):
         continue
+    else:
+        print(f"ERROR at line {i}: {line}")
+        exit()
