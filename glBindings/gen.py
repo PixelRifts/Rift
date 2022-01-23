@@ -111,6 +111,7 @@ for i in range(len(lines)):
         current_line_str = line[7:]
         current_line_str = current_line_str.replace(";", "")
         current_line_str = current_line_str.replace("const ", "")
+        current_line_str = current_line_str.replace("const*", "")
         current_line_str = current_line_str.replace("GLchar *", "cstring ")
         func_return_type = current_line_str.partition(" (")[0]
         func_name = current_line_str.partition(" (")[2].partition(")")[0].split(' ')[1]

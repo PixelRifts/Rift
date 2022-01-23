@@ -1,3 +1,4 @@
+
 cinclude "glad/glad.h";
 import "int.rf";
 
@@ -2239,7 +2240,7 @@ native void glMultTransposeMatrixf(GLfloat *m);
 native void glMultTransposeMatrixd(GLdouble *m);
 native void glBlendFuncSeparate(GLenum sfactorRGB,  GLenum dfactorRGB,  GLenum sfactorAlpha,  GLenum dfactorAlpha);
 native void glMultiDrawArrays(GLenum mode,  GLint *first,  GLsizei *count,  GLsizei drawcount);
-native void glMultiDrawElements(GLenum mode,  GLsizei *count,  GLenum type,  void *const*indices,  GLsizei drawcount);
+native void glMultiDrawElements(GLenum mode,  GLsizei *count,  GLenum type,  void *indices,  GLsizei drawcount);
 native void glPointParameterf(GLenum pname,  GLfloat param);
 native void glPointParameterfv(GLenum pname,  GLfloat *params);
 native void glPointParameteri(GLenum pname,  GLint param);
@@ -2337,7 +2338,7 @@ native void glGetVertexAttribPointerv(GLuint index,  GLenum pname,  void **point
 native GLboolean glIsProgram(GLuint program);
 native GLboolean glIsShader(GLuint shader);
 native void glLinkProgram(GLuint program);
-native void glShaderSource(GLuint shader,  GLsizei count,  cstring const*string,  GLint *length);
+native void glShaderSource(GLuint shader,  GLsizei count,  cstring string,  GLint *length);
 native void glUseProgram(GLuint program);
 native void glUniform1f(GLint location,  GLfloat v0);
 native void glUniform2f(GLint location,  GLfloat v0,  GLfloat v1);
@@ -2412,7 +2413,7 @@ native void glBeginTransformFeedback(GLenum primitiveMode);
 native void glEndTransformFeedback();
 native void glBindBufferRange(GLenum target,  GLuint index,  GLuint buffer,  GLintptr offset,  GLsizeiptr size);
 native void glBindBufferBase(GLenum target,  GLuint index,  GLuint buffer);
-native void glTransformFeedbackVaryings(GLuint program,  GLsizei count,  cstring const*varyings,  GLenum bufferMode);
+native void glTransformFeedbackVaryings(GLuint program,  GLsizei count,  cstring varyings,  GLenum bufferMode);
 native void glGetTransformFeedbackVarying(GLuint program,  GLuint index,  GLsizei bufSize,  GLsizei *length,  GLsizei *size,  GLenum *type,  cstring name);
 native void glClampColor(GLenum target,  GLenum clamp);
 native void glBeginConditionalRender(GLuint id,  GLenum mode);
@@ -2491,7 +2492,7 @@ native void glDrawElementsInstanced(GLenum mode,  GLsizei count,  GLenum type,  
 native void glTexBuffer(GLenum target,  GLenum internalformat,  GLuint buffer);
 native void glPrimitiveRestartIndex(GLuint index);
 native void glCopyBufferSubData(GLenum readTarget,  GLenum writeTarget,  GLintptr readOffset,  GLintptr writeOffset,  GLsizeiptr size);
-native void glGetUniformIndices(GLuint program,  GLsizei uniformCount,  cstring const*uniformNames,  GLuint *uniformIndices);
+native void glGetUniformIndices(GLuint program,  GLsizei uniformCount,  cstring uniformNames,  GLuint *uniformIndices);
 native void glGetActiveUniformsiv(GLuint program,  GLsizei uniformCount,  GLuint *uniformIndices,  GLenum pname,  GLint *params);
 native void glGetActiveUniformName(GLuint program,  GLuint uniformIndex,  GLsizei bufSize,  GLsizei *length,  cstring uniformName);
 native GLuint glGetUniformBlockIndex(GLuint program,  cstring uniformBlockName);
@@ -2501,7 +2502,7 @@ native void glUniformBlockBinding(GLuint program,  GLuint uniformBlockIndex,  GL
 native void glDrawElementsBaseVertex(GLenum mode,  GLsizei count,  GLenum type,  void *indices,  GLint basevertex);
 native void glDrawRangeElementsBaseVertex(GLenum mode,  GLuint start,  GLuint end,  GLsizei count,  GLenum type,  void *indices,  GLint basevertex);
 native void glDrawElementsInstancedBaseVertex(GLenum mode,  GLsizei count,  GLenum type,  void *indices,  GLsizei instancecount,  GLint basevertex);
-native void glMultiDrawElementsBaseVertex(GLenum mode,  GLsizei *count,  GLenum type,  void *const*indices,  GLsizei drawcount,  GLint *basevertex);
+native void glMultiDrawElementsBaseVertex(GLenum mode,  GLsizei *count,  GLenum type,  void *indices,  GLsizei drawcount,  GLint *basevertex);
 native void glProvokingVertex(GLenum mode);
 native GLsync glFenceSync(GLenum condition,  GLbitfield flags);
 native GLboolean glIsSync(GLsync sync);
@@ -2631,7 +2632,7 @@ native void glProgramBinary(GLuint program,  GLenum binaryFormat,  void *binary,
 native void glProgramParameteri(GLuint program,  GLenum pname,  GLint value);
 native void glUseProgramStages(GLuint pipeline,  GLbitfield stages,  GLuint program);
 native void glActiveShaderProgram(GLuint pipeline,  GLuint program);
-native GLuint glCreateShaderProgramv(GLenum type,  GLsizei count,  cstring const*strings);
+native GLuint glCreateShaderProgramv(GLenum type,  GLsizei count,  cstring strings);
 native void glBindProgramPipeline(GLuint pipeline);
 native void glDeleteProgramPipelines(GLsizei n,  GLuint *pipelines);
 native void glGenProgramPipelines(GLsizei n,  GLuint *pipelines);
