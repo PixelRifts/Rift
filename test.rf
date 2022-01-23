@@ -1,7 +1,6 @@
-import "standard/io.rf";
 import "standard/gl.rf";
-
-native void foo(GLuint base);
+import "standard/glfw.rf";
+import "standard/io.rf";
 
 int main() {
     return 0;
