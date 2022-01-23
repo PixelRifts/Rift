@@ -1,7 +1,8 @@
 import "standard/io.rf";
-import "standard/math.rf";
+import "standard/gl.rf";
+
+native void foo(GLuint base);
 
 int main() {
-    pure_rand_linux();
     return 0;
 }

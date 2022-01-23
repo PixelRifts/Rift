@@ -3,11 +3,6 @@ cinclude "glad/glad.h";
 
 native void gladLoadGL();
 
-/* Boo
-     * /* */
-* /* /* */ */
-*/
-
 namespace GL {
     native enum BufferBits {
         GL_COLOR_BUFFER_BIT,
@@ -34,6 +29,7 @@ namespace GL {
     
     native int GL_TRUE;
     native int GL_FALSE;
+    native typedef GLuint;
     
     native void glClearColor(float r, float g, float b, float a);
     native void glClear(int bit);
