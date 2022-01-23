@@ -154,7 +154,7 @@ namespace std {
         vec2i operator*(vec2i a, vec2i b) {return vec2i{a.x * b.x, a.y * b.y};}
         vec2i operator/(vec2i a, vec2i b) {return vec2i{a.x / b.x, a.y / b.y};}
         vec2i operator[](vec2i a, int i) {if(i == 0) return a.x; else return a.y;}
-        vec2i operator==(vec2i a, vec2i b) {for(int i = 0; i < 2; i++) {if(a[i] != b[i]){return false;}} return true;}
+        bool operator==(vec2i a, vec2i b) {for(int i = 0; i < 2; i++) {if(a[i] != b[i]){return false;}} return true;}
         vec2i v_normal(vec2i a) {return v * (1 / ((float)sqrt(a.x * a.x + a.y * a.y)));}
         vec2i v_scalar(vec2i a, int s) {return vec2i{a.x * s, a.y * s};}
         vec2i v_component(vec2i a, vec2i b) {return vec2i{a.x * b.x, a.y * b.y};}
@@ -167,7 +167,7 @@ namespace std {
         vec2f operator*(vec2f a, vec2f b) {return vec2f{a.x * b.x, a.y * b.y};}
         vec2f operator/(vec2f a, vec2f b) {return vec2f{a.x / b.x, a.y / b.y};}
         vec2f operator[](vec2f a, int i) {if(i == 0) return a.x; else return a.y;}
-        vec2f operator==(vec2f a, vec2f b) {for(int i = 0; i < 2; i++) {if(a[i] != b[i]){return false;}} return true;}
+        bool operator==(vec2f a, vec2f b) {for(int i = 0; i < 2; i++) {if(a[i] != b[i]){return false;}} return true;}
         vec2f v_normal(vec2f a) {return v * (1 / ((float)sqrt(a.x * a.x + a.y * a.y)));}
         vec2f v_scalar(vec2f a, float s) {return vec2f{a.x * s, a.y * s};}
         vec2f v_component(vec2f a, vec2f b) {return vec2f{a.x * b.x, a.y * b.y};}
@@ -180,7 +180,7 @@ namespace std {
         vec2d operator*(vec2d a, vec2d b) {return vec2d{a.x * b.x, a.y * b.y};}
         vec2d operator/(vec2d a, vec2d b) {return vec2d{a.x / b.x, a.y / b.y};}
         vec2d operator[](vec2d a, int i) {if(i == 0) return a.x; else return a.y;}
-        vec2d operator==(vec2d a, vec2d b) {for(int i = 0; i < 2; i++) {if(a[i] != b[i]){return false;}} return true;}
+        bool operator==(vec2d a, vec2d b) {for(int i = 0; i < 2; i++) {if(a[i] != b[i]){return false;}} return true;}
         vec2d v_normal(vec2d a) {return v * (1 / ((double)sqrt(a.x * a.x + a.y * a.y)));}
         vec2d v_scalar(vec2d a, double s) {return vec2d{a.x * s, a.y * s};}
         vec2d v_component(vec2d a, vec2d b) {return vec2d{a.x * b.x, a.y * b.y};}
@@ -194,7 +194,7 @@ namespace std {
         vec3i operator*(vec3i a, vec3i b) {return vec3i{a.x * b.x, a.y * b.y, a.z * b.z};}
         vec3i operator/(vec3i a, vec3i b) {return vec3i{a.x / b.x, a.y / b.y, a.z / b.z};}
         vec3i operator[](vec3i a, int i) {if(i == 0) return a.x; else if(i == 1) return a.y; else return a.z;}
-        vec3i operator==(vec3i a, vec3i b) {for(int i = 0; i < 3; i++) {if(a[i] != b[i]){return false;}} return true;}
+        bool operator==(vec3i a, vec3i b) {for(int i = 0; i < 3; i++) {if(a[i] != b[i]){return false;}} return true;}
         vec3i v_normal(vec3i a) {return v * (1 / ((float)sqrt(a.x * a.x + a.y * a.y + a.z * a.z)));}
         vec3i v_scalar(vec3i a, int s) {return vec3i{a.x * s, a.y * s, a.z * s};}
         vec3i v_component(vec3i a, vec3i b) {return vec3i{a.x * b.x, a.y * b.y, a.z * b.z};}
@@ -207,7 +207,7 @@ namespace std {
         vec3f operator*(vec3f a, vec3f b) {return vec3f{a.x * b.x, a.y * b.y, a.z * b.z};}
         vec3f operator/(vec3f a, vec3f b) {return vec3f{a.x / b.x, a.y / b.y, a.z / b.z};}
         vec3f operator[](vec3f a, int i) {if(i == 0) return a.x; else if(i == 1) return a.y; else return a.z;}
-        vec3f operator==(vec3f a, vec3f b) {for(int i = 0; i < 3; i++) {if(a[i] != b[i]){return false;}} return true;}
+        bool operator==(vec3f a, vec3f b) {for(int i = 0; i < 3; i++) {if(a[i] != b[i]){return false;}} return true;}
         vec3f v_normal(vec3f a) {return v * (1 / ((float)sqrt(a.x * a.x + a.y * a.y + a.z * a.z)));}
         vec3f v_scalar(vec3f a, float s) {return vec3f{a.x * s, a.y * s, a.z * s};}
         vec3f v_component(vec3f a, vec3f b) {return vec3f{a.x * b.x, a.y * b.y, a.z * b.z};}
@@ -220,7 +220,7 @@ namespace std {
         vec3d operator*(vec3d a, vec3d b) {return vec3d{a.x * b.x, a.y * b.y, a.z * b.z};}
         vec3d operator/(vec3d a, vec3d b) {return vec3d{a.x / b.x, a.y / b.y, a.z / b.z};}
         vec3d operator[](vec3d a, int i) {if(i == 0) return a.x; else if(i == 1) return a.y; else return a.z;}
-        vec3d operator==(vec3d a, vec3d b) {for(int i = 0; i < 3; i++) {if(a[i] != b[i]){return false;}} return true;}
+        bool operator==(vec3d a, vec3d b) {for(int i = 0; i < 3; i++) {if(a[i] != b[i]){return false;}} return true;}
         vec3d v_normal(vec3d a) {return v * (1 / ((double)sqrt(a.x * a.x + a.y * a.y + a.z * a.z)));}
         vec3d v_scalar(vec3d a, double s) {return vec3d{a.x * s, a.y * s, a.z * s};}
         vec3d v_component(vec3d a, vec3d b) {return vec3d{a.x * b.x, a.y * b.y, a.z * b.z};}
@@ -234,7 +234,7 @@ namespace std {
         vec4i operator*(vec4i a, vec4i b) {return vec4i{a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w};}
         vec4i operator/(vec4i a, vec4i b) {return vec4i{a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w};}
         vec4i operator[](vec4i a, int i) {if(i == 0) return a.x; else if(i == 1) return a.y; else if(i == 2) return a.z; else return a.w;}
-        vec4i operator==(vec4i a, vec4i b) {for(int i = 0; i < 4; i++) {if(a[i] != b[i]){return false;}} return true;}
+        bool operator==(vec4i a, vec4i b) {for(int i = 0; i < 4; i++) {if(a[i] != b[i]){return false;}} return true;}
         vec4i v_normal(vec4i a) {return v * (1 / ((float)sqrt(a.x * a.x + a.y * a.y + a.z * a.z + a.w * a.w)));}
         vec4i v_scalar(vec4i a, int s) {return vec4i{a.x * s, a.y * s, a.z * s, a.w * s};}
         vec4i v_component(vec4i a, vec4i b) {return vec4i{a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w};}
@@ -247,7 +247,7 @@ namespace std {
         vec4f operator*(vec4f a, vec4f b) {return vec4f{a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w};}
         vec4f operator/(vec4f a, vec4f b) {return vec4f{a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w};}
         vec4f operator[](vec4f a, int i) {if(i == 0) return a.x; else if(i == 1) return a.y; else if(i == 2) return a.z; else return a.w;}
-        vec4f operator==(vec4f a, vec4f b) {for(int i = 0; i < 4; i++) {if(a[i] != b[i]){return false;}} return true;}
+        bool operator==(vec4f a, vec4f b) {for(int i = 0; i < 4; i++) {if(a[i] != b[i]){return false;}} return true;}
         vec4f v_normal(vec4f a) {return v * (1 / ((float)sqrt(a.x * a.x + a.y * a.y + a.z * a.z + a.w * a.w)));}
         vec4f v_scalar(vec4f a, float s) {return vec4f{a.x * s, a.y * s, a.z * s, a.w * s};}
         vec4f v_component(vec4f a, vec4f b) {return vec4f{a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w};}
@@ -260,7 +260,7 @@ namespace std {
         vec4d operator*(vec4d a, vec4d b) {return vec4d{a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w};}
         vec4d operator/(vec4d a, vec4d b) {return vec4d{a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w};}
         vec4d operator[](vec4d a, int i) {if(i == 0) return a.x; else if(i == 1) return a.y; else if(i == 2) return a.z; else return a.w;}
-        vec4d operator==(vec4d a, vec4d b) {for(int i = 0; i < 4; i++) {if(a[i] != b[i]){return false;}} return true;}
+        bool operator==(vec4d a, vec4d b) {for(int i = 0; i < 4; i++) {if(a[i] != b[i]){return false;}} return true;}
         vec4d v_normal(vec4d a) {return v * (1 / ((double)sqrt(a.x * a.x + a.y * a.y + a.z * a.z + a.w * a.w)));}   
         vec4d v_scalar(vec4d a, double s) {return vec4d{a.x * s, a.y * s, a.z * s, a.w * s};}
         vec4d v_component(vec4d a, vec4d b) {return vec4d{a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w};}
@@ -551,57 +551,57 @@ namespace std {
             return c;
         }
 
-        mat2i operator==(mat2i a, mat2i b) {
+        bool operator==(mat2i a, mat2i b) {
             for(int i = 0; i < 4; i++) {
                 if(a[i] != b[i]) {return false;}
             }
             return true;
         }
-        mat2f operator==(mat2f a, mat2f b) {
+        bool operator==(mat2f a, mat2f b) {
             for(int i = 0; i < 4; i++) {
                 if(a[i] != b[i]) {return false;}
             }
             return true;
         }
-        mat2d operator==(mat2d a, mat2d b) {
+        bool operator==(mat2d a, mat2d b) {
             for(int i = 0; i < 4; i++) {
                 if(a[i] != b[i]) {return false;}
             }
             return true;
         }
 
-        mat3i operator==(mat3i a, mat3i b) {
+        bool operator==(mat3i a, mat3i b) {
             for(int i = 0; i < 9; i++) {
                 if(a[i] != b[i]) {return false;}
             }
             return true;
         }
-        mat3f operator==(mat3f a, mat3f b) {
+        bool operator==(mat3f a, mat3f b) {
             for(int i = 0; i < 9; i++) {
                 if(a[i] != b[i]) {return false;}
             }
             return true;
         }
-        mat3d operator==(mat3d a, mat3d b) {
+        bool operator==(mat3d a, mat3d b) {
             for(int i = 0; i < 9; i++) {
                 if(a[i] != b[i]) {return false;}
             }
             return true;
         }
 
-        mat4i operator==(mat4i a, mat4i b) {
+        bool operator==(mat4i a, mat4i b) {
             for(int i = 0; i < 16; i++) {
                 if(a[i] != b[i]) {return false;}
             }
             return true;
         }
-        mat4f operator==(mat4f a, mat4f b) {
+        bool operator==(mat4f a, mat4f b) {
             for(int i = 0; i < 16; i++) {
                 if(a[i] != b[i]) {return false;}
             }
             return true;
         }
-        mat4d operator==(mat4d a, mat4d b) {
+        bool operator==(mat4d a, mat4d b) {
             for(int i = 0; i < 16; i++) {
                 if(a[i] != b[i]) {return false;}
             }
