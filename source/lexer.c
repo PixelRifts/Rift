@@ -432,10 +432,11 @@ L_Token L_LexToken(L_Lexer* lexer) {
             } else if (L_Peek(lexer) == '*') {
                 // TODO(voxel): Record the position of the /* here to be reported as error for unterminated comment block
                 L_Advance(lexer);
-                
                 u32 depth = 1;
                 while (depth != 0) {
                     L_Advance(lexer);
+                    if (L_Peek(lexer) == '\n') lexer->line++;
+                    
                     if (L_Bound(lexer)) return L_ErrorToken(lexer, str_lit("Unterminated Comment Block\n"));
                     if (L_Peek(lexer) == '*' && L_PeekNext(lexer) == '/') {
                         L_Advance(lexer);

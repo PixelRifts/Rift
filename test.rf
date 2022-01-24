@@ -1,13 +1,7 @@
 import "standard/gl.rf";
 import "standard/glfw.rf";
-import "standard/io.rf";
-
-@!windows
-void shouldntwork() {
-    
-}
+import "standard/math.rf";
 
 int main() {
-    shouldntwork();
     return 0;
 }

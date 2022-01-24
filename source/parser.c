@@ -2201,6 +2201,8 @@ static P_Expr* P_ExprUnary(P_Parser* parser) {
     L_TokenType op_type = parser->previous.type;
     P_Expr* operand = P_ExprPrecedence(parser, Prec_Unary);
     P_ValueType ret_type;
+    if (operand == nullptr)
+        return nullptr;
     
     // TODO(voxel): @refactor pull out into table and simple lookup
     switch (op_type) {
@@ -2237,6 +2239,8 @@ static P_Expr* P_ExprBinary(P_Parser* parser, P_Expr* left) {
     P_ParseRule* rule = P_GetRule(op_type);
     P_Expr* right = P_ExprPrecedence(parser, (P_Precedence)(rule->infix_precedence + 1));
     P_Expr* ret;
+    if (left == nullptr || right == nullptr)
+        return nullptr;
     
     opoverload_entry_key key = {
         .type = left->ret_type
