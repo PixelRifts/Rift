@@ -2,6 +2,12 @@ import "standard/gl.rf";
 import "standard/glfw.rf";
 import "standard/io.rf";
 
+@!windows
+void shouldntwork() {
+    
+}
+
 int main() {
+    shouldntwork();
     return 0;
 }

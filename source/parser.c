@@ -684,10 +684,12 @@ static b8 P_IsInScope(P_Parser* parser, P_ScopeType type) {
 
 static b8 P_HasTag(string_list* list, string_list_node* tagname) {
     b8 ret = tagname->str[0] != '!';
+    
+    string_list_node sln = { .str = ret ? tagname->str : tagname->str + 1, .size = ret ? tagname->size : tagname->size - 1 };
     string_list_node* curr = list->first;
     while (curr != nullptr) {
-        if (curr->size == tagname->size) {
-            if (memcmp(curr->str, tagname->str, tagname->size) == 0)
+        if (curr->size == sln.size) {
+            if (memcmp(curr->str, sln.str, sln.size) == 0)
                 return ret;
         }
         curr = curr->next;
@@ -1856,7 +1858,7 @@ static P_Expr* P_ExprLambda(P_Parser* parser) {
 
 static P_Expr* P_ExprCall(P_Parser* parser, P_Expr* left) {
     if (left == nullptr) return nullptr;
-
+    
     if (left->ret_type.type != ValueTypeType_FuncPointer) {
         report_error(parser, str_lit("Cannot call a non function pointer type\n"));
         return nullptr;

@@ -2,6 +2,8 @@
 cinclude "glad/glad.h";
 import "int.rf";
 
+native void gladLoadGL();
+
 typedef uint GLenum;
 typedef uchar GLboolean;
 typedef uint GLbitfield;
