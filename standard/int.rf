@@ -29,6 +29,8 @@ namespace std {
     typedef long         intmax_t;
     typedef ulong        uintmax_t;
 
+    typedef uint64       size_t;
+
     int8_t   INT8_MIN               = (int8_t)-128;
     int8_t   INT8_MAX               = (int8_t)127;
     int16_t  INT16_MIN              = (int16_t)-32768;
