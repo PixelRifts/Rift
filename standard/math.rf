@@ -399,6 +399,18 @@ namespace std {
             v->w = (v->w * len);
         }
 
+        int v_dot(vec2i a, vec2i b) {return (a.x * b.x + a.y * b.y);}
+        float v_dot(vec2f a, vec2f b) {return (a.x * b.x + a.y * b.y);}
+        double v_dot(vec2d a, vec2d b) {return (a.x * b.x + a.y * b.y);}
+
+        int v_dot(vec3i a, vec3i b) {return (a.x * b.x + a.y * b.y + a.z * b.z);}
+        float v_dot(vec3f a, vec3f b) {return (a.x * b.x + a.y * b.y + a.z * b.z);}
+        double v_dot(vec3d a, vec3d b) {return (a.x * b.x + a.y * b.y + a.z * b.z);}
+
+        int v_dot(vec4i a, vec4i b) {return (a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w);}
+        float v_dot(vec4f a, vec4f b) {return (a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w);}
+        double v_dot(vec4d a, vec4d b) {return (a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w);}
+
         void m_print(mat2i m) {
             printf("2x2 Int Matrix {\n");
             printf("    %d, %d\n", m.m[0], m.m[1]);
