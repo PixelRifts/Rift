@@ -137,481 +137,1076 @@ namespace std {
         int MATH_ERRNO       = 1;
         int MATH_ERREXCEPT   = 2;
         int math_errhandling = 1;
-        
-        struct vec2i {int x; int y;};
-        struct vec2f {float x; float y;};
-        struct vec2d {double x; double y;};
-        struct vec3i {int x; int y; int z;};
-        struct vec3f {float x; float y; float z;};
-        struct vec3d {double x; double y; double z;};
-        struct vec4i {int x; int y; int z; int w;};
-        struct vec4f {float x; float y; float z; float w;};
-        struct vec4d {double x; double y; double z; double w;};
-        
-        // 2d vector
-        vec2i operator+(vec2i a, vec2i b) {return vec2i{a.x + b.x, a.y + b.y};}
-        vec2i operator-(vec2i a, vec2i b) {return vec2i{a.x - b.x, a.y - b.y};}
-        vec2i operator*(vec2i a, vec2i b) {return vec2i{a.x * b.x, a.y * b.y};}
-        vec2i operator/(vec2i a, vec2i b) {return vec2i{a.x / b.x, a.y / b.y};}
-        vec2i operator[](vec2i a, int i) {if(i == 0) return a.x; else return a.y;}
-        bool operator==(vec2i a, vec2i b) {for(int i = 0; i < 2; i++) {if(a[i] != b[i]){return false;}} return true;}
-        vec2i v_normal(vec2i a) {return v * (1 / ((float)sqrt(a.x * a.x + a.y * a.y)));}
-        vec2i v_scalar(vec2i a, int s) {return vec2i{a.x * s, a.y * s};}
-        vec2i v_component(vec2i a, vec2i b) {return vec2i{a.x * b.x, a.y * b.y};}
-        vec2i v_dot(vec2i a, vec2i b) {return ((a.x * b.x) + (a.y * b.y));}
-        vec2i v_cross(vec2i a, vec2i b) {return vec2i{(a.x * b.y), (a.y * b.x)};}
-        vec2i v_mag(vec2i a) {return (float)sqrt(a.x * a.x + a.y * a.y);}
-        vec2i v_normal(vec2i *v) {float inv_dist = 1 / (float) sqrt(v->x*v->x + v->y*v->y); v->x *= inv_dist; v->y *= inv_dist;}
-        
-        vec2f operator+(vec2f a, vec2f b) {return vec2f{a.x + b.x, a.y + b.y};}
-        vec2f operator-(vec2f a, vec2f b) {return vec2f{a.x - b.x, a.y - b.y};}
-        vec2f operator*(vec2f a, vec2f b) {return vec2f{a.x * b.x, a.y * b.y};}
-        vec2f operator/(vec2f a, vec2f b) {return vec2f{a.x / b.x, a.y / b.y};}
-        vec2f operator[](vec2f a, int i) {if(i == 0) return a.x; else return a.y;}
-        bool operator==(vec2f a, vec2f b) {for(int i = 0; i < 2; i++) {if(a[i] != b[i]){return false;}} return true;}
-        vec2f v_normal(vec2f a) {return v * (1 / ((float)sqrt(a.x * a.x + a.y * a.y)));}
-        vec2f v_scalar(vec2f a, float s) {return vec2f{a.x * s, a.y * s};}
-        vec2f v_component(vec2f a, vec2f b) {return vec2f{a.x * b.x, a.y * b.y};}
-        vec2f v_dot(vec2f a, vec2f b) {return ((a.x * b.x) + (a.y * b.y));}
-        vec2f v_cross(vec2f a, vec2f b) {return vec2f{(a.x * b.y), (a.y * b.x)};}
-        vec2f v_mag(vec2f a) {return (float)sqrt(a.x * a.x + a.y * a.y);}
-        vec2f v_normal(vec2f *v) {float inv_dist = 1 / (float) sqrt(v->x*v->x + v->y*v->y); v->x *= inv_dist; v->y *= inv_dist;}
-        
-        vec2d operator+(vec2d a, vec2d b) {return vec2d{a.x + b.x, a.y + b.y};}
-        vec2d operator-(vec2d a, vec2d b) {return vec2d{a.x - b.x, a.y - b.y};}
-        vec2d operator*(vec2d a, vec2d b) {return vec2d{a.x * b.x, a.y * b.y};}
-        vec2d operator/(vec2d a, vec2d b) {return vec2d{a.x / b.x, a.y / b.y};}
-        vec2d operator[](vec2d a, int i) {if(i == 0) return a.x; else return a.y;}
-        bool operator==(vec2d a, vec2d b) {for(int i = 0; i < 2; i++) {if(a[i] != b[i]){return false;}} return true;}
-        vec2d v_normal(vec2d a) {return v * (1 / ((double)sqrt(a.x * a.x + a.y * a.y)));}
-        vec2d v_scalar(vec2d a, double s) {return vec2d{a.x * s, a.y * s};}
-        vec2d v_component(vec2d a, vec2d b) {return vec2d{a.x * b.x, a.y * b.y};}
-        vec2d v_dot(vec2d a, vec2d b) {return ((a.x * b.x) + (a.y * b.y));}
-        vec2d v_cross(vec2d a, vec2d b) {return vec2d{(a.x * b.y), (a.y * b.x)};}
-        vec2d v_mag(vec2d a) {return (double)sqrt(a.x * a.x + a.y * a.y);}
-        vec2d v_normal(vec2d *v) {double inv_dist = 1 / (double) sqrt(v->x*v->x + v->y*v->y); v->x *= inv_dist; v->y *= inv_dist;}
-        
-        // 3d vector
-        vec3i operator+(vec3i a, vec3i b) {return vec3i{a.x + b.x, a.y + b.y, a.z + b.z};}
-        vec3i operator-(vec3i a, vec3i b) {return vec3i{a.x - b.x, a.y - b.y, a.z - b.z};}
-        vec3i operator*(vec3i a, vec3i b) {return vec3i{a.x * b.x, a.y * b.y, a.z * b.z};}
-        vec3i operator/(vec3i a, vec3i b) {return vec3i{a.x / b.x, a.y / b.y, a.z / b.z};}
-        vec3i operator[](vec3i a, int i) {if(i == 0) return a.x; else if(i == 1) return a.y; else return a.z;}
-        bool operator==(vec3i a, vec3i b) {for(int i = 0; i < 3; i++) {if(a[i] != b[i]){return false;}} return true;}
-        vec3i v_normal(vec3i a) {return v * (1 / ((float)sqrt(a.x * a.x + a.y * a.y + a.z * a.z)));}
-        vec3i v_scalar(vec3i a, int s) {return vec3i{a.x * s, a.y * s, a.z * s};}
-        vec3i v_component(vec3i a, vec3i b) {return vec3i{a.x * b.x, a.y * b.y, a.z * b.z};}
-        vec3i v_dot(vec3i a, vec3i b) {return ((a.x * b.x) + (a.y * b.y) + (a.z * b.z));}
-        vec3i v_cross(vec3i a, vec3i b) {return vec3i{(a.x * b.y) - (a.y * b.x), (a.x * b.z) - (a.z * b.x), (a.y * b.z) - (a.z * b.y)};}
-        vec3i v_mag(vec3i a) {return (float)sqrt(a.x * a.x + a.y * a.y + a.z * a.z);}
-        vec3i v_normal(vec3i *v) {float inv_dist = 1 / (float) sqrt(v->x*v->x + v->y*v->y + v->z*v->z); v->x *= inv_dist; v->y *= inv_dist; v->z *= inv_dist;}
-        
-        vec3f operator+(vec3f a, vec3f b) {return vec3f{a.x + b.x, a.y + b.y, a.z + b.z};}
-        vec3f operator-(vec3f a, vec3f b) {return vec3f{a.x - b.x, a.y - b.y, a.z - b.z};}
-        vec3f operator*(vec3f a, vec3f b) {return vec3f{a.x * b.x, a.y * b.y, a.z * b.z};}
-        vec3f operator/(vec3f a, vec3f b) {return vec3f{a.x / b.x, a.y / b.y, a.z / b.z};}
-        vec3f operator[](vec3f a, int i) {if(i == 0) return a.x; else if(i == 1) return a.y; else return a.z;}
-        bool operator==(vec3f a, vec3f b) {for(int i = 0; i < 3; i++) {if(a[i] != b[i]){return false;}} return true;}
-        vec3f v_normal(vec3f a) {return v * (1 / ((float)sqrt(a.x * a.x + a.y * a.y + a.z * a.z)));}
-        vec3f v_scalar(vec3f a, float s) {return vec3f{a.x * s, a.y * s, a.z * s};}
-        vec3f v_component(vec3f a, vec3f b) {return vec3f{a.x * b.x, a.y * b.y, a.z * b.z};}
-        vec3f v_dot(vec3f a, vec3f b) {return ((a.x * b.x) + (a.y * b.y) + (a.z * b.z));}
-        vec3f v_cross(vec3f a, vec3f b) {return vec3f{(a.x * b.y) - (a.y * b.x), (a.x * b.z) - (a.z * b.x), (a.y * b.z) - (a.z * b.y)};}
-        vec3f v_mag(vec3f a) {return (float)sqrt(a.x * a.x + a.y * a.y + a.z * a.z);}
-        vec3f v_normal(vec3f *v) {float inv_dist = 1 / (float) sqrt(v->x*v->x + v->y*v->y + v->z*v->z); v->x *= inv_dist; v->y *= inv_dist; v->z *= inv_dist;}
-        
-        vec3d operator+(vec3d a, vec3d b) {return vec3d{a.x + b.x, a.y + b.y, a.z + b.z};}
-        vec3d operator-(vec3d a, vec3d b) {return vec3d{a.x - b.x, a.y - b.y, a.z - b.z};}
-        vec3d operator*(vec3d a, vec3d b) {return vec3d{a.x * b.x, a.y * b.y, a.z * b.z};}
-        vec3d operator/(vec3d a, vec3d b) {return vec3d{a.x / b.x, a.y / b.y, a.z / b.z};}
-        vec3d operator[](vec3d a, int i) {if(i == 0) return a.x; else if(i == 1) return a.y; else return a.z;}
-        bool operator==(vec3d a, vec3d b) {for(int i = 0; i < 3; i++) {if(a[i] != b[i]){return false;}} return true;}
-        vec3d v_normal(vec3d a) {return v * (1 / ((double)sqrt(a.x * a.x + a.y * a.y + a.z * a.z)));}
-        vec3d v_scalar(vec3d a, double s) {return vec3d{a.x * s, a.y * s, a.z * s};}
-        vec3d v_component(vec3d a, vec3d b) {return vec3d{a.x * b.x, a.y * b.y, a.z * b.z};}
-        vec3d v_dot(vec3d a, vec3d b) {return ((a.x * b.x) + (a.y * b.y) + (a.z * b.z));}
-        vec3d v_cross(vec3d a, vec3d b) {return vec3d{(a.x * b.y) - (a.y * b.x), (a.x * b.z) - (a.z * b.x), (a.y * b.z) - (a.z * b.y)};}
-        vec3d v_mag(vec3d a) {return (double)sqrt(a.x * a.x + a.y * a.y + a.z * a.z);}
-        vec3d v_normal(vec3d *v) {double inv_dist = 1 / (double) sqrt(v->x*v->x + v->y*v->y + v->z*v->z); v->x *= inv_dist; v->y *= inv_dist; v->z *= inv_dist;}
-        
-        // 4d vector
-        vec4i operator+(vec4i a, vec4i b) {return vec4i{a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w};}
-        vec4i operator-(vec4i a, vec4i b) {return vec4i{a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w};}
-        vec4i operator*(vec4i a, vec4i b) {return vec4i{a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w};}
-        vec4i operator/(vec4i a, vec4i b) {return vec4i{a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w};}
-        vec4i operator[](vec4i a, int i) {if(i == 0) return a.x; else if(i == 1) return a.y; else if(i == 2) return a.z; else return a.w;}
-        bool operator==(vec4i a, vec4i b) {for(int i = 0; i < 4; i++) {if(a[i] != b[i]){return false;}} return true;}
-        vec4i v_normal(vec4i a) {return v * (1 / ((float)sqrt(a.x * a.x + a.y * a.y + a.z * a.z + a.w * a.w)));}
-        vec4i v_scalar(vec4i a, int s) {return vec4i{a.x * s, a.y * s, a.z * s, a.w * s};}
-        vec4i v_component(vec4i a, vec4i b) {return vec4i{a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w};}
-        vec4i v_dot(vec4i a, vec4i b) {return ((a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w));}
-        vec4i v_cross(vec4i a, vec4i b) {return vec4i{(a.x * b.y) - (a.y * b.x), (a.x * b.z) - (a.z * b.x), (a.x * b.w) - (a.w * b.x), (a.y * b.z) - (a.z * b.y), (a.y * b.w) - (a.w * b.y), (a.z * b.w) - (a.w * b.z)};}
-        vec4i v_mag(vec4i a) {return (float)sqrt(a.x * a.x + a.y * a.y + a.z * a.z + a.w * a.w);}
-        vec4i v_normal(vec4i *v) {float inv_dist = 1 / (float) sqrt(v->x*v->x + v->y*v->y + v->z*v->z + v->w*v->w); v->x *= inv_dist; v->y *= inv_dist; v->z *= inv_dist; v->w *= inv_dist;}
-        
-        vec4f operator+(vec4f a, vec4f b) {return vec4f{a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w};}
-        vec4f operator-(vec4f a, vec4f b) {return vec4f{a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w};}
-        vec4f operator*(vec4f a, vec4f b) {return vec4f{a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w};}
-        vec4f operator/(vec4f a, vec4f b) {return vec4f{a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w};}
-        vec4f operator[](vec4f a, int i) {if(i == 0) return a.x; else if(i == 1) return a.y; else if(i == 2) return a.z; else return a.w;}
-        bool operator==(vec4f a, vec4f b) {for(int i = 0; i < 4; i++) {if(a[i] != b[i]){return false;}} return true;}
-        vec4f v_normal(vec4f a) {return v * (1 / ((float)sqrt(a.x * a.x + a.y * a.y + a.z * a.z + a.w * a.w)));}
-        vec4f v_scalar(vec4f a, float s) {return vec4f{a.x * s, a.y * s, a.z * s, a.w * s};}
-        vec4f v_component(vec4f a, vec4f b) {return vec4f{a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w};}
-        vec4f v_dot(vec4f a, vec4f b) {return ((a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w));}
-        vec4f v_cross(vec4f a, vec4f b) {return vec4f{(a.x * b.y) - (a.y * b.x), (a.x * b.z) - (a.z * b.x), (a.x * b.w) - (a.w * b.x), (a.y * b.z) - (a.z * b.y), (a.y * b.w) - (a.w * b.y), (a.z * b.w) - (a.w * b.z)};}
-        vec4f v_mag(vec4f a) {return (float)sqrt(a.x * a.x + a.y * a.y + a.z * a.z + a.w * a.w);}
-        vec4f v_normal(vec4f *v) {float inv_dist = 1 / (float) sqrt(v->x*v->x + v->y*v->y + v->z*v->z + v->w*v->w); v->x *= inv_dist; v->y *= inv_dist; v->z *= inv_dist; v->w *= inv_dist;}
-        
-        vec4d operator+(vec4d a, vec4d b) {return vec4d{a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w};}
-        vec4d operator-(vec4d a, vec4d b) {return vec4d{a.x - b.x, a.y - b.y, a.z - b.z, a.w - b.w};}
-        vec4d operator*(vec4d a, vec4d b) {return vec4d{a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w};}
-        vec4d operator/(vec4d a, vec4d b) {return vec4d{a.x / b.x, a.y / b.y, a.z / b.z, a.w / b.w};}
-        vec4d operator[](vec4d a, int i) {if(i == 0) return a.x; else if(i == 1) return a.y; else if(i == 2) return a.z; else return a.w;}
-        bool operator==(vec4d a, vec4d b) {for(int i = 0; i < 4; i++) {if(a[i] != b[i]){return false;}} return true;}
-        vec4d v_normal(vec4d a) {return v * (1 / ((double)sqrt(a.x * a.x + a.y * a.y + a.z * a.z + a.w * a.w)));}   
-        vec4d v_scalar(vec4d a, double s) {return vec4d{a.x * s, a.y * s, a.z * s, a.w * s};}
-        vec4d v_component(vec4d a, vec4d b) {return vec4d{a.x * b.x, a.y * b.y, a.z * b.z, a.w * b.w};}
-        vec4d v_dot(vec4d a, vec4d b) {return ((a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w));}
-        vec4d v_cross(vec4d a, vec4d b) {return vec4d{(a.x * b.y) - (a.y * b.x), (a.x * b.z) - (a.z * b.x), (a.x * b.w) - (a.w * b.x), (a.y * b.z) - (a.z * b.y), (a.y * b.w) - (a.w * b.y), (a.z * b.w) - (a.w * b.z)};}
-        vec4d v_mag(vec4d a) {return (double)sqrt(a.x * a.x + a.y * a.y + a.z * a.z + a.w * a.w);}
-        vec4d v_normal(vec4d *v) {double inv_dist = 1 / (double) sqrt(v->x*v->x + v->y*v->y + v->z*v->z + v->w*v->w); v->x *= inv_dist; v->y *= inv_dist; v->z *= inv_dist; v->w *= inv_dist;}
-        
-        flagenum mat_flags {
-            M_PERSPECTIVE,
-            M_ORTHO,
-            M_VIEW,
-            M_STANDARD
+
+        struct vec2i {int x; int y;}
+        struct vec2f {float x; float y;}
+        struct vec2d {double x; double y;}
+
+        struct vec3i {int x; int y; int z;}
+        struct vec3f {float x; float y; float z;}
+        struct vec3d {double x; double y; double z;}
+
+        struct vec4i {int x; int y; int z; int w;}
+        struct vec4f {float x; float y; float z; float w;}
+        struct vec4d {double x; double y; double z; double w;}
+
+        struct mat2i {int[4] m;}
+        struct mat2f {float[4] m;}
+        struct mat2d {double[4] m;}
+
+        struct mat3i {int[9] m;}
+        struct mat3f {float[9] m;}
+        struct mat3d {double[9] m;}
+
+        struct mat4i {int[16] m;}
+        struct mat4f {float[16] m;}
+        struct mat4d {double[16] m;}
+
+        vec2i operator+(vec2i a, vec2i b) {return (vec2i) { .x = (a.x + b.x), .y = (a.y + b.y)};}
+        vec2f operator+(vec2f a, vec2f b) {return (vec2f) { .x = (a.x + b.x), .y = (a.y + b.y)};}
+        vec2d operator+(vec2d a, vec2d b) {return (vec2d) { .x = (a.x + b.x), .y = (a.y + b.y)};}
+
+        vec2i operator-(vec2i a, vec2i b) {return (vec2i) { .x = (a.x - b.x), .y = (a.y - b.y)};}
+        vec2f operator-(vec2f a, vec2f b) {return (vec2f) { .x = (a.x - b.x), .y = (a.y - b.y)};}
+        vec2d operator-(vec2d a, vec2d b) {return (vec2d) { .x = (a.x - b.x), .y = (a.y - b.y)};}
+
+        vec2i operator*(vec2i a, vec2i b) {return (vec2i) { .x = (a.x * b.x), .y = (a.y * b.y)};}
+        vec2f operator*(vec2f a, vec2f b) {return (vec2f) { .x = (a.x * b.x), .y = (a.y * b.y)};}
+        vec2d operator*(vec2d a, vec2d b) {return (vec2d) { .x = (a.x * b.x), .y = (a.y * b.y)};}
+
+        vec2i operator/(vec2i a, vec2i b) {return (vec2i) { .x = (a.x / b.x), .y = (a.y / b.y)};}
+        vec2f operator/(vec2f a, vec2f b) {return (vec2f) { .x = (a.x / b.x), .y = (a.y / b.y)};}
+        vec2d operator/(vec2d a, vec2d b) {return (vec2d) { .x = (a.x / b.x), .y = (a.y / b.y)};}
+
+        vec3i operator+(vec3i a, vec3i b) {return (vec3i) { .x = (a.x + b.x), .y = (a.y + b.y), .z = (a.z + b.z)};}
+        vec3f operator+(vec3f a, vec3f b) {return (vec3f) { .x = (a.x + b.x), .y = (a.y + b.y), .z = (a.z + b.z)};}
+        vec3d operator+(vec3d a, vec3d b) {return (vec3d) { .x = (a.x + b.x), .y = (a.y + b.y), .z = (a.z + b.z)};}
+
+        vec3i operator-(vec3i a, vec3i b) {return (vec3i) { .x = (a.x - b.x), .y = (a.y - b.y), .z = (a.z - b.z)};}
+        vec3f operator-(vec3f a, vec3f b) {return (vec3f) { .x = (a.x - b.x), .y = (a.y - b.y), .z = (a.z - b.z)};}
+        vec3d operator-(vec3d a, vec3d b) {return (vec3d) { .x = (a.x - b.x), .y = (a.y - b.y), .z = (a.z - b.z)};}
+
+        vec3i operator*(vec3i a, vec3i b) {return (vec3i) { .x = (a.x * b.x), .y = (a.y * b.y), .z = (a.z * b.z)};}
+        vec3f operator*(vec3f a, vec3f b) {return (vec3f) { .x = (a.x * b.x), .y = (a.y * b.y), .z = (a.z * b.z)};}
+        vec3d operator*(vec3d a, vec3d b) {return (vec3d) { .x = (a.x * b.x), .y = (a.y * b.y), .z = (a.z * b.z)};}
+
+        vec3i operator/(vec3i a, vec3i b) {return (vec3i) { .x = (a.x / b.x), .y = (a.y / b.y), .z = (a.z / b.z)};}
+        vec3f operator/(vec3f a, vec3f b) {return (vec3f) { .x = (a.x / b.x), .y = (a.y / b.y), .z = (a.z / b.z)};}
+        vec3d operator/(vec3d a, vec3d b) {return (vec3d) { .x = (a.x / b.x), .y = (a.y / b.y), .z = (a.z / b.z)};}
+
+        vec4i operator+(vec4i a, vec4i b) {return (vec4i) { .x = (a.x + b.x), .y = (a.y + b.y), .z = (a.z + b.z), .w = (a.w + b.w)};}
+        vec4f operator+(vec4f a, vec4f b) {return (vec4f) { .x = (a.x + b.x), .y = (a.y + b.y), .z = (a.z + b.z), .w = (a.w + b.w)};}
+        vec4d operator+(vec4d a, vec4d b) {return (vec4d) { .x = (a.x + b.x), .y = (a.y + b.y), .z = (a.z + b.z), .w = (a.w + b.w)};}
+
+        vec4i operator-(vec4i a, vec4i b) {return (vec4i) { .x = (a.x - b.x), .y = (a.y - b.y), .z = (a.z - b.z), .w = (a.w - b.w)};}
+        vec4f operator-(vec4f a, vec4f b) {return (vec4f) { .x = (a.x - b.x), .y = (a.y - b.y), .z = (a.z - b.z), .w = (a.w - b.w)};}
+        vec4d operator-(vec4d a, vec4d b) {return (vec4d) { .x = (a.x - b.x), .y = (a.y - b.y), .z = (a.z - b.z), .w = (a.w - b.w)};}
+
+        vec4i operator*(vec4i a, vec4i b) {return (vec4i) { .x = (a.x * b.x), .y = (a.y * b.y), .z = (a.z * b.z), .w = (a.w * b.w)};}
+        vec4f operator*(vec4f a, vec4f b) {return (vec4f) { .x = (a.x * b.x), .y = (a.y * b.y), .z = (a.z * b.z), .w = (a.w * b.w)};}
+        vec4d operator*(vec4d a, vec4d b) {return (vec4d) { .x = (a.x * b.x), .y = (a.y * b.y), .z = (a.z * b.z), .w = (a.w * b.w)};}
+
+        vec4i operator/(vec4i a, vec4i b) {return (vec4i) { .x = (a.x / b.x), .y = (a.y / b.y), .z = (a.z / b.z), .w = (a.w / b.w)};}
+        vec4f operator/(vec4f a, vec4f b) {return (vec4f) { .x = (a.x / b.x), .y = (a.y / b.y), .z = (a.z / b.z), .w = (a.w / b.w)};}
+        vec4d operator/(vec4d a, vec4d b) {return (vec4d) { .x = (a.x / b.x), .y = (a.y / b.y), .z = (a.z / b.z), .w = (a.w / b.w)};}
+
+        bool operator==(vec2i a, vec2i b) {return (a.x == b.x) && (a.y == b.y);}
+        bool operator==(vec2f a, vec2f b) {return (a.x == b.x) && (a.y == b.y);}
+        bool operator==(vec2d a, vec2d b) {return (a.x == b.x) && (a.y == b.y);}
+
+        bool operator==(vec3i a, vec3i b) {return (a.x == b.x) && (a.y == b.y) && (a.z == b.z);}
+        bool operator==(vec3f a, vec3f b) {return (a.x == b.x) && (a.y == b.y) && (a.z == b.z);}
+        bool operator==(vec3d a, vec3d b) {return (a.x == b.x) && (a.y == b.y) && (a.z == b.z);}
+
+        bool operator==(vec4i a, vec4i b) {return (a.x == b.x) && (a.y == b.y) && (a.z == b.z) && (a.w == b.w);}
+        bool operator==(vec4f a, vec4f b) {return (a.x == b.x) && (a.y == b.y) && (a.z == b.z) && (a.w == b.w);}
+        bool operator==(vec4d a, vec4d b) {return (a.x == b.x) && (a.y == b.y) && (a.z == b.z) && (a.w == b.w);}
+
+        bool operator!=(vec2i a, vec2i b) {return (a.x != b.x) || (a.y != b.y);}
+        bool operator!=(vec2f a, vec2f b) {return (a.x != b.x) || (a.y != b.y);}
+        bool operator!=(vec2d a, vec2d b) {return (a.x != b.x) || (a.y != b.y);}
+
+        bool operator!=(vec3i a, vec3i b) {return (a.x != b.x) || (a.y != b.y) || (a.z != b.z);}
+        bool operator!=(vec3f a, vec3f b) {return (a.x != b.x) || (a.y != b.y) || (a.z != b.z);}
+        bool operator!=(vec3d a, vec3d b) {return (a.x != b.x) || (a.y != b.y) || (a.z != b.z);}
+
+        bool operator!=(vec4i a, vec4i b) {return (a.x != b.x) || (a.y != b.y) || (a.z != b.z) || (a.w != b.w);}
+        bool operator!=(vec4f a, vec4f b) {return (a.x != b.x) || (a.y != b.y) || (a.z != b.z) || (a.w != b.w);}
+        bool operator!=(vec4d a, vec4d b) {return (a.x != b.x) || (a.y != b.y) || (a.z != b.z) || (a.w != b.w);}
+
+        vec2i operator+(vec2i a, float b) {return (vec2i) { .x = (a.x + b), .y = (a.y + b)};}
+        vec2f operator+(vec2f a, float b) {return (vec2f) { .x = (a.x + b), .y = (a.y + b)};}
+        vec2d operator+(vec2d a, double b) {return (vec2d) { .x = (a.x + b), .y = (a.y + b)};}
+
+        vec2i operator-(vec2i a, float b) {return (vec2i) { .x = (a.x - b), .y = (a.y - b)};}
+        vec2f operator-(vec2f a, float b) {return (vec2f) { .x = (a.x - b), .y = (a.y - b)};}
+        vec2d operator-(vec2d a, double b) {return (vec2d) { .x = (a.x - b), .y = (a.y - b)};}
+
+        vec2i operator*(vec2i a, float b) {return (vec2i) { .x = (a.x * b), .y = (a.y * b)};}
+        vec2f operator*(vec2f a, float b) {return (vec2f) { .x = (a.x * b), .y = (a.y * b)};}
+        vec2d operator*(vec2d a, double b) {return (vec2d) { .x = (a.x * b), .y = (a.y * b)};}
+
+        vec2i operator/(vec2i a, float b) {return (vec2i) { .x = (a.x / b), .y = (a.y / b)};}
+        vec2f operator/(vec2f a, float b) {return (vec2f) { .x = (a.x / b), .y = (a.y / b)};}
+        vec2d operator/(vec2d a, double b) {return (vec2d) { .x = (a.x / b), .y = (a.y / b)};}
+
+        vec3i operator+(vec3i a, float b) {return (vec3i) { .x = (a.x + b), .y = (a.y + b), .z = (a.z + b)};}
+        vec3f operator+(vec3f a, float b) {return (vec3f) { .x = (a.x + b), .y = (a.y + b), .z = (a.z + b)};}
+        vec3d operator+(vec3d a, double b) {return (vec3d) { .x = (a.x + b), .y = (a.y + b), .z = (a.z + b)};}
+
+        vec3i operator-(vec3i a, float b) {return (vec3i) { .x = (a.x - b), .y = (a.y - b), .z = (a.z - b)};}
+        vec3f operator-(vec3f a, float b) {return (vec3f) { .x = (a.x - b), .y = (a.y - b), .z = (a.z - b)};}
+        vec3d operator-(vec3d a, double b) {return (vec3d) { .x = (a.x - b), .y = (a.y - b), .z = (a.z - b)};}
+
+        vec3i operator*(vec3i a, float b) {return (vec3i) { .x = (a.x * b), .y = (a.y * b), .z = (a.z * b)};}
+        vec3f operator*(vec3f a, float b) {return (vec3f) { .x = (a.x * b), .y = (a.y * b), .z = (a.z * b)};}
+        vec3d operator*(vec3d a, double b) {return (vec3d) { .x = (a.x * b), .y = (a.y * b), .z = (a.z * b)};}
+
+        vec3i operator/(vec3i a, float b) {return (vec3i) { .x = (a.x / b), .y = (a.y / b), .z = (a.z / b)};}
+        vec3f operator/(vec3f a, float b) {return (vec3f) { .x = (a.x / b), .y = (a.y / b), .z = (a.z / b)};}
+        vec3d operator/(vec3d a, double b) {return (vec3d) { .x = (a.x / b), .y = (a.y / b), .z = (a.z / b)};}
+
+        vec4i operator+(vec4i a, float b) {return (vec4i) { .x = (a.x + b), .y = (a.y + b), .z = (a.z + b), .w = (a.w + b)};}
+        vec4f operator+(vec4f a, float b) {return (vec4f) { .x = (a.x + b), .y = (a.y + b), .z = (a.z + b), .w = (a.w + b)};}
+        vec4d operator+(vec4d a, double b) {return (vec4d) { .x = (a.x + b), .y = (a.y + b), .z = (a.z + b), .w = (a.w + b)};}
+
+        vec4i operator-(vec4i a, float b) {return (vec4i) { .x = (a.x - b), .y = (a.y - b), .z = (a.z - b), .w = (a.w - b)};}
+        vec4f operator-(vec4f a, float b) {return (vec4f) { .x = (a.x - b), .y = (a.y - b), .z = (a.z - b), .w = (a.w - b)};}
+        vec4d operator-(vec4d a, double b) {return (vec4d) { .x = (a.x - b), .y = (a.y - b), .z = (a.z - b), .w = (a.w - b)};}
+
+        vec4i operator*(vec4i a, float b) {return (vec4i) { .x = (a.x * b), .y = (a.y * b), .z = (a.z * b), .w = (a.w * b)};}
+        vec4f operator*(vec4f a, float b) {return (vec4f) { .x = (a.x * b), .y = (a.y * b), .z = (a.z * b), .w = (a.w * b)};}
+        vec4d operator*(vec4d a, double b) {return (vec4d) { .x = (a.x * b), .y = (a.y * b), .z = (a.z * b), .w = (a.w * b)};}
+
+        vec4i operator/(vec4i a, float b) {return (vec4i) { .x = (a.x / b), .y = (a.y / b), .z = (a.z / b), .w = (a.w / b)};}
+        vec4f operator/(vec4f a, float b) {return (vec4f) { .x = (a.x / b), .y = (a.y / b), .z = (a.z / b), .w = (a.w / b)};}
+        vec4d operator/(vec4d a, double b) {return (vec4d) { .x = (a.x / b), .y = (a.y / b), .z = (a.z / b), .w = (a.w / b)};}
+
+        vec2i operator+(float a, vec2i b) {return (vec2i) { .x = (a + b.x), .y = (a + b.y)};}
+        vec2f operator+(float a, vec2f b) {return (vec2f) { .x = (a + b.x), .y = (a + b.y)};}
+        vec2d operator+(double a, vec2d b) {return (vec2d) { .x = (a + b.x), .y = (a + b.y)};}
+
+        vec3i operator+(float a, vec3i b) {return (vec3i) { .x = (a + b.x), .y = (a + b.y), .z = (a + b.z)};}
+        vec3f operator+(float a, vec3f b) {return (vec3f) { .x = (a + b.x), .y = (a + b.y), .z = (a + b.z)};}
+        vec3d operator+(double a, vec3d b) {return (vec3d) { .x = (a + b.x), .y = (a + b.y), .z = (a + b.z)};}
+
+        vec4i operator+(float a, vec4i b) {return (vec4i) { .x = (a + b.x), .y = (a + b.y), .z = (a + b.z), .w = (a + b.w)};}
+        vec4f operator+(float a, vec4f b) {return (vec4f) { .x = (a + b.x), .y = (a + b.y), .z = (a + b.z), .w = (a + b.w)};}
+        vec4d operator+(double a, vec4d b) {return (vec4d) { .x = (a + b.x), .y = (a + b.y), .z = (a + b.z), .w = (a + b.w)};}
+
+        vec2i operator-(float a, vec2i b) {return (vec2i) { .x = (a - b.x), .y = (a - b.y)};}
+        vec2f operator-(float a, vec2f b) {return (vec2f) { .x = (a - b.x), .y = (a - b.y)};}
+        vec2d operator-(double a, vec2d b) {return (vec2d) { .x = (a - b.x), .y = (a - b.y)};}
+
+        vec3i operator-(float a, vec3i b) {return (vec3i) { .x = (a - b.x), .y = (a - b.y), .z = (a - b.z)};}
+        vec3f operator-(float a, vec3f b) {return (vec3f) { .x = (a - b.x), .y = (a - b.y), .z = (a - b.z)};}
+        vec3d operator-(double a, vec3d b) {return (vec3d) { .x = (a - b.x), .y = (a - b.y), .z = (a - b.z)};}
+
+        vec4i operator-(float a, vec4i b) {return (vec4i) { .x = (a - b.x), .y = (a - b.y), .z = (a - b.z), .w = (a - b.w)};}
+        vec4f operator-(float a, vec4f b) {return (vec4f) { .x = (a - b.x), .y = (a - b.y), .z = (a - b.z), .w = (a - b.w)};}
+        vec4d operator-(double a, vec4d b) {return (vec4d) { .x = (a - b.x), .y = (a - b.y), .z = (a - b.z), .w = (a - b.w)};}
+
+        vec2i operator*(float a, vec2i b) {return (vec2i) { .x = (a * b.x), .y = (a * b.y)};}
+        vec2f operator*(float a, vec2f b) {return (vec2f) { .x = (a * b.x), .y = (a * b.y)};}
+        vec2d operator*(double a, vec2d b) {return (vec2d) { .x = (a * b.x), .y = (a * b.y)};}
+
+        vec3i operator*(float a, vec3i b) {return (vec3i) { .x = (a * b.x), .y = (a * b.y), .z = (a * b.z)};}
+        vec3f operator*(float a, vec3f b) {return (vec3f) { .x = (a * b.x), .y = (a * b.y), .z = (a * b.z)};}
+        vec3d operator*(double a, vec3d b) {return (vec3d) { .x = (a * b.x), .y = (a * b.y), .z = (a * b.z)};}
+
+        vec4i operator*(float a, vec4i b) {return (vec4i) { .x = (a * b.x), .y = (a * b.y), .z = (a * b.z), .w = (a * b.w)};}
+        vec4f operator*(float a, vec4f b) {return (vec4f) { .x = (a * b.x), .y = (a * b.y), .z = (a * b.z), .w = (a * b.w)};}
+        vec4d operator*(double a, vec4d b) {return (vec4d) { .x = (a * b.x), .y = (a * b.y), .z = (a * b.z), .w = (a * b.w)};}
+
+        vec2i operator/(float a, vec2i b) {return (vec2i) { .x = (a / b.x), .y = (a / b.y)};}
+        vec2f operator/(float a, vec2f b) {return (vec2f) { .x = (a / b.x), .y = (a / b.y)};}
+        vec2d operator/(double a, vec2d b) {return (vec2d) { .x = (a / b.x), .y = (a / b.y)};}
+
+        vec3i operator/(float a, vec3i b) {return (vec3i) { .x = (a / b.x), .y = (a / b.y), .z = (a / b.z)};}
+        vec3f operator/(float a, vec3f b) {return (vec3f) { .x = (a / b.x), .y = (a / b.y), .z = (a / b.z)};}
+        vec3d operator/(double a, vec3d b) {return (vec3d) { .x = (a / b.x), .y = (a / b.y), .z = (a / b.z)};}
+
+        vec4i operator/(float a, vec4i b) {return (vec4i) { .x = (a / b.x), .y = (a / b.y), .z = (a / b.z), .w = (a / b.w)};}
+        vec4f operator/(float a, vec4f b) {return (vec4f) { .x = (a / b.x), .y = (a / b.y), .z = (a / b.z), .w = (a / b.w)};}
+        vec4d operator/(double a, vec4d b) {return (vec4d) { .x = (a / b.x), .y = (a / b.y), .z = (a / b.z), .w = (a / b.w)};}
+
+        int operator[](vec2i v, int i) {if(i == 0) return v.x; else return v.y;}
+        float operator[](vec2f v, int i) {if(i == 0) return v.x; else return v.y;}
+        double operator[](vec2d v, int i) {if(i == 0) return v.x; else return v.y;}
+
+        int operator[](vec3i v, int i) {if(i == 0) return v.x; else if(i == 1) return v.y; else return v.z;}
+        float operator[](vec3f v, int i) {if(i == 0) return v.x; else if(i == 1) return v.y; else return v.z;}
+        double operator[](vec3d v, int i) {if(i == 0) return v.x; else if(i == 1) return v.y; else return v.z;}
+
+        int operator[](vec4i v, int i) {if(i == 0) return v.x; else if(i == 1) return v.y; else if(i == 2) return v.z; else return v.w;}
+        float operator[](vec4f v, int i) {if(i == 0) return v.x; else if(i == 1) return v.y; else if(i == 2) return v.z; else return v.w;}
+        double operator[](vec4d v, int i) {if(i == 0) return v.x; else if(i == 1) return v.y; else if(i == 2) return v.z; else return v.w;}
+
+        vec2i v_normal(vec2i v) {return (v * (1 / (float) sqrt(v.x*v.x + v.y*v.y)));}
+        vec2f v_normal(vec2f v) {return (v * (1 / (float) sqrt(v.x*v.x + v.y*v.y)));}
+        vec2d v_normal(vec2d v) {return (v * (1 / (double) sqrt(v.x*v.x + v.y*v.y)));}
+
+        vec3i v_normal(vec3i v) {return (v * (1 / (float) sqrt(v.x*v.x + v.y*v.y + v.z*v.z)));}
+        vec3f v_normal(vec3f v) {return (v * (1 / (float) sqrt(v.x*v.x + v.y*v.y + v.z*v.z)));}
+        vec3d v_normal(vec3d v) {return (v * (1 / (double) sqrt(v.x*v.x + v.y*v.y + v.z*v.z)));}
+
+        vec4i v_normal(vec4i v) {return (v * (1 / (float) sqrt(v.x*v.x + v.y*v.y + v.z*v.z + v.w*v.w)));}
+        vec4f v_normal(vec4f v) {return (v * (1 / (float) sqrt(v.x*v.x + v.y*v.y + v.z*v.z + v.w*v.w)));}
+        vec4d v_normal(vec4d v) {return (v * (1 / (double) sqrt(v.x*v.x + v.y*v.y + v.z*v.z + v.w*v.w)));}
+
+        void v_normal(vec2i *v) {
+            float len = (float) sqrt(v->x*v->x + v->y*v->y);
+            v->x = (int)(v->x * len);
+            v->y = (int)(v->y * len);
         }
-        
-        struct mat2i {float[4] m; int flags;}
-        struct mat2f {float[4] m; int flags;}
-        struct mat2d {double[4] m; int flags;}
-        
-        struct mat3i {float[9] m; int flags;}
-        struct mat3f {float[9] m; int flags;}
-        struct mat3d {double[9] m; int flags;}
-        
-        struct mat4i {float[16] m; int flags;}
-        struct mat4f {float[16] m; int flags;}
-        struct mat4d {double[16] m; int flags;}
-        
-        bool operator==(mat2i a, mat2i b) {for(int i = 0; i < 4; i++) {if(a.m[i] != b.m[i]){return false;}} return true;}
-        bool operator==(mat2f a, mat2f b) {for(int i = 0; i < 4; i++) {if(a.m[i] != b.m[i]){return false;}} return true;}
-        bool operator==(mat2d a, mat2d b) {for(int i = 0; i < 4; i++) {if(a.m[i] != b.m[i]){return false;}} return true;}
-        
-        bool operator==(mat3i a, mat3i b) {for(int i = 0; i < 9; i++) {if(a.m[i] != b.m[i]){return false;}} return true;}
-        bool operator==(mat3f a, mat3f b) {for(int i = 0; i < 9; i++) {if(a.m[i] != b.m[i]){return false;}} return true;}
-        bool operator==(mat3d a, mat3d b) {for(int i = 0; i < 9; i++) {if(a.m[i] != b.m[i]){return false;}} return true;}
-        
-        bool operator==(mat4i a, mat4i b) {for(int i = 0; i < 16; i++) {if(a.m[i] != b.m[i]){return false;}} return true;}
-        bool operator==(mat4f a, mat4f b) {for(int i = 0; i < 16; i++) {if(a.m[i] != b.m[i]){return false;}} return true;}
-        bool operator==(mat4d a, mat4d b) {for(int i = 0; i < 16; i++) {if(a.m[i] != b.m[i]){return false;}} return true;}
-        
-        mat2i operator+(mat2i a, mat2i b) {mat2i c; for(int i = 0; i < 4; i++) {c.m[i] = a.m[i] + b.m[i];} return c;}
-        mat2i operator-(mat2i a, mat2i b) {mat2i c; for(int i = 0; i < 4; i++) {c.m[i] = a.m[i] - b.m[i];} return c;}
-        mat2f operator+(mat2f a, mat2f b) {mat2f c; for(int i = 0; i < 4; i++) {c.m[i] = a.m[i] + b.m[i];} return c;}
-        mat2f operator-(mat2f a, mat2f b) {mat2f c; for(int i = 0; i < 4; i++) {c.m[i] = a.m[i] - b.m[i];} return c;}
-        mat2d operator+(mat2d a, mat2d b) {mat2d c; for(int i = 0; i < 4; i++) {c.m[i] = a.m[i] + b.m[i];} return c;}
-        mat2d operator-(mat2d a, mat2d b) {mat2d c; for(int i = 0; i < 4; i++) {c.m[i] = a.m[i] - b.m[i];} return c;}
-        
-        mat3i operator+(mat3i a, mat3i b) {mat3i c; for(int i = 0; i < 9; i++) {c.m[i] = a.m[i] + b.m[i];} return c;}
-        mat3i operator-(mat3i a, mat3i b) {mat3i c; for(int i = 0; i < 9; i++) {c.m[i] = a.m[i] - b.m[i];} return c;}
-        mat3f operator+(mat3f a, mat3f b) {mat3f c; for(int i = 0; i < 9; i++) {c.m[i] = a.m[i] + b.m[i];} return c;}
-        mat3f operator-(mat3f a, mat3f b) {mat3f c; for(int i = 0; i < 9; i++) {c.m[i] = a.m[i] - b.m[i];} return c;}
-        
-        mat4i operator+(mat4i a, mat4i b) {mat4i c; for(int i = 0; i < 16; i++) {c.m[i] = a.m[i] + b.m[i];} return c;}
-        mat4i operator-(mat4i a, mat4i b) {mat4i c; for(int i = 0; i < 16; i++) {c.m[i] = a.m[i] - b.m[i];} return c;}
-        mat4f operator+(mat4f a, mat4f b) {mat4f c; for(int i = 0; i < 16; i++) {c.m[i] = a.m[i] + b.m[i];} return c;}
-        mat4f operator-(mat4f a, mat4f b) {mat4f c; for(int i = 0; i < 16; i++) {c.m[i] = a.m[i] - b.m[i];} return c;}
-        
-        mat2i operator*(mat2i a, int b) {mat2i c; for(int i = 0; i < 4; i++) {c.m[i] = a.m[i] * b;} return c;}
-        mat2i operator*(int a, mat2i b) {mat2i c; for(int i = 0; i < 4; i++) {c.m[i] = a * b.m[i];} return c;}
-        mat2f operator*(mat2f a, float b) {mat2f c; for(int i = 0; i < 4; i++) {c.m[i] = a.m[i] * b;} return c;}
-        mat2f operator*(float a, mat2f b) {mat2f c; for(int i = 0; i < 4; i++) {c.m[i] = a * b.m[i];} return c;}
-        mat2d operator*(mat2d a, double b) {mat2d c; for(int i = 0; i < 4; i++) {c.m[i] = a.m[i] * b;} return c;}
-        mat2d operator*(double a, mat2d b) {mat2d c; for(int i = 0; i < 4; i++) {c.m[i] = a * b.m[i];} return c;}
-        
-        mat3i operator*(mat3i a, int b) {mat3i c; for(int i = 0; i < 9; i++) {c.m[i] = a.m[i] * b;} return c;}
-        mat3i operator*(int a, mat3i b) {mat3i c; for(int i = 0; i < 9; i++) {c.m[i] = a * b.m[i];} return c;}
-        mat3f operator*(mat3f a, float b) {mat3f c; for(int i = 0; i < 9; i++) {c.m[i] = a.m[i] * b;} return c;}
-        mat3f operator*(float a, mat3f b) {mat3f c; for(int i = 0; i < 9; i++) {c.m[i] = a * b.m[i];} return c;}
-        mat3d operator*(mat3d a, double b) {mat3d c; for(int i = 0; i < 9; i++) {c.m[i] = a.m[i] * b;} return c;}
-        mat3d operator*(double a, mat3d b) {mat3d c; for(int i = 0; i < 9; i++) {c.m[i] = a * b.m[i];} return c;}
-        
-        mat4i operator*(mat4i a, int b) {mat4i c; for(int i = 0; i < 16; i++) {c.m[i] = a.m[i] * b;} return c;}
-        mat4i operator*(int a, mat4i b) {mat4i c; for(int i = 0; i < 16; i++) {c.m[i] = a * b.m[i];} return c;}
-        mat4f operator*(mat4f a, float b) {mat4f c; for(int i = 0; i < 16; i++) {c.m[i] = a.m[i] * b;} return c;}
-        mat4f operator*(float a, mat4f b) {mat4f c; for(int i = 0; i < 16; i++) {c.m[i] = a * b.m[i];} return c;}
-        mat4d operator*(mat4d a, double b) {mat4d c; for(int i = 0; i < 16; i++) {c.m[i] = a.m[i] * b;} return c;}
-        mat4d operator*(double a, mat4d b) {mat4d c; for(int i = 0; i < 16; i++) {c.m[i] = a * b.m[i];} return c;}
-        
+        void v_normal(vec2f *v) {
+            float len = (float) sqrt(v->x*v->x + v->y*v->y);
+            v->x = (v->x * len);
+            v->y = (v->y * len);
+        }
+        void v_normal(vec2d *v) {
+            double len = (double) sqrt(v->x*v->x + v->y*v->y);
+            v->x = (v->x * len);
+            v->y = (v->y * len);
+        }
+
+        void v_normal(vec3i *v) {
+            float len = (float) sqrt(v->x*v->x + v->y*v->y + v->z*v->z);
+            v->x = (int)(v->x * len);
+            v->y = (int)(v->y * len);
+            v->z = (int)(v->z * len);
+        }
+        void v_normal(vec3f *v) {
+            float len = (float) sqrt(v->x*v->x + v->y*v->y + v->z*v->z);
+            v->x = (v->x * len);
+            v->y = (v->y * len);
+            v->z = (v->z * len);
+        }
+        void v_normal(vec3d *v) {
+            double len = (double) sqrt(v->x*v->x + v->y*v->y + v->z*v->z);
+            v->x = (v->x * len);
+            v->y = (v->y * len);
+            v->z = (v->z * len);
+        }
+
+        void v_normal(vec4i *v) {
+            float len = (float) sqrt(v->x*v->x + v->y*v->y + v->z*v->z + v->w*v->w);
+            v->x = (int)(v->x * len);
+            v->y = (int)(v->y * len);
+            v->z = (int)(v->z * len);
+            v->w = (int)(v->w * len);
+        }
+        void v_normal(vec4f *v) {
+            float len = (float) sqrt(v->x*v->x + v->y*v->y + v->z*v->z + v->w*v->w);
+            v->x = (v->x * len);
+            v->y = (v->y * len);
+            v->z = (v->z * len);
+            v->w = (v->w * len);
+        }
+        void v_normal(vec4d *v) {
+            double len = (double) sqrt(v->x*v->x + v->y*v->y + v->z*v->z + v->w*v->w);
+            v->x = (v->x * len);
+            v->y = (v->y * len);
+            v->z = (v->z * len);
+            v->w = (v->w * len);
+        }
+
+        int v_dot(vec2i a, vec2i b) {return ((a.x * b.x) + (a.y * b.y));}
+        float v_dot(vec2f a, vec2f b) {return ((a.x * b.x) + (a.y * b.y));}
+        double v_dot(vec2d a, vec2d b) {return ((a.x * b.x) + (a.y * b.y));}
+
+        int v_dot(vec3i a, vec3i b) {return ((a.x * b.x) + (a.y * b.y) + (a.z * b.z));}
+        float v_dot(vec3f a, vec3f b) {return ((a.x * b.x) + (a.y * b.y) + (a.z * b.z));}
+        double v_dot(vec3d a, vec3d b) {return ((a.x * b.x) + (a.y * b.y) + (a.z * b.z));}
+
+        int v_dot(vec4i a, vec4i b) {return ((a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w));}
+        float v_dot(vec4f a, vec4f b) {return ((a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w));}
+        double v_dot(vec4d a, vec4d b) {return ((a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w));}
+
+        int v_cross(vec2i a, vec2i b) {return ((a.x * b.y) - (a.y * b.x));}
+        float v_cross(vec2f a, vec2f b) {return ((a.x * b.y) - (a.y * b.x));}
+        double v_cross(vec2d a, vec2d b) {return ((a.x * b.y) - (a.y * b.x));}
+
+        vec3i v_cross(vec3i a, vec3i b) {
+            return (vec3i) { .x = a.y * b.z - a.z * b.y,
+                             .y = a.z * b.x - a.x * b.z,
+                             .z = a.x * b.y - a.y * b.x };
+        }
+        vec3f v_cross(vec3f a, vec3f b) {
+            return (vec3f) { .x = a.y * b.z - a.z * b.y,
+                             .y = a.z * b.x - a.x * b.z,
+                             .z = a.x * b.y - a.y * b.x };
+        }
+        vec3d v_cross(vec3d a, vec3d b) {
+            return (vec3d) { .x = a.y * b.z - a.z * b.y,
+                             .y = a.z * b.x - a.x * b.z,
+                             .z = a.x * b.y - a.y * b.x };
+        }
+
+        void v_print(vec2i v) {printf("2x2 Int Vector {\n\t%d, %d\n}\n", v.x, v.y);}
+        void v_print(vec2f v) {printf("2x2 Float Vector {\n\t%f, %f\n}\n", v.x, v.y);}
+        void v_print(vec2d v) {printf("2x2 Double Vector {\n\t%f, %f\n}\n", v.x, v.y);}
+
+        void v_print(vec3i v) {printf("3x3 Int Vector {\n\t%d, %d, %d\n}\n", v.x, v.y, v.z);}
+        void v_print(vec3f v) {printf("3x3 Float Vector {\n\t%f, %f, %f\n}\n", v.x, v.y, v.z);}
+        void v_print(vec3d v) {printf("3x3 Double Vector {\n\t%f, %f, %f\n}\n", v.x, v.y, v.z);}
+
+        void v_print(vec4i v) {printf("4x4 Int Vector {\n\t%d, %d, %d, %d\n}\n", v.x, v.y, v.z, v.w);}
+        void v_print(vec4f v) {printf("4x4 Float Vector {\n\t%f, %f, %f, %f\n}\n", v.x, v.y, v.z, v.w);}
+        void v_print(vec4d v) {printf("4x4 Double Vector {\n\t%f, %f, %f, %f\n}\n", v.x, v.y, v.z, v.w);}
+
+        void v_print(vec2i *v) {printf("2x2 Int Vector {\n\t%d, %d\n}\n", v->x, v->y);}
+        void v_print(vec2f *v) {printf("2x2 Float Vector {\n\t%f, %f\n}\n", v->x, v->y);}
+        void v_print(vec2d *v) {printf("2x2 Double Vector {\n\t%f, %f\n}\n", v->x, v->y);}
+
+        void v_print(vec3i *v) {printf("3x3 Int Vector {\n\t%d, %d, %d\n}\n", v->x, v->y, v->z);}
+        void v_print(vec3f *v) {printf("3x3 Float Vector {\n\t%f, %f, %f\n}\n", v->x, v->y, v->z);}
+        void v_print(vec3d *v) {printf("3x3 Double Vector {\n\t%f, %f, %f\n}\n", v->x, v->y, v->z);}
+
+        void v_print(vec4i *v) {printf("4x4 Int Vector {\n\t%d, %d, %d, %d\n}\n", v->x, v->y, v->z, v->w);}
+        void v_print(vec4f *v) {printf("4x4 Float Vector {\n\t%f, %f, %f, %f\n}\n", v->x, v->y, v->z, v->w);}
+        void v_print(vec4d *v) {printf("4x4 Double Vector {\n\t%f, %f, %f, %f\n}\n", v->x, v->y, v->z, v->w);}
+
+        bool operator==(mat2i a, mat2i b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[4] == b.m[4]));
+        }
+        bool operator==(mat2f a, mat2f b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[4] == b.m[4]));
+        }
+        bool operator==(mat2d a, mat2d b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[3] == b.m[3]));
+        }
+
+        bool operator==(mat3i a, mat3i b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[3] == b.m[3]) &&
+                    (a.m[4] == b.m[4]) && (a.m[5] == b.m[5]));
+        }
+        bool operator==(mat3f a, mat3f b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[3] == b.m[3]) &&
+                    (a.m[4] == b.m[4]) && (a.m[5] == b.m[5]));
+        }
+        bool operator==(mat3d a, mat3d b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[3] == b.m[3]) &&
+                    (a.m[4] == b.m[4]) && (a.m[5] == b.m[5]));
+        }
+
+        bool operator==(mat4i a, mat4i b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[3] == b.m[3]) &&
+                    (a.m[4] == b.m[4]) && (a.m[5] == b.m[5]) &&
+                    (a.m[6] == b.m[6]) && (a.m[7] == b.m[7]));
+        }
+        bool operator==(mat4f a, mat4f b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[3] == b.m[3]) &&
+                    (a.m[4] == b.m[4]) && (a.m[5] == b.m[5]) &&
+                    (a.m[6] == b.m[6]) && (a.m[7] == b.m[7]));
+        }
+        bool operator==(mat4d a, mat4d b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[3] == b.m[3]) &&
+                    (a.m[4] == b.m[4]) && (a.m[5] == b.m[5]) &&
+                    (a.m[6] == b.m[6]) && (a.m[7] == b.m[7]));
+        }
+
+        mat2i operator+(mat2i a, mat2i b) {
+            mat2i c;
+            c.m[0] = a.m[0] + b.m[0];
+            c.m[1] = a.m[1] + b.m[1];
+            c.m[2] = a.m[2] + b.m[2];
+            c.m[3] = a.m[3] + b.m[3];
+            return c;
+        }
+        mat2f operator+(mat2f a, mat2f b) {
+            mat2f c;
+            c.m[0] = a.m[0] + b.m[0];
+            c.m[1] = a.m[1] + b.m[1];
+            c.m[2] = a.m[2] + b.m[2];
+            c.m[3] = a.m[3] + b.m[3];
+            return c;
+        }
+        mat2d operator+(mat2d a, mat2d b) {
+            mat2d c;
+            c.m[0] = a.m[0] + b.m[0];
+            c.m[1] = a.m[1] + b.m[1];
+            c.m[2] = a.m[2] + b.m[2];
+            c.m[3] = a.m[3] + b.m[3];
+            return c;
+        }
+
+        mat3i operator+(mat3i a, mat3i b) {
+            mat3i c;
+            c.m[0] = a.m[0] + b.m[0];
+            c.m[1] = a.m[1] + b.m[1];
+            c.m[2] = a.m[2] + b.m[2];
+            c.m[3] = a.m[3] + b.m[3];
+            c.m[4] = a.m[4] + b.m[4];
+            c.m[5] = a.m[5] + b.m[5];
+            return c;
+        }
+        mat3f operator+(mat3f a, mat3f b) {
+            mat3f c;
+            c.m[0] = a.m[0] + b.m[0];
+            c.m[1] = a.m[1] + b.m[1];
+            c.m[2] = a.m[2] + b.m[2];
+            c.m[3] = a.m[3] + b.m[3];
+            c.m[4] = a.m[4] + b.m[4];
+            c.m[5] = a.m[5] + b.m[5];
+            return c;
+        }
+        mat3d operator+(mat3d a, mat3d b) {
+            mat3d c;
+            c.m[0] = a.m[0] + b.m[0];
+            c.m[1] = a.m[1] + b.m[1];
+            c.m[2] = a.m[2] + b.m[2];
+            c.m[3] = a.m[3] + b.m[3];
+            c.m[4] = a.m[4] + b.m[4];
+            c.m[5] = a.m[5] + b.m[5];
+            return c;
+        }
+
+        mat4i operator+(mat4i a, mat4i b) {
+            mat4i c;
+            c.m[0] = a.m[0] + b.m[0];
+            c.m[1] = a.m[1] + b.m[1];
+            c.m[2] = a.m[2] + b.m[2];
+            c.m[3] = a.m[3] + b.m[3];
+            c.m[4] = a.m[4] + b.m[4];
+            c.m[5] = a.m[5] + b.m[5];
+            c.m[6] = a.m[6] + b.m[6];
+            c.m[7] = a.m[7] + b.m[7];
+            return c;
+        }
+        mat4f operator+(mat4f a, mat4f b) {
+            mat4f c;
+            c.m[0] = a.m[0] + b.m[0];
+            c.m[1] = a.m[1] + b.m[1];
+            c.m[2] = a.m[2] + b.m[2];
+            c.m[3] = a.m[3] + b.m[3];
+            c.m[4] = a.m[4] + b.m[4];
+            c.m[5] = a.m[5] + b.m[5];
+            c.m[6] = a.m[6] + b.m[6];
+            c.m[7] = a.m[7] + b.m[7];
+            return c;
+        }
+        mat4d operator+(mat4d a, mat4d b) {
+            mat4d c;
+            c.m[0] = a.m[0] + b.m[0];
+            c.m[1] = a.m[1] + b.m[1];
+            c.m[2] = a.m[2] + b.m[2];
+            c.m[3] = a.m[3] + b.m[3];
+            c.m[4] = a.m[4] + b.m[4];
+            c.m[5] = a.m[5] + b.m[5];
+            c.m[6] = a.m[6] + b.m[6];
+            c.m[7] = a.m[7] + b.m[7];
+            return c;
+        }
+
+        mat2i operator-(mat2i a, mat2i b) {
+            mat2i c;
+            c.m[0] = a.m[0] - b.m[0];
+            c.m[1] = a.m[1] - b.m[1];
+            c.m[2] = a.m[2] - b.m[2];
+            c.m[3] = a.m[3] - b.m[3];
+            return c;
+        }
+        mat2f operator-(mat2f a, mat2f b) {
+            mat2f c;
+            c.m[0] = a.m[0] - b.m[0];
+            c.m[1] = a.m[1] - b.m[1];
+            c.m[2] = a.m[2] - b.m[2];
+            c.m[3] = a.m[3] - b.m[3];
+            return c;
+        }
+        mat2d operator-(mat2d a, mat2d b) {
+            mat2d c;
+            c.m[0] = a.m[0] - b.m[0];
+            c.m[1] = a.m[1] - b.m[1];
+            c.m[2] = a.m[2] - b.m[2];
+            c.m[3] = a.m[3] - b.m[3];
+            return c;
+        }
+
+        mat3i operator-(mat3i a, mat3i b) {
+            mat3i c;
+            c.m[0] = a.m[0] - b.m[0];
+            c.m[1] = a.m[1] - b.m[1];
+            c.m[2] = a.m[2] - b.m[2];
+            c.m[3] = a.m[3] - b.m[3];
+            c.m[4] = a.m[4] - b.m[4];
+            c.m[5] = a.m[5] - b.m[5];
+            return c;
+        }
+        mat3f operator-(mat3f a, mat3f b) {
+            mat3f c;
+            c.m[0] = a.m[0] - b.m[0];
+            c.m[1] = a.m[1] - b.m[1];
+            c.m[2] = a.m[2] - b.m[2];
+            c.m[3] = a.m[3] - b.m[3];
+            c.m[4] = a.m[4] - b.m[4];
+            c.m[5] = a.m[5] - b.m[5];
+            return c;
+        }
+        mat3d operator-(mat3d a, mat3d b) {
+            mat3d c;
+            c.m[0] = a.m[0] - b.m[0];
+            c.m[1] = a.m[1] - b.m[1];
+            c.m[2] = a.m[2] - b.m[2];
+            c.m[3] = a.m[3] - b.m[3];
+            c.m[4] = a.m[4] - b.m[4];
+            c.m[5] = a.m[5] - b.m[5];
+            return c;
+        }
+
+        mat4i operator-(mat4i a, mat4i b) {
+            mat4i c;
+            c.m[0] = a.m[0] - b.m[0];
+            c.m[1] = a.m[1] - b.m[1];
+            c.m[2] = a.m[2] - b.m[2];
+            c.m[3] = a.m[3] - b.m[3];
+            c.m[4] = a.m[4] - b.m[4];
+            c.m[5] = a.m[5] - b.m[5];
+            c.m[6] = a.m[6] - b.m[6];
+            c.m[7] = a.m[7] - b.m[7];
+            return c;
+        }
+        mat4f operator-(mat4f a, mat4f b) {
+            mat4f c;
+            c.m[0] = a.m[0] - b.m[0];
+            c.m[1] = a.m[1] - b.m[1];
+            c.m[2] = a.m[2] - b.m[2];
+            c.m[3] = a.m[3] - b.m[3];
+            c.m[4] = a.m[4] - b.m[4];
+            c.m[5] = a.m[5] - b.m[5];
+            c.m[6] = a.m[6] - b.m[6];
+            c.m[7] = a.m[7] - b.m[7];
+            return c;
+        }
+        mat4d operator-(mat4d a, mat4d b) {
+            mat4d c;
+            c.m[0] = a.m[0] - b.m[0];
+            c.m[1] = a.m[1] - b.m[1];
+            c.m[2] = a.m[2] - b.m[2];
+            c.m[3] = a.m[3] - b.m[3];
+            c.m[4] = a.m[4] - b.m[4];
+            c.m[5] = a.m[5] - b.m[5];
+            c.m[6] = a.m[6] - b.m[6];
+            c.m[7] = a.m[7] - b.m[7];
+            return c;
+        }
+
+        mat2i operator*(mat2i a, int b) {
+            mat2i c;
+            c.m[0] = a.m[0] * b;
+            c.m[1] = a.m[1] * b;
+            c.m[2] = a.m[2] * b;
+            c.m[3] = a.m[3] * b;
+            return c;
+        }
+        mat2f operator*(mat2f a, float b) {
+            mat2f c;
+            c.m[0] = a.m[0] * b;
+            c.m[1] = a.m[1] * b;
+            c.m[2] = a.m[2] * b;
+            c.m[3] = a.m[3] * b;
+            return c;
+        }
+        mat2d operator*(mat2d a, double b) {
+            mat2d c;
+            c.m[0] = a.m[0] * b;
+            c.m[1] = a.m[1] * b;
+            c.m[2] = a.m[2] * b;
+            c.m[3] = a.m[3] * b;
+            return c;
+        }
+
+        mat3i operator*(mat3i a, int b) {
+            mat3i c;
+            c.m[0] = a.m[0] * b;
+            c.m[1] = a.m[1] * b;
+            c.m[2] = a.m[2] * b;
+            c.m[3] = a.m[3] * b;
+            c.m[4] = a.m[4] * b;
+            c.m[5] = a.m[5] * b;
+            return c;
+        }
+        mat3f operator*(mat3f a, float b) {
+            mat3f c;
+            c.m[0] = a.m[0] * b;
+            c.m[1] = a.m[1] * b;
+            c.m[2] = a.m[2] * b;
+            c.m[3] = a.m[3] * b;
+            c.m[4] = a.m[4] * b;
+            c.m[5] = a.m[5] * b;
+            return c;
+        }
+        mat3d operator*(mat3d a, double b) {
+            mat3d c;
+            c.m[0] = a.m[0] * b;
+            c.m[1] = a.m[1] * b;
+            c.m[2] = a.m[2] * b;
+            c.m[3] = a.m[3] * b;
+            c.m[4] = a.m[4] * b;
+            c.m[5] = a.m[5] * b;
+            return c;
+        }
+
+        mat4i operator*(mat4i a, int b) {
+            mat4i c;
+            c.m[0] = a.m[0] * b;
+            c.m[1] = a.m[1] * b;
+            c.m[2] = a.m[2] * b;
+            c.m[3] = a.m[3] * b;
+            c.m[4] = a.m[4] * b;
+            c.m[5] = a.m[5] * b;
+            c.m[6] = a.m[6] * b;
+            c.m[7] = a.m[7] * b;
+            return c;
+        }
+        mat4f operator*(mat4f a, float b) {
+            mat4f c;
+            c.m[0] = a.m[0] * b;
+            c.m[1] = a.m[1] * b;
+            c.m[2] = a.m[2] * b;
+            c.m[3] = a.m[3] * b;
+            c.m[4] = a.m[4] * b;
+            c.m[5] = a.m[5] * b;
+            c.m[6] = a.m[6] * b;
+            c.m[7] = a.m[7] * b;
+            return c;
+        }
+        mat4d operator*(mat4d a, double b) {
+            mat4d c;
+            c.m[0] = a.m[0] * b;
+            c.m[1] = a.m[1] * b;
+            c.m[2] = a.m[2] * b;
+            c.m[3] = a.m[3] * b;
+            c.m[4] = a.m[4] * b;
+            c.m[5] = a.m[5] * b;
+            c.m[6] = a.m[6] * b;
+            c.m[7] = a.m[7] * b;
+            return c;
+        }
+
+        mat2i operator/(mat2i a, int b) {
+            mat2i c;
+            c.m[0] = a.m[0] / b;
+            c.m[1] = a.m[1] / b;
+            c.m[2] = a.m[2] / b;
+            c.m[3] = a.m[3] / b;
+            return c;
+        }
+        mat2f operator/(mat2f a, float b) {
+            mat2f c;
+            c.m[0] = a.m[0] / b;
+            c.m[1] = a.m[1] / b;
+            c.m[2] = a.m[2] / b;
+            c.m[3] = a.m[3] / b;
+            return c;
+        }
+        mat2d operator/(mat2d a, double b) {
+            mat2d c;
+            c.m[0] = a.m[0] / b;
+            c.m[1] = a.m[1] / b;
+            c.m[2] = a.m[2] / b;
+            c.m[3] = a.m[3] / b;
+            return c;
+        }
+
+        mat3i operator/(mat3i a, int b) {
+            mat3i c;
+            c.m[0] = a.m[0] / b;
+            c.m[1] = a.m[1] / b;
+            c.m[2] = a.m[2] / b;
+            c.m[3] = a.m[3] / b;
+            c.m[4] = a.m[4] / b;
+            c.m[5] = a.m[5] / b;
+            return c;
+        }
+        mat3f operator/(mat3f a, float b) {
+            mat3f c;
+            c.m[0] = a.m[0] / b;
+            c.m[1] = a.m[1] / b;
+            c.m[2] = a.m[2] / b;
+            c.m[3] = a.m[3] / b;
+            c.m[4] = a.m[4] / b;
+            c.m[5] = a.m[5] / b;
+            return c;
+        }
+        mat3d operator/(mat3d a, double b) {
+            mat3d c;
+            c.m[0] = a.m[0] / b;
+            c.m[1] = a.m[1] / b;
+            c.m[2] = a.m[2] / b;
+            c.m[3] = a.m[3] / b;
+            c.m[4] = a.m[4] / b;
+            c.m[5] = a.m[5] / b;
+            return c;
+        }
+
+        mat4i operator/(mat4i a, int b) {
+            mat4i c;
+            c.m[0] = a.m[0] / b;
+            c.m[1] = a.m[1] / b;
+            c.m[2] = a.m[2] / b;
+            c.m[3] = a.m[3] / b;
+            c.m[4] = a.m[4] / b;
+            c.m[5] = a.m[5] / b;
+            c.m[6] = a.m[6] / b;
+            c.m[7] = a.m[7] / b;
+            return c;
+        }
+        mat4f operator/(mat4f a, float b) {
+            mat4f c;
+            c.m[0] = a.m[0] / b;
+            c.m[1] = a.m[1] / b;
+            c.m[2] = a.m[2] / b;
+            c.m[3] = a.m[3] / b;
+            c.m[4] = a.m[4] / b;
+            c.m[5] = a.m[5] / b;
+            c.m[6] = a.m[6] / b;
+            c.m[7] = a.m[7] / b;
+            return c;
+        }
+        mat4d operator/(mat4d a, double b) {
+            mat4d c;
+            c.m[0] = a.m[0] / b;
+            c.m[1] = a.m[1] / b;
+            c.m[2] = a.m[2] / b;
+            c.m[3] = a.m[3] / b;
+            c.m[4] = a.m[4] / b;
+            c.m[5] = a.m[5] / b;
+            c.m[6] = a.m[6] / b;
+            c.m[7] = a.m[7] / b;
+            return c;
+        }
+
+        vec2i operator*(mat2i m, vec2i v) {
+            return (vec2i) { .x = m.m[0] * v.x + m.m[1] * v.y,
+                             .y = m.m[2] * v.x + m.m[3] * v.y };
+        }
+        vec2f operator*(mat2f m, vec2f v) {
+            return (vec2f) { .x = m.m[0] * v.x + m.m[1] * v.y,
+                             .y = m.m[2] * v.x + m.m[3] * v.y };
+        }
+        vec2d operator*(mat2d m, vec2d v) {
+            return (vec2d) { .x = m.m[0] * v.x + m.m[1] * v.y,
+                             .y = m.m[2] * v.x + m.m[3] * v.y };
+        }
+
+        vec3i operator*(mat3i m, vec3i v) {
+            return (vec3i) { .x = m.m[0] * v.x + m.m[1] * v.y + m.m[2] * v.z,
+                             .y = m.m[3] * v.x + m.m[4] * v.y + m.m[5] * v.z,
+                             .z = m.m[6] * v.x + m.m[7] * v.y + m.m[8] * v.z };
+        }
+        vec3f operator*(mat3f m, vec3f v) {
+            return (vec3f) { .x = m.m[0] * v.x + m.m[1] * v.y + m.m[2] * v.z,
+                             .y = m.m[3] * v.x + m.m[4] * v.y + m.m[5] * v.z,
+                             .z = m.m[6] * v.x + m.m[7] * v.y + m.m[8] * v.z };
+        }
+        vec3d operator*(mat3d m, vec3d v) {
+            return (vec3d) { .x = m.m[0] * v.x + m.m[1] * v.y + m.m[2] * v.z,
+                             .y = m.m[3] * v.x + m.m[4] * v.y + m.m[5] * v.z,
+                             .z = m.m[6] * v.x + m.m[7] * v.y + m.m[8] * v.z };
+        }
+
+        vec4i operator*(mat4i m, vec4i v) {
+            return (vec4i) { .x = m.m[0] * v.x + m.m[1] * v.y + m.m[2] * v.z + m.m[3] * v.w,
+                             .y = m.m[4] * v.x + m.m[5] * v.y + m.m[6] * v.z + m.m[7] * v.w,
+                             .z = m.m[8] * v.x + m.m[9] * v.y + m.m[10] * v.z + m.m[11] * v.w,
+                             .w = m.m[12] * v.x + m.m[13] * v.y + m.m[14] * v.z + m.m[15] * v.w };
+        }
+        vec4f operator*(mat4f m, vec4f v) {
+            return (vec4f) { .x = m.m[0] * v.x + m.m[1] * v.y + m.m[2] * v.z + m.m[3] * v.w,
+                             .y = m.m[4] * v.x + m.m[5] * v.y + m.m[6] * v.z + m.m[7] * v.w,
+                             .z = m.m[8] * v.x + m.m[9] * v.y + m.m[10] * v.z + m.m[11] * v.w,
+                             .w = m.m[12] * v.x + m.m[13] * v.y + m.m[14] * v.z + m.m[15] * v.w };
+        }
+        vec4d operator*(mat4d m, vec4d v) {
+            return (vec4d) { .x = m.m[0] * v.x + m.m[1] * v.y + m.m[2] * v.z + m.m[3] * v.w,
+                             .y = m.m[4] * v.x + m.m[5] * v.y + m.m[6] * v.z + m.m[7] * v.w,
+                             .z = m.m[8] * v.x + m.m[9] * v.y + m.m[10] * v.z + m.m[11] * v.w,
+                             .w = m.m[12] * v.x + m.m[13] * v.y + m.m[14] * v.z + m.m[15] * v.w };
+        }
+
         mat2i operator*(mat2i a, mat2i b) {
             mat2i ret;
-            vec2i temp = (vec2i) { .x = b.m[0], .y = b.m[2] };
-            vec2i col0 = a * temp;
+            vec2i col0 = a * (vec2i) { .x = b.m[0], .y = b.m[1] };
+            vec2i col1 = a * (vec2i) { .x = b.m[2], .y = b.m[3] };
+
             ret.m[0] = col0.x;
             ret.m[1] = col0.y;
-            
-            temp = (vec2i) { .x = b.m[1], .y = b.m[3] };
-            vec2i col1 = a * temp;
+
             ret.m[2] = col1.x;
             ret.m[3] = col1.y;
-            
+
             return ret;
         }
         mat2f operator*(mat2f a, mat2f b) {
             mat2f ret;
-            vec2f temp = (vec2f) { .x = b.m[0], .y = b.m[2] };
-            vec2f col0 = a * temp;
+            vec2f col0 = a * (vec2f) { .x = b.m[0], .y = b.m[1] };
+            vec2f col1 = a * (vec2f) { .x = b.m[2], .y = b.m[3] };
+
             ret.m[0] = col0.x;
             ret.m[1] = col0.y;
-            
-            temp = (vec2f) { .x = b.m[1], .y = b.m[3] };
-            vec2f col1 = a * temp;
+
             ret.m[2] = col1.x;
             ret.m[3] = col1.y;
-            
+
             return ret;
         }
         mat2d operator*(mat2d a, mat2d b) {
             mat2d ret;
-            vec2d temp = (vec2d) { .x = b.m[0], .y = b.m[2] };
-            vec2d col0 = a * temp;
+            vec2d col0 = a * (vec2d) { .x = b.m[0], .y = b.m[1] };
+            vec2d col1 = a * (vec2d) { .x = b.m[2], .y = b.m[3] };
+
             ret.m[0] = col0.x;
             ret.m[1] = col0.y;
-            
-            temp = (vec2d) { .x = b.m[1], .y = b.m[3] };
-            vec2d col1 = a * temp;
+
             ret.m[2] = col1.x;
             ret.m[3] = col1.y;
-            
+
             return ret;
         }
-        
-        mat3 operator*(mat3 a, mat3 b) {
+
+        mat3i operator*(mat3i a, mat3i b) {
             mat3i ret;
-            
+
             for(int i = 0; i < 3; i++) {
-                vec3i bcol = (vec3) { .x = b.m[i], .y = b.m[i + 3], .z = b.m[i + 6] };
+                vec3i bcol = (vec3i) { .x = b.m[i],
+                                       .y = b.m[i + 3],
+                                       .z = b.m[i + 6] };
                 vec3i acol = a * bcol;
-                
-                for (int j = 0; j < 3; j++) {
-                    ret.m[i + j * 3] = acol[j]
+
+                for(int j = 0; j < 3; j++) {
+                    ret.m[i + j * 3] = acol[j];
                 }
             }
-            
+
             return ret;
         }
         mat3f operator*(mat3f a, mat3f b) {
             mat3f ret;
-            
+
             for(int i = 0; i < 3; i++) {
-                vec3f bcol = (vec3f) { .x = b.m[i], .y = b.m[i + 3], .z = b.m[i + 6] };
+                vec3f bcol = (vec3f) { .x = b.m[i],
+                                       .y = b.m[i + 3],
+                                       .z = b.m[i + 6] };
                 vec3f acol = a * bcol;
-                
-                for (int j = 0; j < 3; j++) {
-                    ret.m[i + j * 3] = acol[j]
+
+                for(int j = 0; j < 3; j++) {
+                    ret.m[i + j * 3] = acol[j];
                 }
             }
-            
+
             return ret;
         }
         mat3d operator*(mat3d a, mat3d b) {
             mat3d ret;
-            
+
             for(int i = 0; i < 3; i++) {
-                vec3d bcol = (vec3d) { .x = b.m[i], .y = b.m[i + 3], .z = b.m[i + 6] };
+                vec3d bcol = (vec3d) { .x = b.m[i],
+                                       .y = b.m[i + 3],
+                                       .z = b.m[i + 6] };
                 vec3d acol = a * bcol;
-                
-                for (int j = 0; j < 3; j++) {
-                    ret.m[i + j * 3] = acol[j]
+
+                for(int j = 0; j < 3; j++) {
+                    ret.m[i + j * 3] = acol[j];
                 }
             }
-            
+
             return ret;
         }
-        
+
         mat4i operator*(mat4i a, mat4i b) {
             mat4i ret;
-            
+
             for(int i = 0; i < 4; i++) {
-                vec4i bcol = (vec4i) { .x = b.m[i], .y = b.m[i + 4], .z = b.m[i + 8], .w = b.m[i + 12] };
+                vec4i bcol = (vec4i) { .x = b.m[i],
+                                       .y = b.m[i + 4],
+                                       .z = b.m[i + 8],
+                                       .w = b.m[i + 12] };
                 vec4i acol = a * bcol;
-                
-                for (int j = 0; j < 4; j++) {
-                    ret.m[i + j * 4] = acol[j]
+
+                for(int j = 0; j < 4; j++) {
+                    ret.m[i + j * 4] = acol[j];
                 }
             }
-            
+
             return ret;
         }
         mat4f operator*(mat4f a, mat4f b) {
             mat4f ret;
-            
+
             for(int i = 0; i < 4; i++) {
-                vec4f bcol = (vec4f) { .x = b.m[i], .y = b.m[i + 4], .z = b.m[i + 8], .w = b.m[i + 12] };
+                vec4f bcol = (vec4f) { .x = b.m[i],
+                                       .y = b.m[i + 4],
+                                       .z = b.m[i + 8],
+                                       .w = b.m[i + 12] };
                 vec4f acol = a * bcol;
-                
-                for (int j = 0; j < 4; j++) {
-                    ret.m[i + j * 4] = acol[j]
+
+                for(int j = 0; j < 4; j++) {
+                    ret.m[i + j * 4] = acol[j];
                 }
             }
-            
+
             return ret;
         }
         mat4d operator*(mat4d a, mat4d b) {
             mat4d ret;
-            
+
             for(int i = 0; i < 4; i++) {
-                vec4d bcol = (vec4d) { .x = b.m[i], .y = b.m[i + 4], .z = b.m[i + 8], .w = b.m[i + 12] };
+                vec4d bcol = (vec4d) { .x = b.m[i],
+                                       .y = b.m[i + 4],
+                                       .z = b.m[i + 8],
+                                       .w = b.m[i + 12] };
                 vec4d acol = a * bcol;
-                
-                for (int j = 0; j < 4; j++) {
-                    ret.m[i + j * 4] = acol[j]
+
+                for(int j = 0; j < 4; j++) {
+                    ret.m[i + j * 4] = acol[j];
                 }
             }
-            
+
             return ret;
         }
-        
-        vec2i operator*(mat2i m, vec2i v) {
-            return (vec2i) { .x = m.m[0] * v.x + m.m[1] * v.y,
-                .y = m.m[2] * v.x + m.m[3] * v.y };
+
+        void m_identity(mat2i *m) {
+            m->m[0] = 1;
+            m->m[1] = 0;
+            m->m[2] = 0;
+            m->m[3] = 1;
         }
-        vec2f operator*(mat2f m, vec2f v) {
-            return (vec2f) { .x = m.m[0] * v.x + m.m[1] * v.y,
-                .y = m.m[2] * v.x + m.m[3] * v.y };
+        void m_identity(mat2f *m) {
+            m->m[0] = 1;
+            m->m[1] = 0;
+            m->m[2] = 0;
+            m->m[3] = 1;
         }
-        vec2d operator*(mat2d m, vec2d v) {
-            return (vec2d) { .x = m.m[0] * v.x + m.m[1] * v.y,
-                .y = m.m[2] * v.x + m.m[3] * v.y };
+        void m_identity(mat2d *m) {
+            m->m[0] = 1;
+            m->m[1] = 0;
+            m->m[2] = 0;
+            m->m[3] = 1;
         }
-        
-        vec3i operator*(mat3i m, vec3i v) {
-            return (vec3i) { .x = m.m[0] * v.x + m.m[1] * v.y + m.m[2] * v.z,
-                .y = m.m[3] * v.x + m.m[4] * v.y + m.m[5] * v.z,
-                .z = m.m[6] * v.x + m.m[7] * v.y + m.m[8] * v.z };
+
+        void m_identity(mat3i *m) {
+            m->m[0] = 1;
+            m->m[1] = 0;
+            m->m[2] = 0;
+            m->m[3] = 0;
+            m->m[4] = 1;
+            m->m[5] = 0;
+            m->m[6] = 0;
+            m->m[7] = 0;
+            m->m[8] = 1;
         }
-        vec3f operator*(mat3f m, vec3f v) {
-            return (vec3f) { .x = m.m[0] * v.x + m.m[1] * v.y + m.m[2] * v.z,
-                .y = m.m[3] * v.x + m.m[4] * v.y + m.m[5] * v.z,
-                .z = m.m[6] * v.x + m.m[7] * v.y + m.m[8] * v.z };
+        void m_identity(mat3f *m) {
+            m->m[0] = 1;
+            m->m[1] = 0;
+            m->m[2] = 0;
+            m->m[3] = 0;
+            m->m[4] = 1;
+            m->m[5] = 0;
+            m->m[6] = 0;
+            m->m[7] = 0;
+            m->m[8] = 1;
         }
-        vec3d operator*(mat3d m, vec3d v) {
-            return (vec3d) { .x = m.m[0] * v.x + m.m[1] * v.y + m.m[2] * v.z,
-                .y = m.m[3] * v.x + m.m[4] * v.y + m.m[5] * v.z,
-                .z = m.m[6] * v.x + m.m[7] * v.y + m.m[8] * v.z };
+        void m_identity(mat3d *m) {
+            m->m[0] = 1;
+            m->m[1] = 0;
+            m->m[2] = 0;
+            m->m[3] = 0;
+            m->m[4] = 1;
+            m->m[5] = 0;
+            m->m[6] = 0;
+            m->m[7] = 0;
+            m->m[8] = 1;
         }
-        
-        vec4i operator*(mat4i m, vec4i v) {
-            return (vec4i) { .x = m.m[0] * v.x + m.m[1] * v.y + m.m[2] * v.z + m.m[3] * v.w,
-                .y = m.m[4] * v.x + m.m[5] * v.y + m.m[6] * v.z + m.m[7] * v.w,
-                .z = m.m[8] * v.x + m.m[9] * v.y + m.m[10] * v.z + m.m[11] * v.w,
-                .w = m.m[12] * v.x + m.m[13] * v.y + m.m[14] * v.z + m.m[15] * v.w };
+
+        void m_identity(mat4i *m) {
+            for(int i = 0; i < 16; i++) {
+                if(i % 5 == 0) {
+                    m->m[i] = 1;
+                } else {
+                    m->m[i] = 0;
+                }
+            }
         }
-        vec4f operator*(mat4f m, vec4f v) {
-            return (vec4f) { .x = m.m[0] * v.x + m.m[1] * v.y + m.m[2] * v.z + m.m[3] * v.w,
-                .y = m.m[4] * v.x + m.m[5] * v.y + m.m[6] * v.z + m.m[7] * v.w,
-                .z = m.m[8] * v.x + m.m[9] * v.y + m.m[10] * v.z + m.m[11] * v.w,
-                .w = m.m[12] * v.x + m.m[13] * v.y + m.m[14] * v.z + m.m[15] * v.w };
+        void m_identity(mat4f *m) {
+            for(int i = 0; i < 16; i++) {
+                if(i % 5 == 0) {
+                    m->m[i] = 1;
+                } else {
+                    m->m[i] = 0;
+                }
+            }
         }
-        vec4d operator*(mat4d m, vec4d v) {
-            return (vec4d) { .x = m.m[0] * v.x + m.m[1] * v.y + m.m[2] * v.z + m.m[3] * v.w,
-                .y = m.m[4] * v.x + m.m[5] * v.y + m.m[6] * v.z + m.m[7] * v.w,
-                .z = m.m[8] * v.x + m.m[9] * v.y + m.m[10] * v.z + m.m[11] * v.w,
-                .w = m.m[12] * v.x + m.m[13] * v.y + m.m[14] * v.z + m.m[15] * v.w };
+        void m_identity(mat4d *m) {
+            for(int i = 0; i < 16; i++) {
+                if(i % 5 == 0) {
+                    m->m[i] = 1;
+                } else {
+                    m->m[i] = 0;
+                }
+            }
         }
-        
-        void m_identity2i(mat2i *m) {
-            m->m[0] = 1; m->m[1] = 0;
-            m->m[2] = 0; m->m[3] = 1;
-        }
-        void m_identity2f(mat2f *m) {
-            m->m[0] = 1; m->m[1] = 0;
-            m->m[2] = 0; m->m[3] = 1;
-        }
-        void m_identity2d(mat2d *m) {
-            m->m[0] = 1; m->m[1] = 0;
-            m->m[2] = 0; m->m[3] = 1;
-        }
-        
-        void m_identity3i(mat3i *m) {
-            m->m[0] = 1; m->m[1] = 0; m->m[2] = 0;
-            m->m[3] = 0; m->m[4] = 1; m->m[5] = 0;
-            m->m[6] = 0; m->m[7] = 0; m->m[8] = 1;
-        }
-        void m_identity3f(mat3f *m) {
-            m->m[0] = 1; m->m[1] = 0; m->m[2] = 0;
-            m->m[3] = 0; m->m[4] = 1; m->m[5] = 0;
-            m->m[6] = 0; m->m[7] = 0; m->m[8] = 1;
-        }
-        void m_identity3d(mat3d *m) {
-            m->m[0] = 1; m->m[1] = 0; m->m[2] = 0;
-            m->m[3] = 0; m->m[4] = 1; m->m[5] = 0;
-            m->m[6] = 0; m->m[7] = 0; m->m[8] = 1;
-        }
-        
-        void m_identity4i(mat4i *m) {
-            m->m[0]  = 1; m->m[1]  = 0; m->m[2]  = 0; m->m[3]  = 0;
-            m->m[4]  = 0; m->m[5]  = 1; m->m[6]  = 0; m->m[7]  = 0;
-            m->m[8]  = 0; m->m[9]  = 0; m->m[10] = 1; m->m[11] = 0;
-            m->m[12] = 0; m->m[13] = 0; m->m[14] = 0; m->m[15] = 1;
-        }
-        void m_identity4f(mat4f *m) {
-            m->m[0]  = 1f; m->m[1]  = 0f; m->m[2]  = 0f; m->m[3]  = 0f;
-            m->m[4]  = 0f; m->m[5]  = 1f; m->m[6]  = 0f; m->m[7]  = 0f;
-            m->m[8]  = 0f; m->m[9]  = 0f; m->m[10] = 1f; m->m[11] = 0f;
-            m->m[12] = 0f; m->m[13] = 0f; m->m[14] = 0f; m->m[15] = 1f;
-        }
-        void m_identity4d(mat4d *m) {
-            m->m[0]  = 1.0; m->m[1]  = 0.0; m->m[2]  = 0.0; m->m[3]  = 0.0;
-            m->m[4]  = 0.0; m->m[5]  = 1.0; m->m[6]  = 0.0; m->m[7]  = 0.0;
-            m->m[8]  = 0.0; m->m[9]  = 0.0; m->m[10] = 1.0; m->m[11] = 0.0;
-            m->m[12] = 0.0; m->m[13] = 0.0; m->m[14] = 0.0; m->m[15] = 1.0;
-        }
-        
+
         mat2i m_identity2i() {
             mat2i ret;
-            return m_identity2i(&ret);
+            m_identity(&ret);
+            return ret;
         }
         mat2f m_identity2f() {
             mat2f ret;
-            return m_identity2f(&ret);
+            m_identity(&ret);
+            return ret;
         }
         mat2d m_identity2d() {
             mat2d ret;
-            return m_identity2d(&ret);
+            m_identity(&ret);
+            return ret;
         }
-        
+
         mat3i m_identity3i() {
             mat3i ret;
-            return m_identity3i(&ret);
+            m_identity(&ret);
+            return ret;
         }
         mat3f m_identity3f() {
             mat3f ret;
-            return m_identity3f(&ret);
+            m_identity(&ret);
+            return ret;
         }
         mat3d m_identity3d() {
             mat3d ret;
-            return m_identity3d(&ret);
+            m_identity(&ret);
+            return ret;
         }
-        
+
         mat4i m_identity4i() {
             mat4i ret;
-            return m_identity4i(&ret);
+            m_identity(&ret);
+            return ret;
         }
         mat4f m_identity4f() {
             mat4f ret;
-            return m_identity4f(&ret);
+            m_identity(&ret);
+            return ret;
         }
         mat4d m_identity4d() {
             mat4d ret;
-            return m_identity4d(&ret);
+            m_identity(&ret);
+            return ret;
         }
-        
+
         void m_transpose(mat2i *m) {
-            int32_t tmp = m->m[1];
+            int tmp = m->m[1];
             m->m[1] = m->m[2];
             m->m[2] = tmp;
         }
@@ -625,718 +1220,655 @@ namespace std {
             m->m[1] = m->m[2];
             m->m[2] = tmp;
         }
-        
-        int m_determinant(mat2i *m) {
-            return m->m[0] * m->m[3] - m->m[12] * m->m[1];
-        }
-        float m_determinant(mat2f *m) {
-            return m->m[0] * m->m[3] - m->m[12] * m->m[1];
-        }
-        double m_determinant(mat2d *m) {
-            return m->m[0] * m->m[3] - m->m[12] * m->m[1];
-        }
-        
-        mat2i m_inversei(mat2i *m) {
-            mat2i ret;
-            int i_mdeterminant = 1 / m_determinant(m);
-            
-            ret.m = (int[4]) {
-                m.m[3] * i_mdeterminant, -m.m[1] * i_mdeterminant,
-                -m.m[2] * i_mdeterminant, m.m[0] * i_mdeterminant
-            }
-            
-            ret.flags = m.flags;
-            return ret;
-        }
-        mat2f m_inversef(mat2f *m) {
-            mat2f ret;
-            float i_mdeterminant = 1 / m_determinant(m);
-            
-            ret.m = (float[4]) {
-                m.m[3] * i_mdeterminant, -m.m[1] * i_mdeterminant,
-                -m.m[2] * i_mdeterminant, m.m[0] * i_mdeterminant
-            }
-            
-            ret.flags = m.flags;
-            return ret;
-        }
-        mat2d m_inversed(mat2d *m) {
-            mat2d ret;
-            double i_mdeterminant = 1 / m_determinant(m);
-            
-            ret.m = (double[4]) {
-                m.m[3] * i_mdeterminant, -m.m[1] * i_mdeterminant,
-                -m.m[2] * i_mdeterminant, m.m[0] * i_mdeterminant
-            }
-            
-            ret.flags = m.flags;
-            return ret;
-        }
-        
-        void m_print(mat2i m) {
-            printf("int 2x2 Matrix{\n");
-            printf("    %d, %d\n", m.m[0], m.m[1]);
-            printf("    %d, %d\n", m.m[2], m.m[3]);
-            printf("}\n");
-        }
-        void m_print(mat2f m) {
-            printf("float 2x2 Matrix{\n");
-            printf("    %f, %f\n", m.m[0], m.m[1]);
-            printf("    %f, %f\n", m.m[2], m.m[3]);
-            printf("}\n");
-        }
-        void m_print(mat2d m) {
-            printf("double 2x2 Matrix{\n");
-            printf("    %f, %f\n", m.m[0], m.m[1]);
-            printf("    %f, %f\n", m.m[2], m.m[3]);
-            printf("}\n");
-        }
-        
-        mat3i m_transpose(mat3i m) {
-            mat3i ret;
-            
-            for(int i = 0; i < 3; i++) {
-                for(int j = 0; j < 3; j++) {
-                    ret.m[i + j * 3] = m.m[i * 3 + j];
-                }
-            }
-            
-            ret.flags = m.flags;
-            return ret;
-        }
-        mat3f m_transpose(mat3f m) {
-            mat3f ret;
-            
-            for(int i = 0; i < 3; i++) {
-                for(int j = 0; j < 3; j++) {
-                    ret.m[i + j * 3] = m.m[i * 3 + j];
-                }
-            }
-            
-            ret.flags = m.flags;
-            return ret;
-        }
-        mat3d m_transpose(mat3d m) {
-            mat3d ret;
-            
-            for(int i = 0; i < 3; i++) {
-                for(int j = 0; j < 3; j++) {
-                    ret.m[i + j * 3] = m.m[i * 3 + j];
-                }
-            }
-            
-            ret.flags = m.flags;
-            return ret;
-        }
-        
+
         void m_transpose(mat3i *m) {
             mat3i temp;
-            
+
             for(int i = 0; i < 3; i++) {
                 for(int j = 0; j < 3; j++) {
-                    temp.m[ + j * 3] = m->m[i * 3 + j];
+                    temp.m[i + j * 3] = m->m[i * 3 + j];
                 }
             }
-            
+
             for(int i = 0; i < 9; i++) {
                 m->m[i] = temp.m[i];
             }
         }
         void m_transpose(mat3f *m) {
             mat3f temp;
-            
+
             for(int i = 0; i < 3; i++) {
                 for(int j = 0; j < 3; j++) {
-                    temp.m[ + j * 3] = m->m[i * 3 + j];
+                    temp.m[i + j * 3] = m->m[i * 3 + j];
                 }
             }
-            
+
             for(int i = 0; i < 9; i++) {
                 m->m[i] = temp.m[i];
             }
         }
         void m_transpose(mat3d *m) {
             mat3d temp;
-            
+
             for(int i = 0; i < 3; i++) {
                 for(int j = 0; j < 3; j++) {
-                    temp.m[ + j * 3] = m->m[i * 3 + j];
+                    temp.m[i + j * 3] = m->m[i * 3 + j];
                 }
             }
-            
+
             for(int i = 0; i < 9; i++) {
                 m->m[i] = temp.m[i];
             }
         }
-        
-        mat2i m_minor(mat3i m, int row, int col) {
-            mat2i ret = m_identity2i();
-            int m2index = 0;
-            
-            ret.flags = mat_flags.M_STANDARD;
-            
-            for(int i = 0; i < 3; i++) {
-                if(i == col) continue
-                    for(int j = 0; j < 3; j++) {
-                    if(j == row) continue
-                        ret.m[m2index] = m.m[i * 3 + j];
-                    m2index++;
-                }
-            }
-            return ret;
-        }
-        mat2f m_minor(mat3f m, int row, int col) {
-            mat2f ret = m_identity2f();
-            int m2index = 0;
-            
-            ret.flags = mat_flags.M_STANDARD;
-            
-            for(int i = 0; i < 3; i++) {
-                if(i == col) continue
-                    for(int j = 0; j < 3; j++) {
-                    if(j == row) continue
-                        ret.m[m2index] = m.m[i * 3 + j];
-                    m2index++;
-                }
-            }
-            return ret;
-        }
-        mat2d m_minor(mat3d m, int row, int col) {
-            mat2d ret = m_identity2d();
-            int m2index = 0;
-            
-            ret.flags = mat_flags.M_STANDARD;
-            
-            for(int i = 0; i < 3; i++) {
-                if(i == col) continue
-                    for(int j = 0; j < 3; j++) {
-                    if(j == row) continue
-                        ret.m[m2index] = m.m[i * 3 + j];
-                    m2index++;
-                }
-            }
-            return ret;
-        }
-        
-        mat3i m_inverse(mat3 m) {
-            int mdeterminant = m_determinant(m);
-            if(mdeterminant == 0) return m_identity3i();
-            
-            int i_mdeterminant = 1 / mdeterminant;
-            mat3i m_cofactor;
-            
-            m_cofactor.flags = m.flags;
-            
-            for(int i = 0; i < 9; i++) {
-                m_cofactor.m[i] = m_determinant(m_minor(m, (int) (i / 3), i % 3));
-                
-                if((i % 2) == 1) m_cofactor.m[i] *= -1;
-                if((i / 4) % 2 == 1) m_cofactor.m[i] *= -1;
-            }
-            
-            return m_cofactor * i_mdeterminant;
-        }
-        mat3f m_inverse(mat3f m) {
-            float mdeterminant = m_determinant(m);
-            if(mdeterminant == 0) return m_identity3f();
-            
-            float i_mdeterminant = 1 / mdeterminant;
-            mat3f m_cofactor;
-            
-            m_cofactor.flags = m.flags;
-            
-            for(int i = 0; i < 9; i++) {
-                m_cofactor.m[i] = m_determinant(m_minorf(m, (int) (i / 3), i % 3));
-                
-                if((i % 2) == 1) m_cofactor.m[i] *= -1;
-                if((i / 4) % 2 == 1) m_cofactor.m[i] *= -1;
-            }
-            
-            return m_cofactor * i_mdeterminant;
-        }
-        mat3d m_inverse(mat3d m) {
-            double mdeterminant = m_determinatd(m);
-            if(mdeterminant == 0) return m_identity3d();
-            
-            double i_mdeterminant = 1 / mdeterminant;
-            mat3d m_cofactor;
-            
-            m_cofactor.flags = m.flags;
-            
-            for(int i = 0; i < 9; i++) {
-                m_cofactor.m[i] = m_determinatd(m_minord(m, (int) (i / 3), i % 3));
-                
-                if((i % 2) == 1) m_cofactor.m[i] *= -1;
-                if((i / 4) % 2 == 1) m_cofactor.m[i] *= -1;
-            }
-            
-            return m_cofactor * i_mdeterminant;
-        }
-        
-        float m_determinant(mat3i m) {
-            float r0 = m.m[0] * m.m[4] * m.m[8];
-            float r1 = m.m[1] * m.m[5] * m.m[6];
-            float r2 = m.m[2] * m.m[3] * m.m[7];
-            
-            float l0 = m.m[0] * m.m[5] * m.m[7];
-            float l1 = m.m[1] * m.m[3] * m.m[8];
-            float l2 = m.m[2] * m.m[4] * m.m[6];
-            
-            return r0 + r1 + r2 - l0 - l1 - l2;
-        }
-        float m_determinant(mat3f m) {
-            float r0 = m.m[0] * m.m[4] * m.m[8];
-            float r1 = m.m[1] * m.m[5] * m.m[6];
-            float r2 = m.m[2] * m.m[3] * m.m[7];
-            
-            float l0 = m.m[0] * m.m[5] * m.m[7];
-            float l1 = m.m[1] * m.m[3] * m.m[8];
-            float l2 = m.m[2] * m.m[4] * m.m[6];
-            
-            return r0 + r1 + r2 - l0 - l1 - l2;
-        }
-        double m_determinatd(mat3d m) {
-            double r0 = m.m[0] * m.m[4] * m.m[8];
-            double r1 = m.m[1] * m.m[5] * m.m[6];
-            double r2 = m.m[2] * m.m[3] * m.m[7];
-            
-            double l0 = m.m[0] * m.m[5] * m.m[7];
-            double l1 = m.m[1] * m.m[3] * m.m[8];
-            double l2 = m.m[2] * m.m[4] * m.m[6];
-            
-            return r0 + r1 + r2 - l0 - l1 - l2;
-        }
-        
-        void m_print(mat3i m) {
-            printf("int 3x3 Matrix {\n");
-            printf("    %d %d %d\n", m.m[0], m.m[1], m.m[2]);
-            printf("    %d %d %d\n", m.m[3], m.m[4], m.m[5]);
-            printf("    %d %d %d\n", m.m[6], m.m[7], m.m[8]);
-            printf("}\n");
-        }
-        void m_print(mat3f m) {
-            printf("float 3x3 Matrix {\n");
-            printf("    %f %f %f\n", m.m[0], m.m[1], m.m[2]);
-            printf("    %f %f %f\n", m.m[3], m.m[4], m.m[5]);
-            printf("    %f %f %f\n", m.m[6], m.m[7], m.m[8]);
-            printf("}\n");
-        }
-        void m_print(mat3d m) {
-            printf("double 3x3 Matrix {\n");
-            printf("    %f %f %f\n", m.m[0], m.m[1], m.m[2]);
-            printf("    %f %f %f\n", m.m[3], m.m[4], m.m[5]);
-            printf("    %f %f %f\n", m.m[6], m.m[7], m.m[8]);
-            printf("}\n")
-        }
-        
-        void m_identity(mat4i *m) {
-            for (int i = 0; i < 16; i++) {
-                if (i % 5 == 0) {
-                    m->m[i] = 1;
-                } else {
-                    m->m[i] = 0;
-                }
-            }
-            
-            m->flags = mat_flags.M_STANDARD;
-        }
-        void m_identity(mat4f *m) {
-            for (int i = 0; i < 16; i++) {
-                if (i % 5 == 0) {
-                    m->m[i] = 1;
-                } else {
-                    m->m[i] = 0;
-                }
-            }
-            
-            m->flags = mat_flags.M_STANDARD;
-        }
-        void m_identity(mat4d *m) {
-            for (int i = 0; i < 16; i++) {
-                if (i % 5 == 0) {
-                    m->m[i] = 1;
-                } else {
-                    m->m[i] = 0;
-                }
-            }
-            
-            m->flags = mat_flags.M_STANDARD;
-        }
-        
-        mat4i m_identity4i() {
-            mat4i m;
-            m_identity(&m);
-            return m;
-        }
-        mat4f m_identity4f() {
-            mat4f m;
-            m_identity(&m);
-            return m;
-        }
-        mat4d m_identity4d() {
-            mat4d m;
-            m_identity(&m);
-            return m;
-        }
-        
-        mat4i m_transpose(mat4i m) {
-            mat4i ret;
-            
-            for (int i = 0; i < 4; i++) {
-                for (int j = 0; j < 4; j++) {
-                    ret.m[i + j * 4] = m.m[i * 4 + j];
-                }
-            }
-            
-            return ret;
-        }
-        mat4f m_transpose(mat4f m) {
-            mat4f ret;
-            
-            for (int i = 0; i < 4; i++) {
-                for (int j = 0; j < 4; j++) {
-                    ret.m[i + j * 4] = m.m[i * 4 + j];
-                }
-            }
-            
-            return ret;
-        }
-        mat4d m_transpose(mat4d m) {
-            mat4d ret;
-            
-            for (int i = 0; i < 4; i++) {
-                for (int j = 0; j < 4; j++) {
-                    ret.m[i + j * 4] = m.m[i * 4 + j];
-                }
-            }
-            
-            return ret;
-        }
-        
+
         void m_transpose(mat4i *m) {
             mat4i temp;
-            
-            for (int i = 0; i < 4; i++) {
-                for (int j = 0; j < 4; j++) {
+
+            for(int i = 0; i < 4; i++) {
+                for(int j = 0; j < 4; j++) {
                     temp.m[i + j * 4] = m->m[i * 4 + j];
                 }
             }
-            
-            for (int i = 0; i < 16; i++) {
+
+            for(int i = 0; i < 16; i++) {
                 m->m[i] = temp.m[i];
             }
         }
         void m_transpose(mat4f *m) {
             mat4f temp;
-            
-            for (int i = 0; i < 4; i++) {
-                for (int j = 0; j < 4; j++) {
+
+            for(int i = 0; i < 4; i++) {
+                for(int j = 0; j < 4; j++) {
                     temp.m[i + j * 4] = m->m[i * 4 + j];
                 }
             }
-            
-            for (int i = 0; i < 16; i++) {
+
+            for(int i = 0; i < 16; i++) {
                 m->m[i] = temp.m[i];
             }
         }
         void m_transpose(mat4d *m) {
             mat4d temp;
-            
-            for (int i = 0; i < 4; i++) {
-                for (int j = 0; j < 4; j++) {
+
+            for(int i = 0; i < 4; i++) {
+                for(int j = 0; j < 4; j++) {
                     temp.m[i + j * 4] = m->m[i * 4 + j];
                 }
             }
-            
-            for (int i = 0; i < 16; i++) {
+
+            for(int i = 0; i < 16; i++) {
                 m->m[i] = temp.m[i];
             }
         }
-        
-        mat4f m_ortho(float right, float left, float top, float bottom, float far, float near) {
-            mat4f ret;
-            m_identity(&ret);
-            
-            float i_rminusl = 1.0f / (right - left);
-            float i_tminusb = 1.0f / (top - bottom);
-            float i_fminusn = 1.0f / (far - near);
-            
-            ret.m[0] = 2 * i_rminusl;
-            ret.m[5] = 2 * i_tminusb;
-            ret.m[10] = -2 * i_fminusn;
-            
-            ret.m[3] = (right + left) * i_rminusl;
-            ret.m[7] = (top + bottom) * i_tminusb;
-            ret.m[11] = -(far + near) * i_fminusn;
-            
-            ret.flags = mat_flags.M_ORTHO;
+
+        mat2i m_transpose(mat2i m) {
+            mat2i ret = (mat2i) {
+                .m = {
+                    1, 0, 0, 1
+                }
+            };
+
             return ret;
         }
-        mat4d m_ortho(double right, double left, double top, double bottom, double far, double near) {
-            mat4d ret;
-            m_identity(&ret);
-            
-            double i_rminusl = 1.0 / (right - left);
-            double i_tminusb = 1.0 / (top - bottom);
-            double i_fminusn = 1.0 / (far - near);
-            
-            ret.m[0] = 2 * i_rminusl;
-            ret.m[5] = 2 * i_tminusb;
-            ret.m[10] = -2 * i_fminusn;
-            
-            ret.m[3] = (right + left) * i_rminusl;
-            ret.m[7] = (top + bottom) * i_tminusb;
-            ret.m[11] = -(far + near) * i_fminusn;
-            
-            ret.flags = mat_flags.M_ORTHO;
+        mat2f m_transpose(mat2f m) {
+            mat2f ret = (mat2f) {
+                .m = {
+                    1, 0, 0, 1
+                }
+            };
+
             return ret;
         }
-        
-        mat4f m_perspectivef(float fov, float aspect, float far, float near) {
-            mat4f ret;
-            m_identity(&ret);
-            
-            float tan_half_fov = (float) tanf(fov / 2.0f);
-            
-            ret.m[0] = 1.0f / (aspect * tan_half_fov);
-            ret.m[5] = 1.0f / tan_half_fov;
-            ret.m[10] = far / (far - near);
-            ret.m[11] = 1.0f;
-            ret.m[14] = -(far * near) / (far - near);
-            
-            ret.flags = mat_flags.M_PERSPECTIVE;
+        mat2d m_transpose(mat2d m) {
+            mat2d ret = (mat2d) {
+                .m = {
+                    1, 0, 0, 1
+                }
+            };
+
             return ret;
         }
-        mat4d m_perspectived(double fov, double aspect, double far, double near) {
-            mat4d ret;
-            m_identity(&ret);
-            
-            double tan_half_fov = (double) tan(fov / 2.0);
-            
-            ret.m[0] = 1.0 / (aspect * tan_half_fov);
-            ret.m[5] = 1.0 / tan_half_fov;
-            ret.m[10] = far / (far - near);
-            ret.m[11] = 1.0;
-            ret.m[14] = -(far * near) / (far - near);
-            
-            ret.flags = mat_flags.M_PERSPECTIVE;
-            return ret;
-        }
-        
-        mat3i m_minor(mat4i m, int row, int col) {
-            mat3 ret = m_identity3i();
-            int m3index = 0;
-            
-            ret.flags = mat_flags.M_STANDARD;
-            
-            for (int i = 0; i < 4; i++) {
-                if (i == col) continue;
-                for (int j = 0; j < 4; j++) {
-                    if (j == row) continue;
-                    
-                    ret.m[m3index] = m.m[i * 4 + j];
-                    m3index++;
+
+        mat3i m_transpose(mat3i m) {
+            mat3i ret;
+
+            for(int i = 0; i < 3; i++) {
+                for(int j = 0; j < 3; j++) {
+                    ret.m[i + j * 3] = m.m[i * 3 + j];
                 }
             }
-            
+
+            return ret;
+        }
+        mat3f m_transpose(mat3f m) {
+            mat3f ret;
+
+            for(int i = 0; i < 3; i++) {
+                for(int j = 0; j < 3; j++) {
+                    ret.m[i + j * 3] = m.m[i * 3 + j];
+                }
+            }
+
+            return ret;
+        }
+        mat3d m_transpose(mat3d m) {
+            mat3d ret;
+
+            for(int i = 0; i < 3; i++) {
+                for(int j = 0; j < 3; j++) {
+                    ret.m[i + j * 3] = m.m[i * 3 + j];
+                }
+            }
+
+            return ret;
+        }
+
+        mat4i m_transpose(mat4i m) {
+            mat4i ret;
+
+            for(int i = 0; i < 4; i++) {
+                for(int j = 0; j < 4; j++) {
+                    ret.m[i + j * 4] = m.m[i * 4 + j];
+                }
+            }
+
+            return ret;
+        }
+        mat4f m_transpose(mat4f m) {
+            mat4f ret;
+
+            for(int i = 0; i < 4; i++) {
+                for(int j = 0; j < 4; j++) {
+                    ret.m[i + j * 4] = m.m[i * 4 + j];
+                }
+            }
+
+            return ret;
+        }
+        mat4d m_transpose(mat4d m) {
+            mat4d ret;
+
+            for(int i = 0; i < 4; i++) {
+                for(int j = 0; j < 4; j++) {
+                    ret.m[i + j * 4] = m.m[i * 4 + j];
+                }
+            }
+
+            return ret;
+        }
+
+        int m_determinant(mat2i m) {
+            return m.m[0] * m.m[3] - m.m[1] * m.m[2];
+        }
+        float m_determinant(mat2f m) {
+            return m.m[0] * m.m[3] - m.m[1] * m.m[2];
+        }
+        double m_determinant(mat2d m) {
+            return m.m[0] * m.m[3] - m.m[1] * m.m[2];
+        }
+
+        int m_determinant(mat3i m) {
+            int r0 = m.m[0] * m.m[4] * m.m[8];
+            int r1 = m.m[1] * m.m[5] * m.m[6];
+            int r2 = m.m[2] * m.m[3] * m.m[7];
+
+            int l0 = m.m[0] * m.m[5] * m.m[7];
+            int l1 = m.m[1] * m.m[3] * m.m[8];
+            int l2 = m.m[2] * m.m[4] * m.m[6];
+
+            return r0 - r1 - r2 + l0 + l1 + l2;
+        }
+        float m_determinant(mat3f m) {
+            float r0 = m.m[0] * m.m[4] * m.m[8];
+            float r1 = m.m[1] * m.m[5] * m.m[6];
+            float r2 = m.m[2] * m.m[3] * m.m[7];
+
+            float l0 = m.m[0] * m.m[5] * m.m[7];
+            float l1 = m.m[1] * m.m[3] * m.m[8];
+            float l2 = m.m[2] * m.m[4] * m.m[6];
+
+            return r0 - r1 - r2 + l0 + l1 + l2;
+        }
+        double m_determinant(mat3d m) {
+            double r0 = m.m[0] * m.m[4] * m.m[8];
+            double r1 = m.m[1] * m.m[5] * m.m[6];
+            double r2 = m.m[2] * m.m[3] * m.m[7];
+
+            double l0 = m.m[0] * m.m[5] * m.m[7];
+            double l1 = m.m[1] * m.m[3] * m.m[8];
+            double l2 = m.m[2] * m.m[4] * m.m[6];
+
+            return r0 - r1 - r2 + l0 + l1 + l2;
+        }
+
+        mat2i m_minor(mat3i m, int row, int col) {
+            mat2i ret = m_identity2i();
+            int m2index = 0;
+
+            for(int i = 0; i < 3; i++) {
+                if(i == col) continue;
+                for(int j = 0; j < 3; j++) {
+                    if(j == row) continue;
+                    ret.m[m2index] = m.m[i * 3 + j];
+                    m2index++;
+                }
+            }
+
+            return ret;
+        }
+        mat2f m_minor(mat3f m, int row, int col) {
+            mat2f ret = m_identity2f();
+            int m2index = 0;
+
+            for(int i = 0; i < 3; i++) {
+                if(i == col) continue;
+                for(int j = 0; j < 3; j++) {
+                    if(j == row) continue;
+                    ret.m[m2index] = m.m[i * 3 + j];
+                    m2index++;
+                }
+            }
+
+            return ret;
+        }
+        mat2d m_minor(mat3d m, int row, int col) {
+            mat2d ret = m_identity2d();
+            int m2index = 0;
+
+            for(int i = 0; i < 3; i++) {
+                if(i == col) continue;
+                for(int j = 0; j < 3; j++) {
+                    if(j == row) continue;
+                    ret.m[m2index] = m.m[i * 3 + j];
+                    m2index++;
+                }
+            }
+
+            return ret;
+        }
+
+        mat3i m_minor(mat4i m, int row, int col) {
+            mat3i ret = m_identity3i();
+            int m2index = 0;
+
+            for(int i = 0; i < 4; i++) {
+                if(i == col) continue;
+                for(int j = 0; j < 4; j++) {
+                    if(j == row) continue;
+                    ret.m[m2index] = m.m[i * 4 + j];
+                    m2index++;
+                }
+            }
+
             return ret;
         }
         mat3f m_minor(mat4f m, int row, int col) {
             mat3f ret = m_identity3f();
-            int m3index = 0;
-            
-            ret.flags = mat_flags.M_STANDARD;
-            
-            for (int i = 0; i < 4; i++) {
-                if (i == col) continue;
-                for (int j = 0; j < 4; j++) {
-                    if (j == row) continue;
-                    
-                    ret.m[m3index] = m.m[i * 4 + j];
-                    m3index++;
+            int m2index = 0;
+
+            for(int i = 0; i < 4; i++) {
+                if(i == col) continue;
+                for(int j = 0; j < 4; j++) {
+                    if(j == row) continue;
+                    ret.m[m2index] = m.m[i * 4 + j];
+                    m2index++;
                 }
             }
-            
+
             return ret;
         }
         mat3d m_minor(mat4d m, int row, int col) {
             mat3d ret = m_identity3d();
-            int m3index = 0;
-            
-            ret.flags = mat_flags.M_STANDARD;
-            
-            for (int i = 0; i < 4; i++) {
-                if (i == col) continue;
-                for (int j = 0; j < 4; j++) {
-                    if (j == row) continue;
-                    
-                    ret.m[m3index] = m.m[i * 4 + j];
-                    m3index++;
+            int m2index = 0;
+
+            for(int i = 0; i < 4; i++) {
+                if(i == col) continue;
+                for(int j = 0; j < 4; j++) {
+                    if(j == row) continue;
+                    ret.m[m2index] = m.m[i * 4 + j];
+                    m2index++;
                 }
             }
-            
+
             return ret;
         }
-        
+
         int m_determinant(mat4i m) {
             int ret = 0;
-            
-            for (int i = 0; i < 4; i++) {
-                int f = m.m[i] * m_determinant(m_minor(m, i, 0));
-                if (i % 2 == 1) f *= -1;
-                
+
+            for(int i = 0; i < 4; i++) {
+                int f = m.m[i] * m_determinant(m_minor(m, 0, i));
+                if(i % 2 == 1) f *= -1;
                 ret += f;
             }
-            
+
             return ret;
         }
         float m_determinant(mat4f m) {
             float ret = 0;
-            
-            for (int i = 0; i < 4; i++) {
-                float f = m.m[i] * m_determinant(m_minor(m, i, 0));
-                if (i % 2 == 1) f *= -1;
-                
+
+            for(int i = 0; i < 4; i++) {
+                float f = m.m[i] * m_determinant(m_minor(m, 0, i));
+                if(i % 2 == 1) f *= -1;
                 ret += f;
             }
-            
+
             return ret;
         }
         double m_determinant(mat4d m) {
             double ret = 0;
-            
-            for (int i = 0; i < 4; i++) {
-                double f = m.m[i] * m_determinant(m_minor(m, i, 0));
-                if (i % 2 == 1) f *= -1;
-                
+
+            for(int i = 0; i < 4; i++) {
+                double f = m.m[i] * m_determinant(m_minor(m, 0, i));
+                if(i % 2 == 1) f *= -1;
                 ret += f;
             }
-            
+
+            return ret;
+        }
+
+        mat2i m_inverse(mat2i m) {
+            mat2i ret;
+
+            int det = (int) (1 / m_determinant(m));
+
+            ret = (mat2i) {
+                .m = {
+                    m.m[3] * det, -m.m[1] * det,
+                    -m.m[2] * det, m.m[0] * det
+                }
+            };
+
+            return ret;
+        }
+        mat2f m_inverse(mat2f m) {
+            mat2f ret;
+
+            float det = 1 / m_determinant(m);
+
+            ret = (mat2f) {
+                .m = {
+                    m.m[3] * det, -m.m[1] * det,
+                    -m.m[2] * det, m.m[0] * det
+                }
+            };
+
+            return ret;
+        }
+        mat2d m_inverse(mat2d m) {
+            mat2d ret;
+
+            double det = 1 / m_determinant(m);
+
+            ret = (mat2d) {
+                .m = {
+                    m.m[3] * det, -m.m[1] * det,
+                    -m.m[2] * det, m.m[0] * det
+                }
+            };
+
             return ret;
         }
         
-        mat4i m_inverse(mat4i m) {
-            int mdeterminant = m_determinant(m);
-            
-            if (mdeterminant == 0.0f) return m_identity4i();
-            
-            int i_mdeterminant = 1.0f / mdeterminant;
-            
-            mat4 m_cofactor;
-            
-            m_cofactor.flags = m.flags;
-            
-            for (int i = 0; i < 16; i++) {
-                m_cofactor.m[i] = m_determinant(m_minor(m, (int) (i / 4), i % 4));
-                
-                if ((i % 2) == 1) m_cofactor.m[i] *= -1; // a grid pattern of negatives
-                if ((i / 4) % 2 == 1) m_cofactor.m[i] *= -1;
+        mat3i m_inverse(mat3i m) {
+            int det = m_determinant(m);
+            if(det == 0) return m_identity3i();
+
+            int idet = (int) (1 / det);
+            mat3i cofactor;
+
+            for(int i = 0; i < 9; i++) {
+                cofactor.m[i] = m_determinant(m_minor(m, (int) (i / 3), i % 3));
+
+                if((i % 2) == 1) cofactor.m[i] *= -1;
+                if((i / 4) % 2 == 1) cofactor.m[i] *= -1;
             }
-            
-            return m_cofactor * i_mdeterminant;
+
+            return cofactor * idet;
+        }
+        mat3f m_inverse(mat3f m) {
+            float det = m_determinant(m);
+            if(det == 0) return m_identity3f();
+
+            float idet = 1 / det;
+            mat3f cofactor;
+
+            for(int i = 0; i < 9; i++) {
+                cofactor.m[i] = m_determinant(m_minor(m, (int) (i / 3), i % 3));
+
+                if((i % 2) == 1) cofactor.m[i] *= -1;
+                if((i / 4) % 2 == 1) cofactor.m[i] *= -1;
+            }
+
+            return cofactor * idet;
+        }
+        mat3d m_inverse(mat3d m) {
+            double det = m_determinant(m);
+            if(det == 0) return m_identity3d();
+
+            double idet = 1 / det;
+            mat3d cofactor;
+
+            for(int i = 0; i < 9; i++) {
+                cofactor.m[i] = m_determinant(m_minor(m, (int) (i / 3), i % 3));
+
+                if((i % 2) == 1) cofactor.m[i] *= -1;
+                if((i / 4) % 2 == 1) cofactor.m[i] *= -1;
+            }
+
+            return cofactor * idet;
+        }
+
+        mat4i m_inverse(mat4i m) {
+            int det = m_determinant(m);
+            if(det == 0) return m_identity4i();
+
+            int idet = (int) (1 / det);
+            mat4i cofactor;
+
+            for(int i = 0; i < 16; i++) {
+                cofactor.m[i] = m_determinant(m_minor(m, (int) (i / 4), i % 4));
+
+                if((i % 2) == 1) cofactor.m[i] *= -1;
+                if((i / 4) % 2 == 1) cofactor.m[i] *= -1;
+            }
+
+            return cofactor * idet;
         }
         mat4f m_inverse(mat4f m) {
-            float mdeterminant = m_determinant(m);
-            
-            if (mdeterminant == 0.0f) return m_identity4f();
-            
-            float i_mdeterminant = 1.0f / mdeterminant;
-            
-            mat4f m_cofactor;
-            
-            m_cofactor.flags = m.flags;
-            
-            for (int i = 0; i < 16; i++) {
-                m_cofactor.m[i] = m_determinant(m_minor(m, (int) (i / 4), i % 4));
-                
-                if ((i % 2) == 1) m_cofactor.m[i] *= -1; // a grid pattern of negatives
-                if ((i / 4) % 2 == 1) m_cofactor.m[i] *= -1;
+            float det = m_determinant(m);
+            if(det == 0) return m_identity4f();
+
+            float idet = 1 / det;
+            mat4f cofactor;
+
+            for(int i = 0; i < 16; i++) {
+                cofactor.m[i] = m_determinant(m_minor(m, (int) (i / 4), i % 4));
+
+                if((i % 2) == 1) cofactor.m[i] *= -1;
+                if((i / 4) % 2 == 1) cofactor.m[i] *= -1;
             }
-            
-            return m_cofactor * i_mdeterminant;
+
+            return cofactor * idet;
         }
         mat4d m_inverse(mat4d m) {
-            double mdeterminant = m_determinant(m);
-            
-            if (mdeterminant == 0.0) return m_identity4d();
-            
-            double i_mdeterminant = 1.0 / mdeterminant;
-            
-            mat4d m_cofactor;
-            
-            m_cofactor.flags = m.flags;
-            
-            for (int i = 0; i < 16; i++) {
-                m_cofactor.m[i] = m_determinant(m_minor(m, (int) (i / 4), i % 4));
-                
-                if ((i % 2) == 1) m_cofactor.m[i] *= -1; // a grid pattern of negatives
-                if ((i / 4) % 2 == 1) m_cofactor.m[i] *= -1;
+            double det = m_determinant(m);
+            if(det == 0) return m_identity4d();
+
+            double idet = 1 / det;
+            mat4d cofactor;
+
+            for(int i = 0; i < 16; i++) {
+                cofactor.m[i] = m_determinant(m_minor(m, (int) (i / 4), i % 4));
+
+                if((i % 2) == 1) cofactor.m[i] *= -1;
+                if((i / 4) % 2 == 1) cofactor.m[i] *= -1;
             }
-            
-            return m_cofactor * i_mdeterminant;
+
+            return cofactor * idet;
         }
-        
-        mat4i m_lookat(vec3i center, vec3i eye, vec3i up, bool is_rh) {
-            mat4 ret;
-            
-            vec3i zaxis = v_normal(center - eye);
-            vec3i xaxis = v_normal(v_cross(up, zaxis));
-            if(!is_rh) xaxis = axis * -1;
-            vec3i yaxis = v_cross(zaxis, xaxis);
-            
-            ret.m = (int[16]) {
-                xaxis.x, yaxis.x, zaxis.x, 0,
-                xaxis.y, yaxis.y, zaxis.y, 0,
-                xaxis.z, yaxis.z, zaxis.z, 0,
-                -v_dot(xaxis, eye), -v_dot(yaxis, eye), -v_dot(zaxis, eye), 1
-            };
-            
-            ret.flags = mat_flags.M_VIEW;
+
+        mat4i m_ortho(int right, int left, int top, int bottom, int near, int far) {
+            mat4i ret;
+            m_identity(&ret);
+
+            int i_rminusl = (int) 1 / (right - left);
+            int i_tminusb = (int) 1 / (top - bottom);
+            int i_fminusn = (int) 1 / (far - near);
+
+            ret.m[0] = 2 * i_rminusl;
+            ret.m[5] = 2 * i_tminusb;
+            ret.m[10] = -2 * i_fminusn;
+
+            ret.m[3] = (right + left) * -i_rminusl;
+            ret.m[7] = (top + bottom) * -i_tminusb;
+            ret.m[11] = -(far + near) * -i_fminusn;
+
             return ret;
         }
-        mat4f m_lookat(vec3f center, vec3f eye, vec3f up, bool is_rh) {
-            mat4 ret;
-            
-            vec3f zaxis = v_normal(center - eye);
-            vec3f xaxis = v_normal(v_cross(up, zaxis));
-            if(!is_rh) xaxis = axis * -1;
-            vec3f yaxis = v_cross(zaxis, xaxis);
-            
-            ret.m = (float[16]) {
-                xaxis.x, yaxis.x, zaxis.x, 0,
-                xaxis.y, yaxis.y, zaxis.y, 0,
-                xaxis.z, yaxis.z, zaxis.z, 0,
-                -v_dot(xaxis, eye), -v_dot(yaxis, eye), -v_dot(zaxis, eye), 1
-            };
-            
-            ret.flags = mat_flags.M_VIEW;
+        mat4f m_ortho(float right, float left, float top, float bottom, float near, float far) {
+            mat4f ret;
+            m_identity(&ret);
+
+            float i_rminusl = 1 / (right - left);
+            float i_tminusb = 1 / (top - bottom);
+            float i_fminusn = 1 / (far - near);
+
+            ret.m[0] = 2 * i_rminusl;
+            ret.m[5] = 2 * i_tminusb;
+            ret.m[10] = -2 * i_fminusn;
+
+            ret.m[3] = (right + left) * -i_rminusl;
+            ret.m[7] = (top + bottom) * -i_tminusb;
+            ret.m[11] = -(far + near) * -i_fminusn;
+
             return ret;
         }
-        mat4d m_lookat(vec3d center, vec3d eye, vec3d up, bool is_rh) {
-            mat4 ret;
-            
-            vec3d zaxis = v_normal(center - eye);
-            vec3d xaxis = v_normal(v_cross(up, zaxis));
-            if(!is_rh) xaxis = axis * -1;
-            vec3d yaxis = v_cross(zaxis, xaxis);
-            
-            ret.m = (double[16]) {
-                xaxis.x, yaxis.x, zaxis.x, 0,
-                xaxis.y, yaxis.y, zaxis.y, 0,
-                xaxis.z, yaxis.z, zaxis.z, 0,
-                -v_dot(xaxis, eye), -v_dot(yaxis, eye), -v_dot(zaxis, eye), 1
-            };
-            
-            ret.flags = mat_flags.M_VIEW;
+        mat4d m_ortho(double right, double left, double top, double bottom, double near, double far) {
+            mat4d ret;
+            m_identity(&ret);
+
+            double i_rminusl = 1 / (right - left);
+            double i_tminusb = 1 / (top - bottom);
+            double i_fminusn = 1 / (far - near);
+
+            ret.m[0] = 2 * i_rminusl;
+            ret.m[5] = 2 * i_tminusb;
+            ret.m[10] = -2 * i_fminusn;
+
+            ret.m[3] = (right + left) * -i_rminusl;
+            ret.m[7] = (top + bottom) * -i_tminusb;
+            ret.m[11] = -(far + near) * -i_fminusn;
+
             return ret;
         }
-        
+
+        mat4i m_perspective(int fov, int aspect, int far, int near) {
+            mat4i ret;
+            m_identity(&ret);
+
+            int i_fov = (int) 1 / (tan(fov / 2));
+
+            ret.m[0] = (int) (1 / (aspect * i_fov));
+            ret.m[5] = (int) (1 / i_fov);
+            ret.m[10] = (int) (far / (far - near));
+            ret.m[11] = -(far * near) / (far - near);
+            ret.m[14] = 1;
+
+            return ret;
+        }
+        mat4f m_perspective(float fov, float aspect, float far, float near) {
+            mat4f ret;
+            m_identity(&ret);
+
+            float i_fov = (float) (1 / (tan(fov / 2)));
+
+            ret.m[0] = 1 / (aspect * i_fov);
+            ret.m[5] = 1 / i_fov;
+            ret.m[10] = far / (far - near);
+            ret.m[11] = -(far * near) / (far - near);
+            ret.m[14] = 1;
+
+            return ret;
+        }
+        mat4d m_perspective(double fov, double aspect, double far, double near) {
+            mat4d ret;
+            m_identity(&ret);
+
+            double i_fov = 1 / (tan(fov / 2));
+
+            ret.m[0] = 1 / (aspect * i_fov);
+            ret.m[5] = 1 / i_fov;
+            ret.m[10] = far / (far - near);
+            ret.m[11] = -(far * near) / (far - near);
+            ret.m[14] = 1;
+
+            return ret;
+        }
+
+        void m_print(mat2i m) {
+            printf("2x2 Int Matrix {\n");
+            printf("    %d, %d\n", m.m[0], m.m[1]);
+            printf("    %d, %d\n", m.m[2], m.m[3]);
+            printf("}\n");
+        }
+        void m_print(mat2f m) {
+            printf("2x2 Float Matrix {\n");
+            printf("    %f, %f\n", m.m[0], m.m[1]);
+            printf("    %f, %f\n", m.m[2], m.m[3]);
+            printf("}\n");
+        }
+        void m_print(mat2d m) {
+            printf("2x2 Double Matrix {\n");
+            printf("    %lf, %lf\n", m.m[0], m.m[1]);
+            printf("    %lf, %lf\n", m.m[2], m.m[3]);
+            printf("}\n");
+        }
+
+        void m_print(mat3i m) {
+            printf("3x3 Int Matrix {\n");
+            printf("    %d, %d, %d\n", m.m[0], m.m[1], m.m[2]);
+            printf("    %d, %d, %d\n", m.m[3], m.m[4], m.m[5]);
+            printf("    %d, %d, %d\n", m.m[6], m.m[7], m.m[8]);
+            printf("}\n");
+        }
+        void m_print(mat3f m) {
+            printf("3x3 Float Matrix {\n");
+            printf("    %f, %f, %f\n", m.m[0], m.m[1], m.m[2]);
+            printf("    %f, %f, %f\n", m.m[3], m.m[4], m.m[5]);
+            printf("    %f, %f, %f\n", m.m[6], m.m[7], m.m[8]);
+            printf("}\n");
+        }
+        void m_print(mat3d m) {
+            printf("3x3 Double Matrix {\n");
+            printf("    %lf, %lf, %lf\n", m.m[0], m.m[1], m.m[2]);
+            printf("    %lf, %lf, %lf\n", m.m[3], m.m[4], m.m[5]);
+            printf("    %lf, %lf, %lf\n", m.m[6], m.m[7], m.m[8]);
+            printf("}\n");
+        }
+
         void m_print(mat4i m) {
-            printf("int 4x4 Matrix {\n");
-            printf("    %d %d %d %d\n", m.m[0], m.m[1], m.m[2], m.m[3]);
-            printf("    %d %d %d %d\n", m.m[4], m.m[5], m.m[6], m.m[7]);
-            printf("    %d %d %d %d\n", m.m[8], m.m[9], m.m[10], m.m[11]);
-            printf("    %d %d %d %d\n", m.m[12], m.m[13], m.m[14], m.m[15]);
+            printf("4x4 Int Matrix {\n");
+            printf("    %d, %d, %d, %d\n", m.m[0], m.m[1], m.m[2], m.m[3]);
+            printf("    %d, %d, %d, %d\n", m.m[4], m.m[5], m.m[6], m.m[7]);
+            printf("    %d, %d, %d, %d\n", m.m[8], m.m[9], m.m[10], m.m[11]);
+            printf("    %d, %d, %d, %d\n", m.m[12], m.m[13], m.m[14], m.m[15]);
+            printf("}\n");
+        }
+        void m_print(mat4f m) {
+            printf("4x4 Float Matrix {\n");
+            printf("    %f, %f, %f, %f\n", m.m[0], m.m[1], m.m[2], m.m[3]);
+            printf("    %f, %f, %f, %f\n", m.m[4], m.m[5], m.m[6], m.m[7]);
+            printf("    %f, %f, %f, %f\n", m.m[8], m.m[9], m.m[10], m.m[11]);
+            printf("    %f, %f, %f, %f\n", m.m[12], m.m[13], m.m[14], m.m[15]);
+            printf("}\n");
+        }
+        void m_print(mat4d m) {
+            printf("4x4 Double Matrix {\n");
+            printf("    %lf, %lf, %lf, %lf\n", m.m[0], m.m[1], m.m[2], m.m[3]);
+            printf("    %lf, %lf, %lf, %lf\n", m.m[4], m.m[5], m.m[6], m.m[7]);
+            printf("    %lf, %lf, %lf, %lf\n", m.m[8], m.m[9], m.m[10], m.m[11]);
+            printf("    %lf, %lf, %lf, %lf\n", m.m[12], m.m[13], m.m[14], m.m[15]);
             printf("}\n");
         }
     }

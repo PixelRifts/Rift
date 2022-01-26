@@ -42,7 +42,7 @@ static string fix_filepath(M_Arena* arena, string path) {
 static void report_error_at(P_Parser* parser, L_Token* token, string message, ...) {
     if (parser->panik_mode) return;
     
-    fprintf(stderr, "Error:%.*s:%d: ", str_expand(parser->filename), token->line);
+    fprintf(stderr, "[ ERROR ]:%.*s:%d: ", str_expand(parser->filename), token->line);
     if (token->type != TokenType_Error && token->type != TokenType_EOF)
         fprintf(stderr, "At '%.*s' ", token->length, token->start);
     
