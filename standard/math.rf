@@ -150,17 +150,17 @@ namespace std {
         struct vec4f {float x; float y; float z; float w;}
         struct vec4d {double x; double y; double z; double w;}
 
-        struct mat2i {vec2i[4] m;}
-        struct mat2f {vec2f[4] m;}
-        struct mat2d {vec2d[4] m;}
+        struct mat2i {int[4] m;}
+        struct mat2f {float[4] m;}
+        struct mat2d {double[4] m;}
 
-        struct mat3i {vec3i[4] m;}
-        struct mat3f {vec3f[4] m;}
-        struct mat3d {vec3d[4] m;}
+        struct mat3i {int[9] m;}
+        struct mat3f {float[9] m;}
+        struct mat3d {double[9] m;}
 
-        struct mat4i {vec4i[4] m;}
-        struct mat4f {vec4f[4] m;}
-        struct mat4d {vec4d[4] m;}
+        struct mat4i {int[16] m;}
+        struct mat4f {float[16] m;}
+        struct mat4d {double[16] m;}
 
         vec2i operator+(vec2i a, vec2i b) {return (vec2i) { .x = (a.x + b.x), .y = (a.y + b.y)};}
         vec2f operator+(vec2f a, vec2f b) {return (vec2f) { .x = (a.x + b.x), .y = (a.y + b.y)};}
@@ -209,5 +209,83 @@ namespace std {
         vec4i operator/(vec4i a, vec4i b) {return (vec4i) { .x = (a.x / b.x), .y = (a.y / b.y), .z = (a.z / b.z), .w = (a.w / b.w)};}
         vec4f operator/(vec4f a, vec4f b) {return (vec4f) { .x = (a.x / b.x), .y = (a.y / b.y), .z = (a.z / b.z), .w = (a.w / b.w)};}
         vec4d operator/(vec4d a, vec4d b) {return (vec4d) { .x = (a.x / b.x), .y = (a.y / b.y), .z = (a.z / b.z), .w = (a.w / b.w)};}
+
+        bool operator==(vec2i a, vec2i b) {return (a.x == b.x) && (a.y == b.y);}
+        bool operator==(vec2f a, vec2f b) {return (a.x == b.x) && (a.y == b.y);}
+        bool operator==(vec2d a, vec2d b) {return (a.x == b.x) && (a.y == b.y);}
+
+        bool operator==(vec3i a, vec3i b) {return (a.x == b.x) && (a.y == b.y) && (a.z == b.z);}
+        bool operator==(vec3f a, vec3f b) {return (a.x == b.x) && (a.y == b.y) && (a.z == b.z);}
+        bool operator==(vec3d a, vec3d b) {return (a.x == b.x) && (a.y == b.y) && (a.z == b.z);}
+
+        bool operator==(vec4i a, vec4i b) {return (a.x == b.x) && (a.y == b.y) && (a.z == b.z) && (a.w == b.w);}
+        bool operator==(vec4f a, vec4f b) {return (a.x == b.x) && (a.y == b.y) && (a.z == b.z) && (a.w == b.w);}
+        bool operator==(vec4d a, vec4d b) {return (a.x == b.x) && (a.y == b.y) && (a.z == b.z) && (a.w == b.w);}
+
+        void m_print(mat2i m) {
+            printf("2x2 Int Matrix {\n");
+            printf("    %d, %d\n", m.m[0], m.m[1]);
+            printf("    %d, %d\n", m.m[2], m.m[3]);
+            printf("}\n");
+        }
+        void m_print(mat2f m) {
+            printf("2x2 Float Matrix {\n");
+            printf("    %f, %f\n", m.m[0], m.m[1]);
+            printf("    %f, %f\n", m.m[2], m.m[3]);
+            printf("}\n");
+        }
+        void m_print(mat2d m) {
+            printf("2x2 Double Matrix {\n");
+            printf("    %lf, %lf\n", m.m[0], m.m[1]);
+            printf("    %lf, %lf\n", m.m[2], m.m[3]);
+            printf("}\n");
+        }
+
+        void m_print(mat3i m) {
+            printf("3x3 Int Matrix {\n");
+            printf("    %d, %d, %d\n", m.m[0], m.m[1], m.m[2]);
+            printf("    %d, %d, %d\n", m.m[3], m.m[4], m.m[5]);
+            printf("    %d, %d, %d\n", m.m[6], m.m[7], m.m[8]);
+            printf("}\n");
+        }
+        void m_print(mat3f m) {
+            printf("3x3 Float Matrix {\n");
+            printf("    %f, %f, %f\n", m.m[0], m.m[1], m.m[2]);
+            printf("    %f, %f, %f\n", m.m[3], m.m[4], m.m[5]);
+            printf("    %f, %f, %f\n", m.m[6], m.m[7], m.m[8]);
+            printf("}\n");
+        }
+        void m_print(mat3d m) {
+            printf("3x3 Double Matrix {\n");
+            printf("    %lf, %lf, %lf\n", m.m[0], m.m[1], m.m[2]);
+            printf("    %lf, %lf, %lf\n", m.m[3], m.m[4], m.m[5]);
+            printf("    %lf, %lf, %lf\n", m.m[6], m.m[7], m.m[8]);
+            printf("}\n");
+        }
+
+        void m_print(mat4i m) {
+            printf("4x4 Int Matrix {\n");
+            printf("    %d, %d, %d, %d\n", m.m[0], m.m[1], m.m[2], m.m[3]);
+            printf("    %d, %d, %d, %d\n", m.m[4], m.m[5], m.m[6], m.m[7]);
+            printf("    %d, %d, %d, %d\n", m.m[8], m.m[9], m.m[10], m.m[11]);
+            printf("    %d, %d, %d, %d\n", m.m[12], m.m[13], m.m[14], m.m[15]);
+            printf("}\n");
+        }
+        void m_print(mat4f m) {
+            printf("4x4 Float Matrix {\n");
+            printf("    %f, %f, %f, %f\n", m.m[0], m.m[1], m.m[2], m.m[3]);
+            printf("    %f, %f, %f, %f\n", m.m[4], m.m[5], m.m[6], m.m[7]);
+            printf("    %f, %f, %f, %f\n", m.m[8], m.m[9], m.m[10], m.m[11]);
+            printf("    %f, %f, %f, %f\n", m.m[12], m.m[13], m.m[14], m.m[15]);
+            printf("}\n");
+        }
+        void m_print(mat4d m) {
+            printf("4x4 Double Matrix {\n");
+            printf("    %lf, %lf, %lf, %lf\n", m.m[0], m.m[1], m.m[2], m.m[3]);
+            printf("    %lf, %lf, %lf, %lf\n", m.m[4], m.m[5], m.m[6], m.m[7]);
+            printf("    %lf, %lf, %lf, %lf\n", m.m[8], m.m[9], m.m[10], m.m[11]);
+            printf("    %lf, %lf, %lf, %lf\n", m.m[12], m.m[13], m.m[14], m.m[15]);
+            printf("}\n");
+        }
     }
 }
