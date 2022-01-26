@@ -1301,6 +1301,311 @@ namespace std {
             }
         }
 
+        int m_determinant(mat2i m) {
+            return m.m[0] * m.m[3] - m.m[1] * m.m[2];
+        }
+        float m_determinant(mat2f m) {
+            return m.m[0] * m.m[3] - m.m[1] * m.m[2];
+        }
+        double m_determinant(mat2d m) {
+            return m.m[0] * m.m[3] - m.m[1] * m.m[2];
+        }
+
+        int m_determinant(mat3i m) {
+            int r0 = m.m[0] * m.m[4] * m.m[8];
+            int r1 = m.m[1] * m.m[5] * m.m[6];
+            int r2 = m.m[2] * m.m[3] * m.m[7];
+
+            int l0 = m.m[0] * m.m[5] * m.m[7];
+            int l1 = m.m[1] * m.m[3] * m.m[8];
+            int l2 = m.m[2] * m.m[4] * m.m[6];
+
+            return r0 - r1 - r2 + l0 + l1 + l2;
+        }
+        float m_determinant(mat3f m) {
+            float r0 = m.m[0] * m.m[4] * m.m[8];
+            float r1 = m.m[1] * m.m[5] * m.m[6];
+            float r2 = m.m[2] * m.m[3] * m.m[7];
+
+            float l0 = m.m[0] * m.m[5] * m.m[7];
+            float l1 = m.m[1] * m.m[3] * m.m[8];
+            float l2 = m.m[2] * m.m[4] * m.m[6];
+
+            return r0 - r1 - r2 + l0 + l1 + l2;
+        }
+        double m_determinant(mat3d m) {
+            double r0 = m.m[0] * m.m[4] * m.m[8];
+            double r1 = m.m[1] * m.m[5] * m.m[6];
+            double r2 = m.m[2] * m.m[3] * m.m[7];
+
+            double l0 = m.m[0] * m.m[5] * m.m[7];
+            double l1 = m.m[1] * m.m[3] * m.m[8];
+            double l2 = m.m[2] * m.m[4] * m.m[6];
+
+            return r0 - r1 - r2 + l0 + l1 + l2;
+        }
+
+        mat2i m_minor(mat3i m, int row, int col) {
+            mat2i ret = m_identity2i();
+            int m2index = 0;
+
+            for(int i = 0; i < 3; i++) {
+                if(i == col) continue;
+                for(int j = 0; j < 3; j++) {
+                    if(j == row) continue;
+                    ret.m[m2index] = m.m[i * 3 + j];
+                    m2index++;
+                }
+            }
+
+            return ret;
+        }
+        mat2f m_minor(mat3f m, int row, int col) {
+            mat2f ret = m_identity2f();
+            int m2index = 0;
+
+            for(int i = 0; i < 3; i++) {
+                if(i == col) continue;
+                for(int j = 0; j < 3; j++) {
+                    if(j == row) continue;
+                    ret.m[m2index] = m.m[i * 3 + j];
+                    m2index++;
+                }
+            }
+
+            return ret;
+        }
+        mat2d m_minor(mat3d m, int row, int col) {
+            mat2d ret = m_identity2d();
+            int m2index = 0;
+
+            for(int i = 0; i < 3; i++) {
+                if(i == col) continue;
+                for(int j = 0; j < 3; j++) {
+                    if(j == row) continue;
+                    ret.m[m2index] = m.m[i * 3 + j];
+                    m2index++;
+                }
+            }
+
+            return ret;
+        }
+
+        mat3i m_minor(mat4i m, int row, int col) {
+            mat3i ret = m_identity3i();
+            int m2index = 0;
+
+            for(int i = 0; i < 4; i++) {
+                if(i == col) continue;
+                for(int j = 0; j < 4; j++) {
+                    if(j == row) continue;
+                    ret.m[m2index] = m.m[i * 4 + j];
+                    m2index++;
+                }
+            }
+
+            return ret;
+        }
+        mat3f m_minor(mat4f m, int row, int col) {
+            mat3f ret = m_identity3f();
+            int m2index = 0;
+
+            for(int i = 0; i < 4; i++) {
+                if(i == col) continue;
+                for(int j = 0; j < 4; j++) {
+                    if(j == row) continue;
+                    ret.m[m2index] = m.m[i * 4 + j];
+                    m2index++;
+                }
+            }
+
+            return ret;
+        }
+        mat3d m_minor(mat4d m, int row, int col) {
+            mat3d ret = m_identity3d();
+            int m2index = 0;
+
+            for(int i = 0; i < 4; i++) {
+                if(i == col) continue;
+                for(int j = 0; j < 4; j++) {
+                    if(j == row) continue;
+                    ret.m[m2index] = m.m[i * 4 + j];
+                    m2index++;
+                }
+            }
+
+            return ret;
+        }
+
+        int m_determinant(mat4i m) {
+            int ret = 0;
+
+            for(int i = 0; i < 4; i++) {
+                int f = m.m[i] * m_determinant(m_minor(m, 0, i));
+                if(i % 2 == 1) f *= -1;
+                ret += f;
+            }
+
+            return ret;
+        }
+        float m_determinant(mat4f m) {
+            float ret = 0;
+
+            for(int i = 0; i < 4; i++) {
+                float f = m.m[i] * m_determinant(m_minor(m, 0, i));
+                if(i % 2 == 1) f *= -1;
+                ret += f;
+            }
+
+            return ret;
+        }
+        double m_determinant(mat4d m) {
+            double ret = 0;
+
+            for(int i = 0; i < 4; i++) {
+                double f = m.m[i] * m_determinant(m_minor(m, 0, i));
+                if(i % 2 == 1) f *= -1;
+                ret += f;
+            }
+
+            return ret;
+        }
+
+        mat2i m_inverse(mat2i m) {
+            mat2i ret;
+
+            int det = (int) (1 / m_determinant(m));
+
+            ret.m = (int[4]) {
+                m.m[3] * det, -m.m[1] * det,
+                -m.m[2] * det, m.m[0] * det
+            };
+
+            return ret;
+        }
+        mat2f m_inverse(mat2f m) {
+            mat2f ret;
+
+            float det = 1 / m_determinant(m);
+
+            ret.m = (float[4]) {
+                m.m[3] * det, -m.m[1] * det,
+                -m.m[2] * det, m.m[0] * det
+            };
+
+            return ret;
+        }
+        mat2d m_inverse(mat2d m) {
+            mat2d ret;
+
+            double det = 1 / m_determinant(m);
+
+            ret.m = (double[4]) {
+                m.m[3] * det, -m.m[1] * det,
+                -m.m[2] * det, m.m[0] * det
+            };
+
+            return ret;
+        }
+        
+        mat3i m_inverse(mat3i m) {
+            int det = m_determinant(m);
+            if(det == 0) return m_identity3i();
+
+            int idet = (int) (1 / det);
+            mat3i cofactor;
+
+            for(int i = 0; i < 9; i++) {
+                cofactor.m[i] = m_determinant(m_minor(m, (int) (i / 3), i % 3));
+
+                if((i % 2) == 1) cofactor.m[i] *= -1;
+                if((i / 4) % 2 == 1) cofactor.m[i] *= -1;
+            }
+
+            return cofactor * idet;
+        }
+        mat3f m_inverse(mat3f m) {
+            float det = m_determinant(m);
+            if(det == 0) return m_identity3f();
+
+            float idet = 1 / det;
+            mat3f cofactor;
+
+            for(int i = 0; i < 9; i++) {
+                cofactor.m[i] = m_determinant(m_minor(m, (int) (i / 3), i % 3));
+
+                if((i % 2) == 1) cofactor.m[i] *= -1;
+                if((i / 4) % 2 == 1) cofactor.m[i] *= -1;
+            }
+
+            return cofactor * idet;
+        }
+        mat3d m_inverse(mat3d m) {
+            double det = m_determinant(m);
+            if(det == 0) return m_identity3d();
+
+            double idet = 1 / det;
+            mat3d cofactor;
+
+            for(int i = 0; i < 9; i++) {
+                cofactor.m[i] = m_determinant(m_minor(m, (int) (i / 3), i % 3));
+
+                if((i % 2) == 1) cofactor.m[i] *= -1;
+                if((i / 4) % 2 == 1) cofactor.m[i] *= -1;
+            }
+
+            return cofactor * idet;
+        }
+
+        mat4i m_inverse(mat4i m) {
+            int det = m_determinant(m);
+            if(det == 0) return m_identity4i();
+
+            int idet = (int) (1 / det);
+            mat4i cofactor;
+
+            for(int i = 0; i < 16; i++) {
+                cofactor.m[i] = m_determinant(m_minor(m, (int) (i / 4), i % 4));
+
+                if((i % 2) == 1) cofactor.m[i] *= -1;
+                if((i / 4) % 2 == 1) cofactor.m[i] *= -1;
+            }
+
+            return cofactor * idet;
+        }
+        mat4f m_inverse(mat4f m) {
+            float det = m_determinant(m);
+            if(det == 0) return m_identity4f();
+
+            float idet = 1 / det;
+            mat4f cofactor;
+
+            for(int i = 0; i < 16; i++) {
+                cofactor.m[i] = m_determinant(m_minor(m, (int) (i / 4), i % 4));
+
+                if((i % 2) == 1) cofactor.m[i] *= -1;
+                if((i / 4) % 2 == 1) cofactor.m[i] *= -1;
+            }
+
+            return cofactor * idet;
+        }
+        mat4d m_inverse(mat4d m) {
+            double det = m_determinant(m);
+            if(det == 0) return m_identity4d();
+
+            double idet = 1 / det;
+            mat4d cofactor;
+
+            for(int i = 0; i < 16; i++) {
+                cofactor.m[i] = m_determinant(m_minor(m, (int) (i / 4), i % 4));
+
+                if((i % 2) == 1) cofactor.m[i] *= -1;
+                if((i / 4) % 2 == 1) cofactor.m[i] *= -1;
+            }
+
+            return cofactor * idet;
+        }
+
         void m_print(mat2i m) {
             printf("2x2 Int Matrix {\n");
             printf("    %d, %d\n", m.m[0], m.m[1]);
