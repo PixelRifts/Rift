@@ -1303,49 +1303,100 @@ namespace std {
 
         mat2i m_transpose(mat2i m) {
             mat2i ret;
-            m_transpose(&ret, &m);
+
+            ret.m = (int[4]) {
+                m.m[0], m.m[2],
+                m.m[1], m.m[3]
+            };
+
             return ret;
         }
         mat2f m_transpose(mat2f m) {
             mat2f ret;
-            m_transpose(&ret, &m);
+
+            ret.m = (float[4]) {
+                m.m[0], m.m[2],
+                m.m[1], m.m[3]
+            };
+
             return ret;
         }
         mat2d m_transpose(mat2d m) {
             mat2d ret;
-            m_transpose(&ret, &m);
+
+            ret.m = (double[4]) {
+                m.m[0], m.m[2],
+                m.m[1], m.m[3]
+            };
+
             return ret;
         }
 
         mat3i m_transpose(mat3i m) {
             mat3i ret;
-            m_transpose(&ret, &m);
+
+            for(int i = 0; i < 3; i++) {
+                for(int j = 0; j < 3; j++) {
+                    ret.m[i + j * 3] = m.m[i * 3 + j];
+                }
+            }
+
             return ret;
         }
         mat3f m_transpose(mat3f m) {
             mat3f ret;
-            m_transpose(&ret, &m);
+
+            for(int i = 0; i < 3; i++) {
+                for(int j = 0; j < 3; j++) {
+                    ret.m[i + j * 3] = m.m[i * 3 + j];
+                }
+            }
+
             return ret;
         }
         mat3d m_transpose(mat3d m) {
             mat3d ret;
-            m_transpose(&ret, &m);
+
+            for(int i = 0; i < 3; i++) {
+                for(int j = 0; j < 3; j++) {
+                    ret.m[i + j * 3] = m.m[i * 3 + j];
+                }
+            }
+
             return ret;
         }
 
         mat4i m_transpose(mat4i m) {
             mat4i ret;
-            m_transpose(&ret, &m);
+
+            for(int i = 0; i < 4; i++) {
+                for(int j = 0; j < 4; j++) {
+                    ret.m[i + j * 4] = m.m[i * 4 + j];
+                }
+            }
+
             return ret;
         }
         mat4f m_transpose(mat4f m) {
             mat4f ret;
-            m_transpose(&ret, &m);
+
+            for(int i = 0; i < 4; i++) {
+                for(int j = 0; j < 4; j++) {
+                    ret.m[i + j * 4] = m.m[i * 4 + j];
+                }
+            }
+
             return ret;
         }
         mat4d m_transpose(mat4d m) {
             mat4d ret;
-            m_transpose(&ret, &m);
+
+            for(int i = 0; i < 4; i++) {
+                for(int j = 0; j < 4; j++) {
+                    ret.m[i + j * 4] = m.m[i * 4 + j];
+                }
+            }
+
             return ret;
         }
 
@@ -1652,6 +1703,104 @@ namespace std {
             }
 
             return cofactor * idet;
+        }
+
+        mat4i m_ortho(int right, int left, int top, int bottom, int near, int far) {
+            mat4i ret;
+            m_identity(&ret);
+
+            int i_rminusl = (int) 1 / (right - left);
+            int i_tminusb = (int) 1 / (top - bottom);
+            int i_fminusn = (int) 1 / (far - near);
+
+            ret.m[0] = 2 * i_rminusl;
+            ret.m[5] = 2 * i_tminusb;
+            ret.m[10] = -2 * i_fminusn;
+
+            ret.m[3] = (right + left) * -i_rminusl;
+            ret.m[7] = (top + bottom) * -i_tminusb;
+            ret.m[11] = -(far + near) * -i_fminusn;
+
+            return ret;
+        }
+        mat4f m_ortho(float right, float left, float top, float bottom, float near, float far) {
+            mat4f ret;
+            m_identity(&ret);
+
+            float i_rminusl = 1 / (right - left);
+            float i_tminusb = 1 / (top - bottom);
+            float i_fminusn = 1 / (far - near);
+
+            ret.m[0] = 2 * i_rminusl;
+            ret.m[5] = 2 * i_tminusb;
+            ret.m[10] = -2 * i_fminusn;
+
+            ret.m[3] = (right + left) * -i_rminusl;
+            ret.m[7] = (top + bottom) * -i_tminusb;
+            ret.m[11] = -(far + near) * -i_fminusn;
+
+            return ret;
+        }
+        mat4d m_ortho(double right, double left, double top, double bottom, double near, double far) {
+            mat4d ret;
+            m_identity(&ret);
+
+            double i_rminusl = 1 / (right - left);
+            double i_tminusb = 1 / (top - bottom);
+            double i_fminusn = 1 / (far - near);
+
+            ret.m[0] = 2 * i_rminusl;
+            ret.m[5] = 2 * i_tminusb;
+            ret.m[10] = -2 * i_fminusn;
+
+            ret.m[3] = (right + left) * -i_rminusl;
+            ret.m[7] = (top + bottom) * -i_tminusb;
+            ret.m[11] = -(far + near) * -i_fminusn;
+
+            return ret;
+        }
+
+        mat4i m_perspective(int fov, int aspect, int far, int near) {
+            mat4i ret;
+            m_identity(&ret);
+
+            int i_fov = (int) 1 / (tan(fov / 2));
+
+            ret.m[0] = (int) (1 / (aspect * i_fov));
+            ret.m[5] = (int) (1 / i_fov);
+            ret.m[10] = (int) (far / (far - near));
+            ret.m[11] = -(far * near) / (far - near);
+            ret.m[14] = 1;
+
+            return ret;
+        }
+        mat4f m_perspective(float fov, float aspect, float far, float near) {
+            mat4f ret;
+            m_identity(&ret);
+
+            float i_fov = (float) (1 / (tan(fov / 2)));
+
+            ret.m[0] = 1 / (aspect * i_fov);
+            ret.m[5] = 1 / i_fov;
+            ret.m[10] = far / (far - near);
+            ret.m[11] = -(far * near) / (far - near);
+            ret.m[14] = 1;
+
+            return ret;
+        }
+        mat4d m_perspective(double fov, double aspect, double far, double near) {
+            mat4d ret;
+            m_identity(&ret);
+
+            double i_fov = 1 / (tan(fov / 2));
+
+            ret.m[0] = 1 / (aspect * i_fov);
+            ret.m[5] = 1 / i_fov;
+            ret.m[10] = far / (far - near);
+            ret.m[11] = -(far * near) / (far - near);
+            ret.m[14] = 1;
+
+            return ret;
         }
 
         void m_print(mat2i m) {
