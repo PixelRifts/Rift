@@ -342,6 +342,63 @@ namespace std {
         vec4f v_normal(vec4f v) {return (v * (1 / (float) sqrt(v.x*v.x + v.y*v.y + v.z*v.z + v.w*v.w)));}
         vec4d v_normal(vec4d v) {return (v * (1 / (double) sqrt(v.x*v.x + v.y*v.y + v.z*v.z + v.w*v.w)));}
 
+        void v_normal(vec2i *v) {
+            float len = (float) sqrt(v->x*v->x + v->y*v->y);
+            v->x = (int)(v->x * len);
+            v->y = (int)(v->y * len);
+        }
+        void v_normal(vec2f *v) {
+            float len = (float) sqrt(v->x*v->x + v->y*v->y);
+            v->x = (v->x * len);
+            v->y = (v->y * len);
+        }
+        void v_normal(vec2d *v) {
+            double len = (double) sqrt(v->x*v->x + v->y*v->y);
+            v->x = (v->x * len);
+            v->y = (v->y * len);
+        }
+
+        void v_normal(vec3i *v) {
+            float len = (float) sqrt(v->x*v->x + v->y*v->y + v->z*v->z);
+            v->x = (int)(v->x * len);
+            v->y = (int)(v->y * len);
+            v->z = (int)(v->z * len);
+        }
+        void v_normal(vec3f *v) {
+            float len = (float) sqrt(v->x*v->x + v->y*v->y + v->z*v->z);
+            v->x = (v->x * len);
+            v->y = (v->y * len);
+            v->z = (v->z * len);
+        }
+        void v_normal(vec3d *v) {
+            double len = (double) sqrt(v->x*v->x + v->y*v->y + v->z*v->z);
+            v->x = (v->x * len);
+            v->y = (v->y * len);
+            v->z = (v->z * len);
+        }
+
+        void v_normal(vec4i *v) {
+            float len = (float) sqrt(v->x*v->x + v->y*v->y + v->z*v->z + v->w*v->w);
+            v->x = (int)(v->x * len);
+            v->y = (int)(v->y * len);
+            v->z = (int)(v->z * len);
+            v->w = (int)(v->w * len);
+        }
+        void v_normal(vec4f *v) {
+            float len = (float) sqrt(v->x*v->x + v->y*v->y + v->z*v->z + v->w*v->w);
+            v->x = (v->x * len);
+            v->y = (v->y * len);
+            v->z = (v->z * len);
+            v->w = (v->w * len);
+        }
+        void v_normal(vec4d *v) {
+            double len = (double) sqrt(v->x*v->x + v->y*v->y + v->z*v->z + v->w*v->w);
+            v->x = (v->x * len);
+            v->y = (v->y * len);
+            v->z = (v->z * len);
+            v->w = (v->w * len);
+        }
+
         void m_print(mat2i m) {
             printf("2x2 Int Matrix {\n");
             printf("    %d, %d\n", m.m[0], m.m[1]);
