@@ -1,7 +1,10 @@
-import "standard/gl.rf";
-import "standard/glfw.rf";
 import "standard/math.rf";
 
 int main() {
+    using std;
+    using std.Math;
+    mat4i m;
+    m_identity(&m);
+    m_print(m);
     return 0;
 }

@@ -1302,31 +1302,28 @@ namespace std {
         }
 
         mat2i m_transpose(mat2i m) {
-            mat2i ret;
-
-            ret.m = (int[4]) {
-                m.m[0], m.m[2],
-                m.m[1], m.m[3]
+            mat2i ret = (mat2i) {
+                .m = {
+                    1, 0, 0, 1
+                }
             };
 
             return ret;
         }
         mat2f m_transpose(mat2f m) {
-            mat2f ret;
-
-            ret.m = (float[4]) {
-                m.m[0], m.m[2],
-                m.m[1], m.m[3]
+            mat2f ret = (mat2f) {
+                .m = {
+                    1, 0, 0, 1
+                }
             };
 
             return ret;
         }
         mat2d m_transpose(mat2d m) {
-            mat2d ret;
-
-            ret.m = (double[4]) {
-                m.m[0], m.m[2],
-                m.m[1], m.m[3]
+            mat2d ret = (mat2d) {
+                .m = {
+                    1, 0, 0, 1
+                }
             };
 
             return ret;
@@ -1575,9 +1572,11 @@ namespace std {
 
             int det = (int) (1 / m_determinant(m));
 
-            ret.m = (int[4]) {
-                m.m[3] * det, -m.m[1] * det,
-                -m.m[2] * det, m.m[0] * det
+            ret = (mat2i) {
+                .m = {
+                    m.m[3] * det, -m.m[1] * det,
+                    -m.m[2] * det, m.m[0] * det
+                }
             };
 
             return ret;
@@ -1587,9 +1586,11 @@ namespace std {
 
             float det = 1 / m_determinant(m);
 
-            ret.m = (float[4]) {
-                m.m[3] * det, -m.m[1] * det,
-                -m.m[2] * det, m.m[0] * det
+            ret = (mat2f) {
+                .m = {
+                    m.m[3] * det, -m.m[1] * det,
+                    -m.m[2] * det, m.m[0] * det
+                }
             };
 
             return ret;
@@ -1599,9 +1600,11 @@ namespace std {
 
             double det = 1 / m_determinant(m);
 
-            ret.m = (double[4]) {
-                m.m[3] * det, -m.m[1] * det,
-                -m.m[2] * det, m.m[0] * det
+            ret = (mat2d) {
+                .m = {
+                    m.m[3] * det, -m.m[1] * det,
+                    -m.m[2] * det, m.m[0] * det
+                }
             };
 
             return ret;
@@ -1868,7 +1871,5 @@ namespace std {
             printf("    %lf, %lf, %lf, %lf\n", m.m[12], m.m[13], m.m[14], m.m[15]);
             printf("}\n");
         }
-
-
     }
 }
