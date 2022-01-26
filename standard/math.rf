@@ -161,5 +161,53 @@ namespace std {
         struct mat4i {vec4i[4] m;}
         struct mat4f {vec4f[4] m;}
         struct mat4d {vec4d[4] m;}
+
+        vec2i operator+(vec2i a, vec2i b) {return (vec2i) { .x = (a.x + b.x), .y = (a.y + b.y)};}
+        vec2f operator+(vec2f a, vec2f b) {return (vec2f) { .x = (a.x + b.x), .y = (a.y + b.y)};}
+        vec2d operator+(vec2d a, vec2d b) {return (vec2d) { .x = (a.x + b.x), .y = (a.y + b.y)};}
+
+        vec2i operator-(vec2i a, vec2i b) {return (vec2i) { .x = (a.x - b.x), .y = (a.y - b.y)};}
+        vec2f operator-(vec2f a, vec2f b) {return (vec2f) { .x = (a.x - b.x), .y = (a.y - b.y)};}
+        vec2d operator-(vec2d a, vec2d b) {return (vec2d) { .x = (a.x - b.x), .y = (a.y - b.y)};}
+
+        vec2i operator*(vec2i a, vec2i b) {return (vec2i) { .x = (a.x * b.x), .y = (a.y * b.y)};}
+        vec2f operator*(vec2f a, vec2f b) {return (vec2f) { .x = (a.x * b.x), .y = (a.y * b.y)};}
+        vec2d operator*(vec2d a, vec2d b) {return (vec2d) { .x = (a.x * b.x), .y = (a.y * b.y)};}
+
+        vec2i operator/(vec2i a, vec2i b) {return (vec2i) { .x = (a.x / b.x), .y = (a.y / b.y)};}
+        vec2f operator/(vec2f a, vec2f b) {return (vec2f) { .x = (a.x / b.x), .y = (a.y / b.y)};}
+        vec2d operator/(vec2d a, vec2d b) {return (vec2d) { .x = (a.x / b.x), .y = (a.y / b.y)};}
+
+        vec3i operator+(vec3i a, vec3i b) {return (vec3i) { .x = (a.x + b.x), .y = (a.y + b.y), .z = (a.z + b.z)};}
+        vec3f operator+(vec3f a, vec3f b) {return (vec3f) { .x = (a.x + b.x), .y = (a.y + b.y), .z = (a.z + b.z)};}
+        vec3d operator+(vec3d a, vec3d b) {return (vec3d) { .x = (a.x + b.x), .y = (a.y + b.y), .z = (a.z + b.z)};}
+
+        vec3i operator-(vec3i a, vec3i b) {return (vec3i) { .x = (a.x - b.x), .y = (a.y - b.y), .z = (a.z - b.z)};}
+        vec3f operator-(vec3f a, vec3f b) {return (vec3f) { .x = (a.x - b.x), .y = (a.y - b.y), .z = (a.z - b.z)};}
+        vec3d operator-(vec3d a, vec3d b) {return (vec3d) { .x = (a.x - b.x), .y = (a.y - b.y), .z = (a.z - b.z)};}
+
+        vec3i operator*(vec3i a, vec3i b) {return (vec3i) { .x = (a.x * b.x), .y = (a.y * b.y), .z = (a.z * b.z)};}
+        vec3f operator*(vec3f a, vec3f b) {return (vec3f) { .x = (a.x * b.x), .y = (a.y * b.y), .z = (a.z * b.z)};}
+        vec3d operator*(vec3d a, vec3d b) {return (vec3d) { .x = (a.x * b.x), .y = (a.y * b.y), .z = (a.z * b.z)};}
+
+        vec3i operator/(vec3i a, vec3i b) {return (vec3i) { .x = (a.x / b.x), .y = (a.y / b.y), .z = (a.z / b.z)};}
+        vec3f operator/(vec3f a, vec3f b) {return (vec3f) { .x = (a.x / b.x), .y = (a.y / b.y), .z = (a.z / b.z)};}
+        vec3d operator/(vec3d a, vec3d b) {return (vec3d) { .x = (a.x / b.x), .y = (a.y / b.y), .z = (a.z / b.z)};}
+
+        vec4i operator+(vec4i a, vec4i b) {return (vec4i) { .x = (a.x + b.x), .y = (a.y + b.y), .z = (a.z + b.z), .w = (a.w + b.w)};}
+        vec4f operator+(vec4f a, vec4f b) {return (vec4f) { .x = (a.x + b.x), .y = (a.y + b.y), .z = (a.z + b.z), .w = (a.w + b.w)};}
+        vec4d operator+(vec4d a, vec4d b) {return (vec4d) { .x = (a.x + b.x), .y = (a.y + b.y), .z = (a.z + b.z), .w = (a.w + b.w)};}
+
+        vec4i operator-(vec4i a, vec4i b) {return (vec4i) { .x = (a.x - b.x), .y = (a.y - b.y), .z = (a.z - b.z), .w = (a.w - b.w)};}
+        vec4f operator-(vec4f a, vec4f b) {return (vec4f) { .x = (a.x - b.x), .y = (a.y - b.y), .z = (a.z - b.z), .w = (a.w - b.w)};}
+        vec4d operator-(vec4d a, vec4d b) {return (vec4d) { .x = (a.x - b.x), .y = (a.y - b.y), .z = (a.z - b.z), .w = (a.w - b.w)};}
+
+        vec4i operator*(vec4i a, vec4i b) {return (vec4i) { .x = (a.x * b.x), .y = (a.y * b.y), .z = (a.z * b.z), .w = (a.w * b.w)};}
+        vec4f operator*(vec4f a, vec4f b) {return (vec4f) { .x = (a.x * b.x), .y = (a.y * b.y), .z = (a.z * b.z), .w = (a.w * b.w)};}
+        vec4d operator*(vec4d a, vec4d b) {return (vec4d) { .x = (a.x * b.x), .y = (a.y * b.y), .z = (a.z * b.z), .w = (a.w * b.w)};}
+
+        vec4i operator/(vec4i a, vec4i b) {return (vec4i) { .x = (a.x / b.x), .y = (a.y / b.y), .z = (a.z / b.z), .w = (a.w / b.w)};}
+        vec4f operator/(vec4f a, vec4f b) {return (vec4f) { .x = (a.x / b.x), .y = (a.y / b.y), .z = (a.z / b.z), .w = (a.w / b.w)};}
+        vec4d operator/(vec4d a, vec4d b) {return (vec4d) { .x = (a.x / b.x), .y = (a.y / b.y), .z = (a.z / b.z), .w = (a.w / b.w)};}
     }
 }
