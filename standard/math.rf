@@ -411,6 +411,38 @@ namespace std {
         float v_dot(vec4f a, vec4f b) {return ((a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w));}
         double v_dot(vec4d a, vec4d b) {return ((a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w));}
 
+        int v_cross(vec2i a, vec2i b) {return ((a.x * b.y) - (a.y * b.x));}
+        float v_cross(vec2f a, vec2f b) {return ((a.x * b.y) - (a.y * b.x));}
+        double v_cross(vec2d a, vec2d b) {return ((a.x * b.y) - (a.y * b.x));}
+
+        vec3i v_cross(vec3i a, vec3i b) {
+            return (vec3i) { .x = a.y * b.z - a.z * b.y,
+                             .y = a.z * b.x - a.x * b.z,
+                             .z = a.x * b.y - a.y * b.x };
+        }
+        vec3f v_cross(vec3f a, vec3f b) {
+            return (vec3f) { .x = a.y * b.z - a.z * b.y,
+                             .y = a.z * b.x - a.x * b.z,
+                             .z = a.x * b.y - a.y * b.x };
+        }
+        vec3d v_cross(vec3d a, vec3d b) {
+            return (vec3d) { .x = a.y * b.z - a.z * b.y,
+                             .y = a.z * b.x - a.x * b.z,
+                             .z = a.x * b.y - a.y * b.x };
+        }
+
+        void v_print(vec2i v) {printf("2x2 Int Vector {\n\t%d, %d\n}\n", v.x, v.y);}
+        void v_print(vec2f v) {printf("2x2 Float Vector {\n\t%f, %f\n}\n", v.x, v.y);}
+        void v_print(vec2d v) {printf("2x2 Double Vector {\n\t%f, %f\n}\n", v.x, v.y);}
+
+        void v_print(vec3i v) {printf("3x3 Int Vector {\n\t%d, %d, %d\n}\n", v.x, v.y, v.z);}
+        void v_print(vec3f v) {printf("3x3 Float Vector {\n\t%f, %f, %f\n}\n", v.x, v.y, v.z);}
+        void v_print(vec3d v) {printf("3x3 Double Vector {\n\t%f, %f, %f\n}\n", v.x, v.y, v.z);}
+
+        void v_print(vec4i v) {printf("4x4 Int Vector {\n\t%d, %d, %d, %d\n}\n", v.x, v.y, v.z, v.w);}
+        void v_print(vec4f v) {printf("4x4 Float Vector {\n\t%f, %f, %f, %f\n}\n", v.x, v.y, v.z, v.w);}
+        void v_print(vec4d v) {printf("4x4 Double Vector {\n\t%f, %f, %f, %f\n}\n", v.x, v.y, v.z, v.w);}
+
         void m_print(mat2i m) {
             printf("2x2 Int Matrix {\n");
             printf("    %d, %d\n", m.m[0], m.m[1]);
