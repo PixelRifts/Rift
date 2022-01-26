@@ -443,6 +443,66 @@ namespace std {
         void v_print(vec4f v) {printf("4x4 Float Vector {\n\t%f, %f, %f, %f\n}\n", v.x, v.y, v.z, v.w);}
         void v_print(vec4d v) {printf("4x4 Double Vector {\n\t%f, %f, %f, %f\n}\n", v.x, v.y, v.z, v.w);}
 
+        void v_print(vec2i *v) {printf("2x2 Int Vector {\n\t%d, %d\n}\n", v->x, v->y);}
+        void v_print(vec2f *v) {printf("2x2 Float Vector {\n\t%f, %f\n}\n", v->x, v->y);}
+        void v_print(vec2d *v) {printf("2x2 Double Vector {\n\t%f, %f\n}\n", v->x, v->y);}
+
+        void v_print(vec3i *v) {printf("3x3 Int Vector {\n\t%d, %d, %d\n}\n", v->x, v->y, v->z);}
+        void v_print(vec3f *v) {printf("3x3 Float Vector {\n\t%f, %f, %f\n}\n", v->x, v->y, v->z);}
+        void v_print(vec3d *v) {printf("3x3 Double Vector {\n\t%f, %f, %f\n}\n", v->x, v->y, v->z);}
+
+        void v_print(vec4i *v) {printf("4x4 Int Vector {\n\t%d, %d, %d, %d\n}\n", v->x, v->y, v->z, v->w);}
+        void v_print(vec4f *v) {printf("4x4 Float Vector {\n\t%f, %f, %f, %f\n}\n", v->x, v->y, v->z, v->w);}
+        void v_print(vec4d *v) {printf("4x4 Double Vector {\n\t%f, %f, %f, %f\n}\n", v->x, v->y, v->z, v->w);}
+
+        bool operator==(mat2i a, mat2i b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[4] == b.m[4]));
+        }
+        bool operator==(mat2f a, mat2f b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[4] == b.m[4]));
+        }
+        bool operator==(mat2d a, mat2d b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[3] == b.m[3]));
+        }
+
+        bool operator==(mat3i a, mat3i b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[3] == b.m[3]) &&
+                    (a.m[4] == b.m[4]) && (a.m[5] == b.m[5]));
+        }
+        bool operator==(mat3f a, mat3f b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[3] == b.m[3]) &&
+                    (a.m[4] == b.m[4]) && (a.m[5] == b.m[5]));
+        }
+        bool operator==(mat3d a, mat3d b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[3] == b.m[3]) &&
+                    (a.m[4] == b.m[4]) && (a.m[5] == b.m[5]));
+        }
+
+        bool operator==(mat4i a, mat4i b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[3] == b.m[3]) &&
+                    (a.m[4] == b.m[4]) && (a.m[5] == b.m[5]) &&
+                    (a.m[6] == b.m[6]) && (a.m[7] == b.m[7]));
+        }
+        bool operator==(mat4f a, mat4f b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[3] == b.m[3]) &&
+                    (a.m[4] == b.m[4]) && (a.m[5] == b.m[5]) &&
+                    (a.m[6] == b.m[6]) && (a.m[7] == b.m[7]));
+        }
+        bool operator==(mat4d a, mat4d b) {
+            return ((a.m[0] == b.m[0]) && (a.m[1] == b.m[1]) &&
+                    (a.m[2] == b.m[2]) && (a.m[3] == b.m[3]) &&
+                    (a.m[4] == b.m[4]) && (a.m[5] == b.m[5]) &&
+                    (a.m[6] == b.m[6]) && (a.m[7] == b.m[7]));
+        }
+
         void m_print(mat2i m) {
             printf("2x2 Int Matrix {\n");
             printf("    %d, %d\n", m.m[0], m.m[1]);
