@@ -222,6 +222,126 @@ namespace std {
         bool operator==(vec4f a, vec4f b) {return (a.x == b.x) && (a.y == b.y) && (a.z == b.z) && (a.w == b.w);}
         bool operator==(vec4d a, vec4d b) {return (a.x == b.x) && (a.y == b.y) && (a.z == b.z) && (a.w == b.w);}
 
+        bool operator!=(vec2i a, vec2i b) {return (a.x != b.x) || (a.y != b.y);}
+        bool operator!=(vec2f a, vec2f b) {return (a.x != b.x) || (a.y != b.y);}
+        bool operator!=(vec2d a, vec2d b) {return (a.x != b.x) || (a.y != b.y);}
+
+        bool operator!=(vec3i a, vec3i b) {return (a.x != b.x) || (a.y != b.y) || (a.z != b.z);}
+        bool operator!=(vec3f a, vec3f b) {return (a.x != b.x) || (a.y != b.y) || (a.z != b.z);}
+        bool operator!=(vec3d a, vec3d b) {return (a.x != b.x) || (a.y != b.y) || (a.z != b.z);}
+
+        bool operator!=(vec4i a, vec4i b) {return (a.x != b.x) || (a.y != b.y) || (a.z != b.z) || (a.w != b.w);}
+        bool operator!=(vec4f a, vec4f b) {return (a.x != b.x) || (a.y != b.y) || (a.z != b.z) || (a.w != b.w);}
+        bool operator!=(vec4d a, vec4d b) {return (a.x != b.x) || (a.y != b.y) || (a.z != b.z) || (a.w != b.w);}
+
+        vec2i operator+(vec2i a, float b) {return (vec2i) { .x = (a.x + b), .y = (a.y + b)};}
+        vec2f operator+(vec2f a, float b) {return (vec2f) { .x = (a.x + b), .y = (a.y + b)};}
+        vec2d operator+(vec2d a, double b) {return (vec2d) { .x = (a.x + b), .y = (a.y + b)};}
+
+        vec2i operator-(vec2i a, float b) {return (vec2i) { .x = (a.x - b), .y = (a.y - b)};}
+        vec2f operator-(vec2f a, float b) {return (vec2f) { .x = (a.x - b), .y = (a.y - b)};}
+        vec2d operator-(vec2d a, double b) {return (vec2d) { .x = (a.x - b), .y = (a.y - b)};}
+
+        vec2i operator*(vec2i a, float b) {return (vec2i) { .x = (a.x * b), .y = (a.y * b)};}
+        vec2f operator*(vec2f a, float b) {return (vec2f) { .x = (a.x * b), .y = (a.y * b)};}
+        vec2d operator*(vec2d a, double b) {return (vec2d) { .x = (a.x * b), .y = (a.y * b)};}
+
+        vec2i operator/(vec2i a, float b) {return (vec2i) { .x = (a.x / b), .y = (a.y / b)};}
+        vec2f operator/(vec2f a, float b) {return (vec2f) { .x = (a.x / b), .y = (a.y / b)};}
+        vec2d operator/(vec2d a, double b) {return (vec2d) { .x = (a.x / b), .y = (a.y / b)};}
+
+        vec3i operator+(vec3i a, float b) {return (vec3i) { .x = (a.x + b), .y = (a.y + b), .z = (a.z + b)};}
+        vec3f operator+(vec3f a, float b) {return (vec3f) { .x = (a.x + b), .y = (a.y + b), .z = (a.z + b)};}
+        vec3d operator+(vec3d a, double b) {return (vec3d) { .x = (a.x + b), .y = (a.y + b), .z = (a.z + b)};}
+
+        vec3i operator-(vec3i a, float b) {return (vec3i) { .x = (a.x - b), .y = (a.y - b), .z = (a.z - b)};}
+        vec3f operator-(vec3f a, float b) {return (vec3f) { .x = (a.x - b), .y = (a.y - b), .z = (a.z - b)};}
+        vec3d operator-(vec3d a, double b) {return (vec3d) { .x = (a.x - b), .y = (a.y - b), .z = (a.z - b)};}
+
+        vec3i operator*(vec3i a, float b) {return (vec3i) { .x = (a.x * b), .y = (a.y * b), .z = (a.z * b)};}
+        vec3f operator*(vec3f a, float b) {return (vec3f) { .x = (a.x * b), .y = (a.y * b), .z = (a.z * b)};}
+        vec3d operator*(vec3d a, double b) {return (vec3d) { .x = (a.x * b), .y = (a.y * b), .z = (a.z * b)};}
+
+        vec3i operator/(vec3i a, float b) {return (vec3i) { .x = (a.x / b), .y = (a.y / b), .z = (a.z / b)};}
+        vec3f operator/(vec3f a, float b) {return (vec3f) { .x = (a.x / b), .y = (a.y / b), .z = (a.z / b)};}
+        vec3d operator/(vec3d a, double b) {return (vec3d) { .x = (a.x / b), .y = (a.y / b), .z = (a.z / b)};}
+
+        vec4i operator+(vec4i a, float b) {return (vec4i) { .x = (a.x + b), .y = (a.y + b), .z = (a.z + b), .w = (a.w + b)};}
+        vec4f operator+(vec4f a, float b) {return (vec4f) { .x = (a.x + b), .y = (a.y + b), .z = (a.z + b), .w = (a.w + b)};}
+        vec4d operator+(vec4d a, double b) {return (vec4d) { .x = (a.x + b), .y = (a.y + b), .z = (a.z + b), .w = (a.w + b)};}
+
+        vec4i operator-(vec4i a, float b) {return (vec4i) { .x = (a.x - b), .y = (a.y - b), .z = (a.z - b), .w = (a.w - b)};}
+        vec4f operator-(vec4f a, float b) {return (vec4f) { .x = (a.x - b), .y = (a.y - b), .z = (a.z - b), .w = (a.w - b)};}
+        vec4d operator-(vec4d a, double b) {return (vec4d) { .x = (a.x - b), .y = (a.y - b), .z = (a.z - b), .w = (a.w - b)};}
+
+        vec4i operator*(vec4i a, float b) {return (vec4i) { .x = (a.x * b), .y = (a.y * b), .z = (a.z * b), .w = (a.w * b)};}
+        vec4f operator*(vec4f a, float b) {return (vec4f) { .x = (a.x * b), .y = (a.y * b), .z = (a.z * b), .w = (a.w * b)};}
+        vec4d operator*(vec4d a, double b) {return (vec4d) { .x = (a.x * b), .y = (a.y * b), .z = (a.z * b), .w = (a.w * b)};}
+
+        vec4i operator/(vec4i a, float b) {return (vec4i) { .x = (a.x / b), .y = (a.y / b), .z = (a.z / b), .w = (a.w / b)};}
+        vec4f operator/(vec4f a, float b) {return (vec4f) { .x = (a.x / b), .y = (a.y / b), .z = (a.z / b), .w = (a.w / b)};}
+        vec4d operator/(vec4d a, double b) {return (vec4d) { .x = (a.x / b), .y = (a.y / b), .z = (a.z / b), .w = (a.w / b)};}
+
+        vec2i operator+(float a, vec2i b) {return (vec2i) { .x = (a + b.x), .y = (a + b.y)};}
+        vec2f operator+(float a, vec2f b) {return (vec2f) { .x = (a + b.x), .y = (a + b.y)};}
+        vec2d operator+(double a, vec2d b) {return (vec2d) { .x = (a + b.x), .y = (a + b.y)};}
+
+        vec3i operator+(float a, vec3i b) {return (vec3i) { .x = (a + b.x), .y = (a + b.y), .z = (a + b.z)};}
+        vec3f operator+(float a, vec3f b) {return (vec3f) { .x = (a + b.x), .y = (a + b.y), .z = (a + b.z)};}
+        vec3d operator+(double a, vec3d b) {return (vec3d) { .x = (a + b.x), .y = (a + b.y), .z = (a + b.z)};}
+
+        vec4i operator+(float a, vec4i b) {return (vec4i) { .x = (a + b.x), .y = (a + b.y), .z = (a + b.z), .w = (a + b.w)};}
+        vec4f operator+(float a, vec4f b) {return (vec4f) { .x = (a + b.x), .y = (a + b.y), .z = (a + b.z), .w = (a + b.w)};}
+        vec4d operator+(double a, vec4d b) {return (vec4d) { .x = (a + b.x), .y = (a + b.y), .z = (a + b.z), .w = (a + b.w)};}
+
+        vec2i operator-(float a, vec2i b) {return (vec2i) { .x = (a - b.x), .y = (a - b.y)};}
+        vec2f operator-(float a, vec2f b) {return (vec2f) { .x = (a - b.x), .y = (a - b.y)};}
+        vec2d operator-(double a, vec2d b) {return (vec2d) { .x = (a - b.x), .y = (a - b.y)};}
+
+        vec3i operator-(float a, vec3i b) {return (vec3i) { .x = (a - b.x), .y = (a - b.y), .z = (a - b.z)};}
+        vec3f operator-(float a, vec3f b) {return (vec3f) { .x = (a - b.x), .y = (a - b.y), .z = (a - b.z)};}
+        vec3d operator-(double a, vec3d b) {return (vec3d) { .x = (a - b.x), .y = (a - b.y), .z = (a - b.z)};}
+
+        vec4i operator-(float a, vec4i b) {return (vec4i) { .x = (a - b.x), .y = (a - b.y), .z = (a - b.z), .w = (a - b.w)};}
+        vec4f operator-(float a, vec4f b) {return (vec4f) { .x = (a - b.x), .y = (a - b.y), .z = (a - b.z), .w = (a - b.w)};}
+        vec4d operator-(double a, vec4d b) {return (vec4d) { .x = (a - b.x), .y = (a - b.y), .z = (a - b.z), .w = (a - b.w)};}
+
+        vec2i operator*(float a, vec2i b) {return (vec2i) { .x = (a * b.x), .y = (a * b.y)};}
+        vec2f operator*(float a, vec2f b) {return (vec2f) { .x = (a * b.x), .y = (a * b.y)};}
+        vec2d operator*(double a, vec2d b) {return (vec2d) { .x = (a * b.x), .y = (a * b.y)};}
+
+        vec3i operator*(float a, vec3i b) {return (vec3i) { .x = (a * b.x), .y = (a * b.y), .z = (a * b.z)};}
+        vec3f operator*(float a, vec3f b) {return (vec3f) { .x = (a * b.x), .y = (a * b.y), .z = (a * b.z)};}
+        vec3d operator*(double a, vec3d b) {return (vec3d) { .x = (a * b.x), .y = (a * b.y), .z = (a * b.z)};}
+
+        vec4i operator*(float a, vec4i b) {return (vec4i) { .x = (a * b.x), .y = (a * b.y), .z = (a * b.z), .w = (a * b.w)};}
+        vec4f operator*(float a, vec4f b) {return (vec4f) { .x = (a * b.x), .y = (a * b.y), .z = (a * b.z), .w = (a * b.w)};}
+        vec4d operator*(double a, vec4d b) {return (vec4d) { .x = (a * b.x), .y = (a * b.y), .z = (a * b.z), .w = (a * b.w)};}
+
+        vec2i operator/(float a, vec2i b) {return (vec2i) { .x = (a / b.x), .y = (a / b.y)};}
+        vec2f operator/(float a, vec2f b) {return (vec2f) { .x = (a / b.x), .y = (a / b.y)};}
+        vec2d operator/(double a, vec2d b) {return (vec2d) { .x = (a / b.x), .y = (a / b.y)};}
+
+        vec3i operator/(float a, vec3i b) {return (vec3i) { .x = (a / b.x), .y = (a / b.y), .z = (a / b.z)};}
+        vec3f operator/(float a, vec3f b) {return (vec3f) { .x = (a / b.x), .y = (a / b.y), .z = (a / b.z)};}
+        vec3d operator/(double a, vec3d b) {return (vec3d) { .x = (a / b.x), .y = (a / b.y), .z = (a / b.z)};}
+
+        vec4i operator/(float a, vec4i b) {return (vec4i) { .x = (a / b.x), .y = (a / b.y), .z = (a / b.z), .w = (a / b.w)};}
+        vec4f operator/(float a, vec4f b) {return (vec4f) { .x = (a / b.x), .y = (a / b.y), .z = (a / b.z), .w = (a / b.w)};}
+        vec4d operator/(double a, vec4d b) {return (vec4d) { .x = (a / b.x), .y = (a / b.y), .z = (a / b.z), .w = (a / b.w)};}
+
+        vec2i v_normal(vec2i v) {return (v * (1 / (float) sqrt(v.x*v.x + v.y*v.y)));}
+        vec2f v_normal(vec2f v) {return (v * (1 / (float) sqrt(v.x*v.x + v.y*v.y)));}
+        vec2d v_normal(vec2d v) {return (v * (1 / (double) sqrt(v.x*v.x + v.y*v.y)));}
+
+        vec3i v_normal(vec3i v) {return (v * (1 / (float) sqrt(v.x*v.x + v.y*v.y + v.z*v.z)));}
+        vec3f v_normal(vec3f v) {return (v * (1 / (float) sqrt(v.x*v.x + v.y*v.y + v.z*v.z)));}
+        vec3d v_normal(vec3d v) {return (v * (1 / (double) sqrt(v.x*v.x + v.y*v.y + v.z*v.z)));}
+
+        vec4i v_normal(vec4i v) {return (v * (1 / (float) sqrt(v.x*v.x + v.y*v.y + v.z*v.z + v.w*v.w)));}
+        vec4f v_normal(vec4f v) {return (v * (1 / (float) sqrt(v.x*v.x + v.y*v.y + v.z*v.z + v.w*v.w)));}
+        vec4d v_normal(vec4d v) {return (v * (1 / (double) sqrt(v.x*v.x + v.y*v.y + v.z*v.z + v.w*v.w)));}
+
         void m_print(mat2i m) {
             printf("2x2 Int Matrix {\n");
             printf("    %d, %d\n", m.m[0], m.m[1]);
@@ -287,5 +407,7 @@ namespace std {
             printf("    %lf, %lf, %lf, %lf\n", m.m[12], m.m[13], m.m[14], m.m[15]);
             printf("}\n");
         }
+
+
     }
 }
