@@ -137,5 +137,29 @@ namespace std {
         int MATH_ERRNO       = 1;
         int MATH_ERREXCEPT   = 2;
         int math_errhandling = 1;
+
+        struct vec2i {int x; int y;}
+        struct vec2f {float x; float y;}
+        struct vec2d {double x; double y;}
+
+        struct vec3i {int x; int y; int z;}
+        struct vec3f {float x; float y; float z;}
+        struct vec3d {double x; double y; double z;}
+
+        struct vec4i {int x; int y; int z; int w;}
+        struct vec4f {float x; float y; float z; float w;}
+        struct vec4d {double x; double y; double z; double w;}
+
+        struct mat2i {vec2i[4] m;}
+        struct mat2f {vec2f[4] m;}
+        struct mat2d {vec2d[4] m;}
+
+        struct mat3i {vec3i[4] m;}
+        struct mat3f {vec3f[4] m;}
+        struct mat3d {vec3d[4] m;}
+
+        struct mat4i {vec4i[4] m;}
+        struct mat4f {vec4f[4] m;}
+        struct mat4d {vec4d[4] m;}
     }
 }
