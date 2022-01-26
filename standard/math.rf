@@ -1076,6 +1076,231 @@ namespace std {
             return ret;
         }
 
+        void m_identity(mat2i *m) {
+            m->m[0] = 1;
+            m->m[1] = 0;
+            m->m[2] = 0;
+            m->m[3] = 1;
+        }
+        void m_identity(mat2f *m) {
+            m->m[0] = 1;
+            m->m[1] = 0;
+            m->m[2] = 0;
+            m->m[3] = 1;
+        }
+        void m_identity(mat2d *m) {
+            m->m[0] = 1;
+            m->m[1] = 0;
+            m->m[2] = 0;
+            m->m[3] = 1;
+        }
+
+        void m_identity(mat3i *m) {
+            m->m[0] = 1;
+            m->m[1] = 0;
+            m->m[2] = 0;
+            m->m[3] = 0;
+            m->m[4] = 1;
+            m->m[5] = 0;
+            m->m[6] = 0;
+            m->m[7] = 0;
+            m->m[8] = 1;
+        }
+        void m_identity(mat3f *m) {
+            m->m[0] = 1;
+            m->m[1] = 0;
+            m->m[2] = 0;
+            m->m[3] = 0;
+            m->m[4] = 1;
+            m->m[5] = 0;
+            m->m[6] = 0;
+            m->m[7] = 0;
+            m->m[8] = 1;
+        }
+        void m_identity(mat3d *m) {
+            m->m[0] = 1;
+            m->m[1] = 0;
+            m->m[2] = 0;
+            m->m[3] = 0;
+            m->m[4] = 1;
+            m->m[5] = 0;
+            m->m[6] = 0;
+            m->m[7] = 0;
+            m->m[8] = 1;
+        }
+
+        void m_identity(mat4i *m) {
+            for(int i = 0; i < 16; i++) {
+                if(i % 5 == 0) {
+                    m->m[i] = 1;
+                } else {
+                    m->m[i] = 0;
+                }
+            }
+        }
+        void m_identity(mat4f *m) {
+            for(int i = 0; i < 16; i++) {
+                if(i % 5 == 0) {
+                    m->m[i] = 1;
+                } else {
+                    m->m[i] = 0;
+                }
+            }
+        }
+        void m_identity(mat4d *m) {
+            for(int i = 0; i < 16; i++) {
+                if(i % 5 == 0) {
+                    m->m[i] = 1;
+                } else {
+                    m->m[i] = 0;
+                }
+            }
+        }
+
+        mat2i m_identity2i() {
+            mat2i ret;
+            m_identity(&ret);
+            return ret;
+        }
+        mat2f m_identity2f() {
+            mat2f ret;
+            m_identity(&ret);
+            return ret;
+        }
+        mat2d m_identity2d() {
+            mat2d ret;
+            m_identity(&ret);
+            return ret;
+        }
+
+        mat3i m_identity3i() {
+            mat3i ret;
+            m_identity(&ret);
+            return ret;
+        }
+        mat3f m_identity3f() {
+            mat3f ret;
+            m_identity(&ret);
+            return ret;
+        }
+        mat3d m_identity3d() {
+            mat3d ret;
+            m_identity(&ret);
+            return ret;
+        }
+
+        mat4i m_identity4i() {
+            mat4i ret;
+            m_identity(&ret);
+            return ret;
+        }
+        mat4f m_identity4f() {
+            mat4f ret;
+            m_identity(&ret);
+            return ret;
+        }
+        mat4d m_identity4d() {
+            mat4d ret;
+            m_identity(&ret);
+            return ret;
+        }
+
+        void m_transpose(mat2i *m) {
+            int tmp = m->m[1];
+            m->m[1] = m->m[2];
+            m->m[2] = tmp;
+        }
+        void m_transpose(mat2f *m) {
+            float tmp = m->m[1];
+            m->m[1] = m->m[2];
+            m->m[2] = tmp;
+        }
+        void m_transpose(mat2d *m) {
+            double tmp = m->m[1];
+            m->m[1] = m->m[2];
+            m->m[2] = tmp;
+        }
+
+        void m_transpose(mat3i *m) {
+            mat3i temp;
+
+            for(int i = 0; i < 3; i++) {
+                for(int j = 0; j < 3; j++) {
+                    temp.m[i + j * 3] = m->m[i * 3 + j];
+                }
+            }
+
+            for(int i = 0; i < 9; i++) {
+                m->m[i] = temp.m[i];
+            }
+        }
+        void m_transpose(mat3f *m) {
+            mat3f temp;
+
+            for(int i = 0; i < 3; i++) {
+                for(int j = 0; j < 3; j++) {
+                    temp.m[i + j * 3] = m->m[i * 3 + j];
+                }
+            }
+
+            for(int i = 0; i < 9; i++) {
+                m->m[i] = temp.m[i];
+            }
+        }
+        void m_transpose(mat3d *m) {
+            mat3d temp;
+
+            for(int i = 0; i < 3; i++) {
+                for(int j = 0; j < 3; j++) {
+                    temp.m[i + j * 3] = m->m[i * 3 + j];
+                }
+            }
+
+            for(int i = 0; i < 9; i++) {
+                m->m[i] = temp.m[i];
+            }
+        }
+
+        void m_transpose(mat4i *m) {
+            mat4i temp;
+
+            for(int i = 0; i < 4; i++) {
+                for(int j = 0; j < 4; j++) {
+                    temp.m[i + j * 4] = m->m[i * 4 + j];
+                }
+            }
+
+            for(int i = 0; i < 16; i++) {
+                m->m[i] = temp.m[i];
+            }
+        }
+        void m_transpose(mat4f *m) {
+            mat4f temp;
+
+            for(int i = 0; i < 4; i++) {
+                for(int j = 0; j < 4; j++) {
+                    temp.m[i + j * 4] = m->m[i * 4 + j];
+                }
+            }
+
+            for(int i = 0; i < 16; i++) {
+                m->m[i] = temp.m[i];
+            }
+        }
+        void m_transpose(mat4d *m) {
+            mat4d temp;
+
+            for(int i = 0; i < 4; i++) {
+                for(int j = 0; j < 4; j++) {
+                    temp.m[i + j * 4] = m->m[i * 4 + j];
+                }
+            }
+
+            for(int i = 0; i < 16; i++) {
+                m->m[i] = temp.m[i];
+            }
+        }
+
         void m_print(mat2i m) {
             printf("2x2 Int Matrix {\n");
             printf("    %d, %d\n", m.m[0], m.m[1]);
