@@ -1301,6 +1301,54 @@ namespace std {
             }
         }
 
+        mat2i m_transpose(mat2i m) {
+            mat2i ret;
+            m_transpose(&ret, &m);
+            return ret;
+        }
+        mat2f m_transpose(mat2f m) {
+            mat2f ret;
+            m_transpose(&ret, &m);
+            return ret;
+        }
+        mat2d m_transpose(mat2d m) {
+            mat2d ret;
+            m_transpose(&ret, &m);
+            return ret;
+        }
+
+        mat3i m_transpose(mat3i m) {
+            mat3i ret;
+            m_transpose(&ret, &m);
+            return ret;
+        }
+        mat3f m_transpose(mat3f m) {
+            mat3f ret;
+            m_transpose(&ret, &m);
+            return ret;
+        }
+        mat3d m_transpose(mat3d m) {
+            mat3d ret;
+            m_transpose(&ret, &m);
+            return ret;
+        }
+
+        mat4i m_transpose(mat4i m) {
+            mat4i ret;
+            m_transpose(&ret, &m);
+            return ret;
+        }
+        mat4f m_transpose(mat4f m) {
+            mat4f ret;
+            m_transpose(&ret, &m);
+            return ret;
+        }
+        mat4d m_transpose(mat4d m) {
+            mat4d ret;
+            m_transpose(&ret, &m);
+            return ret;
+        }
+
         int m_determinant(mat2i m) {
             return m.m[0] * m.m[3] - m.m[1] * m.m[2];
         }
