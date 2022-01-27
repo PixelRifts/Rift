@@ -123,7 +123,7 @@ for i in range(len(lines)):
             func_param_list = []
         typedefs.append(Function(func_return_type, func_name, func_param_list))
         typedefFuncs.append(func_name)
+    elif(linesp[0] == "#define"): pass
     else:
-        #print(f"ERROR at line {i}: {line}")
-        #exit()
-        continue
+        print(f"ERROR at line {i}: {line}")
+        exit()
