@@ -1,10 +1,7 @@
-import "standard/math.rf";
+import "stbBindings/stb_image.rf";
+import "stbBindings/stb_hexwave.rf";
+import "standard/io.rf";
 
 int main() {
-    using std;
-    using std.Math;
-    mat4i m;
-    m_identity(&m);
-    m_print(m);
     return 0;
 }
