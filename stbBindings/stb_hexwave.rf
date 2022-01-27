@@ -237,7 +237,3 @@ native struct hexvert;
 
 native void hexwave_generate_linesegs(hexvert* vert, HexWave* hex, float dt);
 //            vert: pointer to an array of hexvert structs
-
-native void hexwave_generate_samples(float* output, int num_samples, HexWave* hex, float freq);
-//            output: buffer where the library will store generated floating point audio samples
-// number_of_samples: the number of audio samples to generate
