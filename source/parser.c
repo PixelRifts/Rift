@@ -1949,7 +1949,16 @@ static P_Expr* P_ExprCall(P_Parser* parser, P_Expr* left) {
         // Checks passed, Create the call node.
         return P_MakeCallNode(parser, left, *left->ret_type.op.func_ptr.ret_type, param_buffer, call_arity);
     }
+    
     report_error(parser, str_lit("No Function Overload of %.*s with given parameters found\n"), str_expand(left->op.funcname.name));
+    printf("Got ");
+    for (u32 i = 0; i < call_arity; i++) {
+        printf("%.*s", str_expand(param_buffer[i]->ret_type.full_type));
+        if (i != call_arity - 1) {
+            printf(", ");
+        }
+    }
+    printf("\n");
     return nullptr;
 }
 
@@ -2172,7 +2181,7 @@ static P_Expr* P_ExprAddr(P_Parser* parser) {
 }
 
 static P_Expr* P_ExprDeref(P_Parser* parser) {
-    P_Expr* e = P_Expression(parser);
+    P_Expr* e = P_ExprPrecedence(parser, Prec_Factor);
     
     if (!is_ptr(&e->ret_type))
         report_error(parser, str_lit("Cannot Dereference expression of type %.*s\n"), str_expand(e->ret_type.full_type));

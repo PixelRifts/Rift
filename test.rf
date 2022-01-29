@@ -1,10 +1,7 @@
-import "standard/math.rf";
+import "standard/memory.rf";
 
 int main() {
-    using std;
-    using std.Math;
-    mat4i m;
-    m_identity(&m);
-    m_print(m);
+    float* ptr = malloc(sizeof(float));
+    *ptr = 10.0f;
     return 0;
 }

@@ -3,12 +3,12 @@ import "int.rf";
 namespace std {
     typedef cstring va_list;
     typedef int64_t fpos_t;
-
+    
     /*
         Only declared importent functions and constants
     */
     native struct FILE;
-
+    
     native int BUFSIZ;
     native int FILENAME_MAX;
     native int FOPEN_MAX;
@@ -22,12 +22,12 @@ namespace std {
     native int TMP_MAX;
     native int L_tmpnam;
     native int EOF;
-
+    
     // Streams
     native FILE *stdout;
     native FILE *stderr;
     native FILE *stdin;
-
+    
     // Functions
     native void clearerr(FILE *stream);
     native int *ctermid(cstring s);
@@ -66,7 +66,7 @@ namespace std {
     native int getw(FILE *stream);
     native int pclose(FILE *stream);
     native void perror(cstring s);
-    native FILE *popen(cstring command, cstring type);
+    native FILE *popen(cstring command, cstring typ);
     native int printf(cstring format, ... rest);
     native int putc(int c, FILE *stream);
     native int putchar(int c);
