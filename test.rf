@@ -1,5 +1,6 @@
 import "stbBindings/stb_image.rf";
 import "stbBindings/stb_hexwave.rf";
+import "stbBindings/stb_truetype.rf";
 import "standard/io.rf";
 
 int main() {

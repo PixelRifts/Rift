@@ -300,17 +300,17 @@ native struct stbi_io_callbacks {
 // 8-bits-per-channel interface
 //
 
-native cstring stbi_load(cstring filename, int* x, int* y, int *channels_in_file, int desired_channels);
-native cstring stbi_load_from_file(stbi_io_callbacks* clbk, void* user, int* x, int* y, int *channels_in_file, int desired_channels);
+native uchar* stbi_load(cstring filename, int* x, int* y, int *channels_in_file, int desired_channels);
+native uchar* stbi_load_from_file(stbi_io_callbacks* clbk, void* user, int* x, int* y, int *channels_in_file, int desired_channels);
 
-native cstring stbi_load_gif_from_memory(cstring buffer, int len, int** delays, int* x, int* y, int* z, int* comp, int req_comp);
+native uchar* stbi_load_gif_from_memory(uchar* buffer, int len, int** delays, int* x, int* y, int* z, int* comp, int req_comp);
 
 ////////////////////////////////////
 //
 // 16-bits-per-channel interface
 //
 
-native ushort* stbi_load_16_from_memory(cstring buffer, int len, int* x, int* y, int* channels_in_file, int desired_channels);
+native ushort* stbi_load_16_from_memory(uchar* buffer, int len, int* x, int* y, int* channels_in_file, int desired_channels);
 native ushort* stbi_load_16_from_callbacks(stbi_io_callbacks* clbk, void* user, int* x, int* y, int* channels_in_file, int desired_channels);
 
 ////////////////////////////////////
@@ -318,7 +318,7 @@ native ushort* stbi_load_16_from_callbacks(stbi_io_callbacks* clbk, void* user, 
 // float-per-channel interface
 //
 
-native float* stbi_loadf_from_memory(cstring buffer, int len, int* x, int* y, int* channels_in_file, int desired_channels);
+native float* stbi_loadf_from_memory(uchar* buffer, int len, int* x, int* y, int* channels_in_file, int desired_channels);
 native float* stbi_loadf_from_callbacks(stbi_io_callbacks* clbk, void* user, int* x, int* y, int* channels_in_file, int desired_channels);
 
 native void stbi_hdr_to_ldr_gamma(float gamma);
@@ -329,7 +329,7 @@ native void stbi_ldr_to_hdr_scale(float scale);
 
 // stbi_is_hdr is always defined, but always returns false if STBI_NO_HDR
 native int stbi_is_hdr_from_callbacks(stbi_io_callbacks* clbk, void* user);
-native int stbi_is_hdr_from_memory(cstring buffer, int len);
+native int stbi_is_hdr_from_memory(uchar* buffer, int len);
 native int stbi_is_hdr(cstring filename);
 native int stbi_is_hdr_from_file(std.FILE* f);
 
@@ -341,9 +341,9 @@ native cstring stbi_failure_reason();
 native void stbi_image_free(void* retval_from_stbi_load);
 
 // get image dimensions & components without fully decoding
-native int stbi_info_from_memory(cstring buffer, int len, int* x, int* y, int* comp);
+native int stbi_info_from_memory(uchar* buffer, int len, int* x, int* y, int* comp);
 native int stbi_info_from_callbacks(stbi_io_callbacks* clbk, void* user, int* x, int* y, int* comp);
-native int stbi_is_16_bit_from_memory(cstring buffer, int len);
+native int stbi_is_16_bit_from_memory(uchar* buffer, int len);
 native int stbi_is_16_bit_from_callbacks(stbi_io_callbacks* clbk, void* user);
 
 // for image formats that explicitly notate that they have premultiplied alpha,
@@ -366,10 +366,10 @@ native void stbi_convert_iphone_png_to_rgb_thread(int flag_true_if_should_conver
 native void stbi_set_flip_vertically_on_load_thread(int flag_true_if_should_flip);
 
 // ZLIB client - used by PNG, available for other purposes
-native cstring stbi_zlib_decode_malloc_guesssize(cstring buffer, int len, int initial_size, int* outlen);
-native cstring stbi_zlib_decode_malloc_guesssize_headerflag(cstring buffer, int len, int initial_size, int* outlen, int parse_header);
-native cstring stbi_zlib_decode_malloc(cstring buffer, int len, int* outlen);
+native cstring stbi_zlib_decode_malloc_guesssize(uchar* buffer, int len, int initial_size, int* outlen);
+native cstring stbi_zlib_decode_malloc_guesssize_headerflag(uchar* buffer, int len, int initial_size, int* outlen, int parse_header);
+native cstring stbi_zlib_decode_malloc(uchar* buffer, int len, int* outlen);
 native int stbi_zlib_decode_buffer(cstring obuffer, int olen, cstring ibuffer, int ilen);
 
-native cstring stbi_zlib_decode_noheader_malloc(cstring buffer, int len, int* outlen);
+native cstring stbi_zlib_decode_noheader_malloc(uchar* buffer, int len, int* outlen);
 native int stbi_zlib_decode_noheader_buffer(cstring obuffer, int olen, cstring ibuffer, int ilen);
