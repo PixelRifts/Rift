@@ -1,5 +1,9 @@
 # Rift
-Rift - A Language Transpiler
+Rift - A Language Compiler
+
+Master branch is WIP (Compiler rework)
+Check out branch v1 for the old transpiler
+
 Meant to be C-Like with some helpful features.
 - Syntax is similar to C
 - Transpiles to C code
