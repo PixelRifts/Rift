@@ -1,12 +1,15 @@
 #include "mem.h"
 #include <string.h>
 #include <assert.h>
+#include <stdio.h>
 
 #ifdef CPCOM_WIN
 #include <windows.h>
 #elif defined(CPCOM_LINUX)
 #include <sys/mman.h>
 #endif
+
+#define DEFAULT_ALIGNMENT (2 * sizeof(void*))
 
 static void* mem_reserve(u64 size) {
 #ifdef CPCOM_WIN
@@ -41,6 +44,31 @@ static void mem_decommit(void* memory, u64 size) {
 #endif
 }
 
+b8 is_power_of_two(uintptr_t x) {
+	return (x & (x-1)) == 0;
+}
+
+u64 align_forward_u64(u64 ptr, u64 align) {
+	u64 p, a, modulo;
+    
+	assert(is_power_of_two(align));
+    
+	p = ptr;
+	a = (size_t)align;
+	// Same as (p % a) but faster as 'a' is a power of two
+	modulo = p & (a-1);
+    
+	if (modulo != 0) {
+		// If 'p' address is not aligned, push the address to the
+		// next value which is aligned
+		p += a - modulo;
+	}
+	return p;
+}
+
+
+//~ Arena (No alignment)
+
 void* arena_alloc(M_Arena* arena, u64 size) {
     void* memory = 0;
     if (arena->alloc_position + size > arena->commit_position) {
@@ -49,8 +77,12 @@ void* arena_alloc(M_Arena* arena, u64 size) {
         commit_size += M_ARENA_COMMIT_SIZE - 1;
         commit_size -= commit_size % M_ARENA_COMMIT_SIZE;
         
-        mem_commit(arena->memory + arena->commit_position, commit_size);
-        arena->commit_position += commit_size;
+        if (arena->commit_position >= arena->max) {
+            assert(0 && "Arena is out of memory");
+        } else {
+            mem_commit(arena->memory + arena->commit_position, commit_size);
+            arena->commit_position += commit_size;
+        }
     }
     memory = arena->memory + arena->alloc_position;
     arena->alloc_position += size;
@@ -76,4 +108,83 @@ void arena_clear(M_Arena* arena) {
 
 void arena_free(M_Arena* arena) {
     mem_release(arena->memory, arena->max);
+}
+
+
+//~ Pool
+
+void* pool_alloc(M_Pool* pool) {
+    M_PoolFreeNode* node = pool->free_list;
+    
+    if (node == nullptr) {
+        u64 commit_size = pool->chunk_size * M_POOL_CHUNK_COMMIT_COUNT;
+        if (pool->commit_position >= pool->max) {
+            assert(0 && "Pool is out of memory");
+        } else {
+            mem_commit(pool->memory + pool->commit_position, commit_size);
+            pool_dealloc_range(pool, pool->memory + pool->commit_position, M_POOL_CHUNK_COMMIT_COUNT);
+            pool->commit_position += commit_size;
+            node = pool->free_list;
+        }
+    }
+    
+    pool->free_list = pool->free_list->next;
+    return memset(node, 0, pool->chunk_size);
+}
+
+void pool_dealloc(M_Pool* pool, void* ptr) {
+    if (ptr == nullptr) return;
+    
+    M_PoolFreeNode* node;
+    
+    void* start = pool->memory;
+    void* end = pool->memory + pool->commit_position;
+    
+    if (!(start <= ptr && ptr < end)) {
+        assert(0 && "Pointer has not been allocated in this Pool");
+        return;
+    }
+    
+    node = (M_PoolFreeNode*) ptr;
+    node->next = pool->free_list;
+    pool->free_list = node;
+}
+
+void pool_dealloc_range(M_Pool* pool, void* ptr, u64 count) {
+    void* start = pool->memory;
+    void* end = pool->memory + pool->commit_position + pool->chunk_size * count;
+    
+    for (u64 i = 0; i < count; i++) {
+        void* pointer = ((M_PoolFreeNode*) ptr) + i;
+        
+        fflush(stdout);
+        if (!(start <= pointer && pointer < end)) {
+            assert(0 && "Overrun while freeing range");
+        }
+        
+        M_PoolFreeNode* node = (M_PoolFreeNode*) pointer;
+		node->next = pool->free_list;
+		pool->free_list = node;
+    }
+}
+
+void pool_init(M_Pool* pool, u64 chunk_size) {
+    pool->max = M_POOL_MAX;
+    pool->memory = mem_reserve(pool->max);
+    pool->commit_position = 0;
+    
+    chunk_size = align_forward_u64(chunk_size, (u64) DEFAULT_ALIGNMENT);
+    pool->chunk_size = chunk_size;
+    
+    assert(chunk_size >= sizeof(M_PoolFreeNode) && "Chunk size is too small");
+    pool->free_list = nullptr;
+    pool_clear(pool);
+}
+
+void pool_clear(M_Pool* pool) {
+    pool_dealloc_range(pool, pool->memory, pool->commit_position / pool->chunk_size);
+}
+
+void pool_free(M_Pool* pool) {
+    mem_release(pool->memory, pool->max);
 }

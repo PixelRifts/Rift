@@ -7,8 +7,9 @@
 #include "str.h"
 
 typedef u32 L_TokenType;
+
 enum {
-    TokenType_Error, TokenType_EOF, TokenType_Whitespace,
+    TokenType_Error, TokenType_EOF,
     
     TokenType_Identifier, TokenType_CstringLit,
     TokenType_IntLit, TokenType_FloatLit, TokenType_DoubleLit, TokenType_CharLit,
@@ -63,18 +64,19 @@ typedef struct L_Lexer {
     const char* start;
     const char* current;
     u32 line;
+    u32 column;
 } L_Lexer;
 
 typedef struct L_Token {
     L_TokenType type;
     const char* start;
-    u32 line, length;
+    u32 line, column, length;
 } L_Token;
 
-void L_Initialize(L_Lexer* lexer, string source);
+void L_Init(L_Lexer* lexer, string source);
 L_Token L_LexToken(L_Lexer* lexer);
 void L_PrintToken(L_Token token);
 
-string L__get_string_from_type__(L_TokenType type);
+string L_GetTypeName(L_TokenType type);
 
 #endif //LEXER_H

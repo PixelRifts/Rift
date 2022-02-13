@@ -1,3 +1,0 @@
-namespace std {
-    native int exit(int status);
-}

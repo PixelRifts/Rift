@@ -1,7 +1,1 @@
-import "standard/memory.rf";
-
-int main() {
-    float* ptr = malloc(sizeof(float));
-    *ptr = 10.0f;
-    return 0;
-}
+10

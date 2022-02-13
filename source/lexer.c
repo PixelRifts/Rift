@@ -2,11 +2,10 @@
 #include <string.h>
 #include <stdio.h>
 
-string L__get_string_from_type__(L_TokenType type) {
+string L_GetTypeName(L_TokenType type) {
     switch (type) {
         case TokenType_Error: return str_lit("Error");
         case TokenType_EOF: return str_lit("EOF");
-        case TokenType_Whitespace: return str_lit("Whitespace");
         case TokenType_Identifier: return str_lit("Identifier");
         case TokenType_CstringLit: return str_lit("Null-terminated String Literal");
         case TokenType_CharLit: return str_lit("Character Literal");
@@ -107,10 +106,16 @@ static b8 is_alpha(i8 c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z
 
 static inline b8 L_Bound(L_Lexer* lexer) { return *lexer->current == '\0'; }
 
+static i8 L_Advance(L_Lexer* lexer) {
+    lexer->current++;
+    lexer->column++;
+    return lexer->current[-1];
+}
+
 static b8 L_Match(L_Lexer* lexer, i8 expected) {
     if (L_Bound(lexer)) return false;
     if (*lexer->current != expected) return false;
-    lexer->current++;
+    L_Advance(lexer);
     return true;
 }
 
@@ -120,6 +125,7 @@ static L_Token L_MakeToken(L_Lexer* lexer, L_TokenType type) {
         .start = lexer->start,
         .length = (u32) (lexer->current - lexer->start),
         .line = lexer->line,
+        .column = lexer->column,
     };
 }
 
@@ -150,11 +156,6 @@ static L_Token L_QuadHandle(L_Lexer* lexer, i8 expected1, L_TokenType yes1, i8 e
     return L_MakeToken(lexer, no);
 }
 
-static i8 L_Advance(L_Lexer* lexer) {
-    lexer->current++;
-    return lexer->current[-1];
-}
-
 static i8 L_Peek(L_Lexer* lexer) { return *lexer->current; }
 
 static i8 L_PeekNext(L_Lexer* lexer) {
@@ -175,7 +176,10 @@ static void L_SkipWhitespace(L_Lexer* lexer) {
 
 static L_Token L_String(L_Lexer* lexer) {
     while (L_Peek(lexer) != '"') {
-        if (L_Peek(lexer) == '\n') lexer->line++;
+        if (L_Peek(lexer) == '\n') {
+            lexer->line++;
+            lexer->column = 1;
+        }
         if (L_Bound(lexer)) return L_ErrorToken(lexer, str_lit("Unterminated String literal"));
         L_Advance(lexer);
     }
@@ -384,10 +388,11 @@ static L_Token L_Tag(L_Lexer* lexer) {
     return L_MakeToken(lexer, TokenType_Tag);
 }
 
-void L_Initialize(L_Lexer* lexer, string source) {
+void L_Init(L_Lexer* lexer, string source) {
     lexer->start = (const char*) source.str;
     lexer->current = (const char*) source.str;
     lexer->line = 1;
+    lexer->column = 1;
 }
 
 L_Token L_LexToken(L_Lexer* lexer) {
@@ -435,7 +440,10 @@ L_Token L_LexToken(L_Lexer* lexer) {
                 u32 depth = 1;
                 while (depth != 0) {
                     L_Advance(lexer);
-                    if (L_Peek(lexer) == '\n') lexer->line++;
+                    if (L_Peek(lexer) == '\n') {
+                        lexer->line++;
+                        lexer->column = 1;
+                    }
                     
                     if (L_Bound(lexer)) return L_ErrorToken(lexer, str_lit("Unterminated Comment Block\n"));
                     if (L_Peek(lexer) == '*' && L_PeekNext(lexer) == '/') {
@@ -479,5 +487,5 @@ L_Token L_LexToken(L_Lexer* lexer) {
 }
 
 void L_PrintToken(L_Token token) {
-    printf("%.*s: %s\n", token.length, token.start, L__get_string_from_type__(token.type).str);
+    printf("%.*s: %.*s\n", token.length, token.start, str_expand(L_GetTypeName(token.type)));
 }
