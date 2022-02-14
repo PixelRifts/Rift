@@ -1,1 +1,4 @@
 10 + 60 * 2 * 3 + 10
+op
+boo + 2
+should_error +

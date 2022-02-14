@@ -176,4 +176,5 @@ void PrintAst_Indent(AstNode* node, u32 indent) {
 
 void PrintAst(AstNode* node) {
     PrintAst_Indent(node, 0);
+    printf("\n");
 }

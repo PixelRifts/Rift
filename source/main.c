@@ -40,6 +40,13 @@ int main(int argc, char **argv) {
         P_Init(&parser, &lexer);
         AstNode* node = P_Parse(&parser);
         PrintAst(node);
+        node = P_Parse(&parser);
+        PrintAst(node);
+        node = P_Parse(&parser);
+        PrintAst(node);
+        node = P_Parse(&parser);
+        PrintAst(node);
+        
         P_Free(&parser);
         
         free(source);
