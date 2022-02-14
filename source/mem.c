@@ -155,9 +155,8 @@ void pool_dealloc_range(M_Pool* pool, void* ptr, u64 count) {
     void* end = pool->memory + pool->commit_position + pool->chunk_size * count;
     
     for (u64 i = 0; i < count; i++) {
-        void* pointer = ((M_PoolFreeNode*) ptr) + i;
+        void* pointer = ptr + i * pool->chunk_size;
         
-        fflush(stdout);
         if (!(start <= pointer && pointer < end)) {
             assert(0 && "Overrun while freeing range");
         }

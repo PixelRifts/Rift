@@ -168,7 +168,7 @@ static void L_SkipWhitespace(L_Lexer* lexer) {
         i8 c = L_Peek(lexer);
         switch (c) {
             case ' ': case '\r': case '\t': L_Advance(lexer); break;
-            case '\n': lexer->line++; L_Advance(lexer); break;
+            case '\n': lexer->line++; lexer->column = 1; L_Advance(lexer); break;
             default: return;
         }
     }

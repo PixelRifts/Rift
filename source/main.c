@@ -39,7 +39,7 @@ int main(int argc, char **argv) {
         P_Parser parser = {0};
         P_Init(&parser, &lexer);
         AstNode* node = P_Parse(&parser);
-        printf("%d\n", node->type);
+        PrintAst(node);
         P_Free(&parser);
         
         free(source);
