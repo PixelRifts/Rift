@@ -7,6 +7,11 @@
 
 static char* readFile(const char* path) {
     FILE* file = fopen(path, "rb");
+
+    if (file == NULL) {
+        fprintf(stderr, "[ERROR] Could not open file %s\n", path);
+        exit(EXIT_FAILURE);
+    }
     
     fseek(file, 0L, SEEK_END);
     size_t fileSize = ftell(file);
