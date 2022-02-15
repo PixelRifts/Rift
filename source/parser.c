@@ -76,11 +76,11 @@ static AstNode* P_AllocIdentNode(P_Parser* parser, string val) {
     return node;
 }
 
-static AstNode* P_AllocBinaryNode(P_Parser* parser, AstNode* lhs, AstNode* rhs, L_TokenType op) {
+static AstNode* P_AllocBinaryNode(P_Parser* parser, AstNode* lhs, AstNode* rhs, L_Token op) {
     AstNode* node = P_AllocNode(parser, NodeType_Binary);
     node->Binary.left  = lhs;
     node->Binary.right = rhs;
-    node->Binary.type  = op;
+    node->Binary.op    = op;
     return node;
 }
 
@@ -119,11 +119,11 @@ static AstNode* P_Expression(P_Parser* parser, Prec prec_in, b8 is_rhs) {
     if (infix_expr_precs[parser->curr.type] != Prec_Invalid) {
         P_Advance(parser);
         while (true) {
-            L_TokenType op = parser->prev.type;
-            if (infix_expr_precs[op] == Prec_Invalid) break;
+            L_Token op = parser->prev;
+            if (infix_expr_precs[op.type] == Prec_Invalid) break;
             
-            if (infix_expr_precs[op] >= prec_in) {
-                rhs = P_Expression(parser, infix_expr_precs[op] + 1, true);
+            if (infix_expr_precs[op.type] >= prec_in) {
+                rhs = P_Expression(parser, infix_expr_precs[op.type] + 1, true);
                 if (rhs->type == NodeType_Error) return P_AllocErrorNode(parser);
                 lhs = P_AllocBinaryNode(parser, lhs, rhs, op);
             } else break;
@@ -167,7 +167,7 @@ void PrintAst_Indent(AstNode* node, u32 indent) {
         } break;
         
         case NodeType_Binary: {
-            printf("%.*s\n", str_expand(L_GetTypeName(node->Binary.type)));
+            printf("%.*s\n", str_expand(L_GetTypeName(node->Binary.op.type)));
             PrintAst_Indent(node->Binary.left, indent + 1);
             PrintAst_Indent(node->Binary.right, indent + 1);
         } break;

@@ -1,4 +1,1 @@
-10 + 60 * 2 * 3 + 10
-op
-boo + 2
-should_error +
+10 + 60 * 3 * 3 * should_error

@@ -3,6 +3,7 @@
 #include "str.h"
 #include "lexer.h"
 #include "parser.h"
+#include "checker.h"
 #include "defines.h"
 
 static char* readFile(const char* path) {
@@ -40,12 +41,8 @@ int main(int argc, char **argv) {
         P_Init(&parser, &lexer);
         AstNode* node = P_Parse(&parser);
         PrintAst(node);
-        node = P_Parse(&parser);
-        PrintAst(node);
-        node = P_Parse(&parser);
-        PrintAst(node);
-        node = P_Parse(&parser);
-        PrintAst(node);
+        C_Checker checker = {0};
+        C_CheckAst(&checker, node);
         
         P_Free(&parser);
         

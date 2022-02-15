@@ -16,19 +16,23 @@ AST_NODE(IntLit, str_lit("Integer Literal"), i64)\
 AST_NODE(Binary, str_lit("Binary Expression"), struct {\
 AstNode* left;\
 AstNode* right;\
-L_TokenType type;\
+L_Token  op;\
 })\
-AST_NODE(EXPR_END, str_lit(""), i8)\
+AST_NODE(EXPR_END, str_lit(""), i8)
 
-#define AST_NODE(Id, Name, Type) NodeType_##Id,
 typedef u32 P_NodeType;
 enum {
-    AST_NODES
+    NodeType_Error,
+    
+    NodeType_EXPR_START,
+    NodeType_Ident,
+    NodeType_IntLit,
+    NodeType_Binary,
+    NodeType_EXPR_END,
 };
-#undef AST_NODE
 
-typedef struct AstNode AstNode;
 #define AST_NODE(Id, Name, Type) Type Id;
+typedef struct AstNode AstNode;
 struct AstNode {
     P_NodeType type;
     union {
