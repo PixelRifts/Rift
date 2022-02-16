@@ -11,6 +11,9 @@
 Array_Prototype(integer_array, int);
 Array_Impl(integer_array, int);
 
+Stack_Prototype(integer_stack, int);
+Stack_Impl(integer_stack, int);
+
 static char* readFile(const char* path) {
     FILE* file = fopen(path, "rb");
     
@@ -33,13 +36,26 @@ int main(int argc, char **argv) {
         char* source = readFile(argv[1]);
         string source_str = { .str = (u8*) source, .size = strlen(source) };
         
+        printf("Array:\n");
         integer_array arr = {0};
         integer_array_add(&arr, 10);
         integer_array_add(&arr, 20);
         integer_array_add(&arr, 30);
-        
-        Array_Iterate(arr, i) {
+        int val = integer_array_remove(&arr, 1);
+        printf("%d\n", val);
+        Iterate(arr, i) {
             printf("%d\n", arr.elems[i]);
+        }
+        
+        printf("\nStack:\n");
+        integer_stack stack = {0};
+        integer_stack_push(&stack, 40);
+        integer_stack_push(&stack, 50);
+        integer_stack_push(&stack, 60);
+        val = integer_stack_pop(&stack);
+        printf("%d\n", val);
+        Iterate(stack, i) {
+            printf("%d\n", stack.elems[i]);
         }
         
         L_Lexer lexer = {0};
