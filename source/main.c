@@ -14,6 +14,18 @@ Array_Impl(integer_array, int);
 Stack_Prototype(integer_stack, int);
 Stack_Impl(integer_stack, int);
 
+HashTable_Prototype(int_string, string, int);
+b8 intstring_key_isnull(int_string_hash_table_key k) {
+    return k.size == 0;
+}
+b8 intstring_val_isnull(int_string_hash_table_value v) {
+    return v == 0;
+}
+b8 intstring_val_istomb(int_string_hash_table_value v) {
+    return v == -69;
+}
+HashTable_Impl(int_string, intstring_key_isnull, str_eq, str_hash, -69, intstring_val_isnull, intstring_val_istomb);
+
 static char* readFile(const char* path) {
     FILE* file = fopen(path, "rb");
     
@@ -57,6 +69,19 @@ int main(int argc, char **argv) {
         Iterate(stack, i) {
             printf("%d\n", stack.elems[i]);
         }
+        
+        printf("\nHash Table:\n");
+        int_string_hash_table table = {0};
+        int_string_hash_table_set(&table, str_lit("YOLO"), 40);
+        int_string_hash_table_set(&table, str_lit("BOO"), 20);
+        int_string_hash_table_set(&table, str_lit("KEK"), 30);
+        int_string_hash_table_del(&table, str_lit("YOLO"));
+        
+        int boo;
+        int_string_hash_table_get(&table, str_lit("BOO"), &boo);
+        printf("%d\n", boo);
+        int_string_hash_table_get(&table, str_lit("KEK"), &boo);
+        printf("%d\n", boo);
         
         L_Lexer lexer = {0};
         L_Init(&lexer, source_str);

@@ -1,7 +1,7 @@
 /*
  TODOS(voxel):
 - Exit Function for the compiler which cleans everything up
-- Better Error Output. Should show line with ~~~~^ underneath offencding token
+- Better Error Output. Should show line with ~~~~^ underneath offending token
 */
 
 #include "parser.h"

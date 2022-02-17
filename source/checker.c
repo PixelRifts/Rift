@@ -1,6 +1,6 @@
 /*
  TODOS(voxel):
-- Better Error Output. Should show line with ~~~~^ underneath offencding token
+- Better Error Output. Should show line with ~~~~^ underneath offending token
 */
 
 #include "checker.h"
