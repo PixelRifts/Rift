@@ -12,13 +12,13 @@
 #define Iterate(array, var) for (int var = 0; var < array.len; var++)
 #define IteratePtr(array, var) for (int var = 0; var < array->len; var++)
 
-#define Array_Prototype(Name, Data)          \
-typedef struct Name {                    \
-u32 cap;                             \
-u32 len;                             \
-Data* elems;                         \
-} Name;                                  \
-void Name##_add(Name* array, Data data); \
+#define Array_Prototype(Name, Data)\
+typedef struct Name {\
+u32 cap;\
+u32 len;\
+Data* elems;\
+} Name;\
+void Name##_add(Name* array, Data data);\
 Data Name##_remove(Name* array, int idx);
 
 
