@@ -84,6 +84,12 @@ static AstNode* P_AllocBinaryNode(P_Parser* parser, AstNode* lhs, AstNode* rhs, 
     return node;
 }
 
+static AstNode* P_AllocReturnNode(P_Parser* parser, AstNode* expr) {
+    AstNode* node = P_AllocNode(parser, NodeType_Return);
+    node->Return = expr;
+    return node;
+}
+
 //~ Expressions
 static AstNode* P_ExprUnary(P_Parser* parser, b8 rhs);
 
@@ -133,6 +139,14 @@ static AstNode* P_Expression(P_Parser* parser, Prec prec_in, b8 is_rhs) {
     return lhs;
 }
 
+static AstNode* P_Statement(P_Parser* parser) {
+    if (P_Match(parser, TokenType_Return)) {
+        AstNode* expr = P_Expression(parser, Prec_Invalid, false);
+        return P_AllocReturnNode(parser, expr);
+    }
+    return P_AllocErrorNode(parser);
+}
+
 void P_Init(P_Parser* parser, L_Lexer* lexer) {
     parser->lexer = lexer;
     pool_init(&parser->node_pool, sizeof(AstNode));
@@ -143,7 +157,7 @@ void P_Init(P_Parser* parser, L_Lexer* lexer) {
 
 AstNode* P_Parse(P_Parser* parser) {
     if (parser->curr.type == TokenType_EOF) return P_AllocErrorNode(parser);
-    return P_Expression(parser, Prec_Invalid, false);
+    return P_Statement(parser);
 }
 
 void P_Free(P_Parser* parser) {
@@ -170,6 +184,11 @@ void PrintAst_Indent(AstNode* node, u32 indent) {
             printf("%.*s\n", str_expand(L_GetTypeName(node->Binary.op.type)));
             PrintAst_Indent(node->Binary.left, indent + 1);
             PrintAst_Indent(node->Binary.right, indent + 1);
+        } break;
+        
+        case NodeType_Return: {
+            printf("Return\n");
+            PrintAst_Indent(node->Return, indent + 1);
         } break;
     }
 }

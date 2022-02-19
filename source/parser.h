@@ -18,7 +18,10 @@ AstNode* left;\
 AstNode* right;\
 L_Token  op;\
 })\
-AST_NODE(EXPR_END, str_lit(""), i8)
+AST_NODE(EXPR_END, str_lit(""), i8)\
+AST_NODE(STMT_START, str_lit(""), i8)\
+AST_NODE(Return, str_lit("Return Statement"), AstNode*)\
+AST_NODE(STMT_END, str_lit(""), i8)
 
 typedef u32 P_NodeType;
 enum {
@@ -29,6 +32,9 @@ enum {
     NodeType_IntLit,
     NodeType_Binary,
     NodeType_EXPR_END,
+    NodeType_STMT_START,
+    NodeType_Return,
+    NodeType_STMT_END,
 };
 
 #define AST_NODE(Id, Name, Type) Type Id;

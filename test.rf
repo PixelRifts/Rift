@@ -1,1 +1,1 @@
-10 + 60 * 3 * 3 * should_error
+return 10 + 60 * 3 * 3

@@ -59,6 +59,12 @@ static C_BasicType C_GetType(C_Checker* checker, AstNode* node) {
             }
             return BasicType_Integer;
         } break;
+        
+        case NodeType_Return: {
+            C_BasicType t = C_GetType(checker, node->Return);
+            if (t != BasicType_Integer) C_ReportCheckError(checker, node->Binary.op, "Cannot print expression of type %.*s\n", str_expand(C_GetBasicTypeName(t)));
+            return BasicType_Invalid;
+        } break;
     }
     return BasicType_Invalid;
 }
