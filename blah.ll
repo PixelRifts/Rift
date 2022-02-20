@@ -3,5 +3,5 @@ source_filename = "Testing"
 
 define i64 @main() {
 entry:
-  ret i64 550
+  %phi = alloca i64, align 8
 }

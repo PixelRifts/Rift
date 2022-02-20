@@ -10,6 +10,13 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
+b8 var_key_is_null(var_hash_table_key k) { return k.name.size == 0 && k.depth == 0; }
+b8 var_key_is_eq(var_hash_table_key a, var_hash_table_key b) { return str_eq(a.name, b.name) && a.depth == b.depth; }
+u32 hash_var_key(var_hash_table_key k) { return str_hash(k.name) + k.depth; }
+b8 var_val_is_null(var_hash_table_value v) { return v.type == BasicType_Invalid; }
+b8 var_val_is_tombstone(var_hash_table_value v) { return v.type == BasicType_End; }
+HashTable_Impl(var, var_key_is_null, var_key_is_eq, hash_var_key, (var_hash_table_value) { .type = BasicType_End }, var_val_is_null, var_val_is_tombstone);
+
 static void C_Report(C_Checker* checker, L_Token token, const char* stage, const char* err, ...) {
     if (checker->errored) return;
     if (checker->error_count > 20) exit(-1);
@@ -65,10 +72,27 @@ static C_BasicType C_GetType(C_Checker* checker, AstNode* node) {
             if (t != BasicType_Integer) C_ReportCheckError(checker, node->Binary.op, "Cannot print expression of type %.*s\n", str_expand(C_GetBasicTypeName(t)));
             return BasicType_Invalid;
         } break;
+        
+        case NodeType_VarDeclAssign: {
+            var_hash_table_key key = (var_hash_table_key) { .name = { .str = node->VarDeclAssign.name.start, .size = node->VarDeclAssign.name.length }, .depth = 0 };
+            if (var_hash_table_get(&checker->var_table, key, nullptr)) {
+                C_ReportCheckError(checker, node->VarDeclAssign.name, "Variable %.*s already exists\n", node->VarDeclAssign.name.length, node->VarDeclAssign.name.start);
+            }
+            var_hash_table_set(&checker->var_table, key, (var_hash_table_value) { .type = BasicType_Integer });
+            return BasicType_Invalid;
+        } break;
     }
     return BasicType_Invalid;
 }
 
+void C_Init(C_Checker* checker) {
+    var_hash_table_init(&checker->var_table);
+}
+
 void C_CheckAst(C_Checker* checker, AstNode* node) {
     C_GetType(checker, node);
+}
+
+void C_Free(C_Checker* checker) {
+    var_hash_table_free(&checker->var_table);
 }

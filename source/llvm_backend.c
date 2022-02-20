@@ -1,6 +1,7 @@
 #include "llvm_backend.h"
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
 static void BL_Report(BL_Emitter* emitter, const char* stage, const char* err, ...) {
     fprintf(stderr, "%s Error: ", stage);
@@ -26,12 +27,12 @@ void BL_Init(BL_Emitter* emitter, string filename) {
 }
 
 LLVMValueRef BL_BuildBinary(BL_Emitter* emitter, L_Token token, LLVMValueRef left, LLVMValueRef right) {
-    static char ctr = 'a' - 1;
+    static char ctr = 'a';
     switch (token.type) {
-        case TokenType_Plus:  ctr++; return LLVMBuildAdd(emitter->builder, left, right, &ctr);
-        case TokenType_Minus: ctr++; return LLVMBuildSub(emitter->builder, left, right, &ctr);
-        case TokenType_Star:  ctr++; return LLVMBuildMul(emitter->builder, left, right, &ctr);
-        case TokenType_Slash: ctr++; return LLVMBuildUDiv(emitter->builder, left, right, &ctr);
+        case TokenType_Plus:  return LLVMBuildAdd(emitter->builder, left, right, &ctr);
+        case TokenType_Minus: return LLVMBuildSub(emitter->builder, left, right, &ctr);
+        case TokenType_Star:  return LLVMBuildMul(emitter->builder, left, right, &ctr);
+        case TokenType_Slash: return LLVMBuildUDiv(emitter->builder, left, right, &ctr);
     }
     return (LLVMValueRef) {0};
 }
@@ -46,12 +47,21 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             return BL_BuildBinary(emitter, node->Binary.op, left, right);
         }
         case NodeType_Return: return LLVMBuildRet(emitter->builder, BL_Emit(emitter, node->Return));
+        case NodeType_VarDeclAssign: {
+            char* hoist = malloc(node->VarDeclAssign.name.length + 1);
+            memcpy(hoist, node->VarDeclAssign.name.start, node->VarDeclAssign.name.length);
+            hoist[node->VarDeclAssign.name.length] = '\0';
+            LLVMValueRef alloca = LLVMBuildAlloca(emitter->builder, LLVMInt64Type(), hoist);
+            free(hoist);
+            return alloca;
+        }
     }
     return (LLVMValueRef) {0};
 }
 
 void BL_Free(BL_Emitter* emitter) {
-    //LLVMBuildRet(emitter->builder, LLVMConstInt(LLVMInt64Type(), 0, 0));
     char* error = nullptr;
     LLVMPrintModuleToFile(emitter->module, (char*)emitter->filename.str, &error);
+    LLVMDisposeBuilder(emitter->builder);
+    LLVMDisposeModule(emitter->module);
 }

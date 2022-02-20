@@ -6,6 +6,7 @@
 #include "defines.h"
 #include "parser.h"
 #include "mem.h"
+#include "ds.h"
 
 // Uses TYPE(Id, Name)
 #define BASIC_TYPES \
@@ -15,14 +16,21 @@ TYPE(Integer, str_lit("Integer"))
 typedef u32 C_BasicType;
 enum {
     BasicType_Invalid,
-    BasicType_Integer
+    BasicType_Integer,
+    BasicType_End
 };
+
+HashTable_Prototype(var, struct { string name; u32 depth; }, struct { C_BasicType type; });
 
 typedef struct C_Checker {
     b8 errored;
     u8 error_count;
+    
+    var_hash_table var_table;
 } C_Checker;
 
+void C_Init(C_Checker* checker);
 void C_CheckAst(C_Checker* checker, AstNode* node);
+void C_Free(C_Checker* checker);
 
 #endif //CHECKER_H

@@ -1,1 +1,1 @@
-return 10 + 60 * 3 * 3
+int phi = 10

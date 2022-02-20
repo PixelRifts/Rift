@@ -90,6 +90,14 @@ static AstNode* P_AllocReturnNode(P_Parser* parser, AstNode* expr) {
     return node;
 }
 
+static AstNode* P_AllocVarDeclAssignNode(P_Parser* parser, L_Token type, L_Token name, AstNode* value) {
+    AstNode* node = P_AllocNode(parser, NodeType_VarDeclAssign);
+    node->VarDeclAssign.type = type;
+    node->VarDeclAssign.name = name;
+    node->VarDeclAssign.value = value;
+    return node;
+}
+
 //~ Expressions
 static AstNode* P_ExprUnary(P_Parser* parser, b8 rhs);
 
@@ -143,6 +151,13 @@ static AstNode* P_Statement(P_Parser* parser) {
     if (P_Match(parser, TokenType_Return)) {
         AstNode* expr = P_Expression(parser, Prec_Invalid, false);
         return P_AllocReturnNode(parser, expr);
+    } else if (P_Match(parser, TokenType_Int)) {
+        L_Token type = parser->prev;
+        P_Eat(parser, TokenType_Identifier);
+        L_Token name = parser->prev;
+        P_Eat(parser, TokenType_Equal);
+        AstNode* value = P_Expression(parser, Prec_Invalid, false);
+        return P_AllocVarDeclAssignNode(parser, type, name, value);
     }
     return P_AllocErrorNode(parser);
 }
@@ -189,6 +204,11 @@ void PrintAst_Indent(AstNode* node, u32 indent) {
         case NodeType_Return: {
             printf("Return\n");
             PrintAst_Indent(node->Return, indent + 1);
+        } break;
+        
+        case NodeType_VarDeclAssign: {
+            printf("Assign to %.*s\n", node->VarDeclAssign.name.length, node->VarDeclAssign.name.start);
+            PrintAst_Indent(node->VarDeclAssign.value, indent + 1);
         } break;
     }
 }

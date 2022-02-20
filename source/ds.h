@@ -114,7 +114,7 @@ table->elems = nullptr;\
 }\
 static Name##_hash_table_entry* Name##_hash_table_find_entry(Name##_hash_table* table, Name##_hash_table_key key) {\
 u32 index = HashKey(key) % table->cap;\
-Name##_hash_table_entry* tombstone;\
+Name##_hash_table_entry* tombstone = nullptr;\
 while (true) {\
 Name##_hash_table_entry* entry = &table->elems[index];\
 if (KeyIsNull(entry->key)) {\
@@ -166,7 +166,7 @@ b8 Name##_hash_table_get(Name##_hash_table* table, Name##_hash_table_key key, Na
 if (table->len == 0) return false;\
 Name##_hash_table_entry* entry = Name##_hash_table_find_entry(table, key);\
 if (KeyIsNull(entry->key)) return false;\
-*val = entry->value;\
+if (val != nullptr) *val = entry->value;\
 return true;\
 }\
 b8 Name##_hash_table_del(Name##_hash_table* table, Name##_hash_table_key key) {\

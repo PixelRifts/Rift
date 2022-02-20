@@ -21,6 +21,11 @@ L_Token  op;\
 AST_NODE(EXPR_END, str_lit(""), i8)\
 AST_NODE(STMT_START, str_lit(""), i8)\
 AST_NODE(Return, str_lit("Return Statement"), AstNode*)\
+AST_NODE(VarDeclAssign, str_lit("Variable Decl Assignment Statement"), struct {\
+L_Token type;\
+L_Token name;\
+AstNode* value;\
+})\
 AST_NODE(STMT_END, str_lit(""), i8)
 
 typedef u32 P_NodeType;
@@ -34,6 +39,7 @@ enum {
     NodeType_EXPR_END,
     NodeType_STMT_START,
     NodeType_Return,
+    NodeType_VarDeclAssign,
     NodeType_STMT_END,
 };
 
