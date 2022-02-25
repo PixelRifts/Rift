@@ -17,8 +17,17 @@ typedef u32 C_BasicType;
 enum {
     BasicType_Invalid,
     BasicType_Integer,
+    BasicType_Cstring,
     BasicType_End
 };
+
+typedef struct C_Type {
+    C_BasicType type;
+    
+    union {
+        // Nothing for now
+    };
+} C_Type;
 
 HashTable_Prototype(var, struct { string name; u32 depth; }, struct { C_BasicType type; });
 

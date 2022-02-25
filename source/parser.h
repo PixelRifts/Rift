@@ -13,6 +13,11 @@ AST_NODE(Error, str_lit(""), i8)\
 AST_NODE(EXPR_START, str_lit(""), i8)\
 AST_NODE(Ident, str_lit("Identifier Expression"), string)\
 AST_NODE(IntLit, str_lit("Integer Literal"), i64)\
+AST_NODE(GlobalString, str_lit("Global String Literal"), string)\
+AST_NODE(Unary, str_lit("Unary Expression"), struct {\
+AstNode* expr;\
+L_Token  op;\
+})\
 AST_NODE(Binary, str_lit("Binary Expression"), struct {\
 AstNode* left;\
 AstNode* right;\
@@ -21,7 +26,7 @@ L_Token  op;\
 AST_NODE(EXPR_END, str_lit(""), i8)\
 AST_NODE(STMT_START, str_lit(""), i8)\
 AST_NODE(Return, str_lit("Return Statement"), AstNode*)\
-AST_NODE(VarDeclAssign, str_lit("Variable Decl Assignment Statement"), struct {\
+AST_NODE(VarDecl, str_lit("Variable Decl Assignment Statement"), struct {\
 L_Token type;\
 L_Token name;\
 AstNode* value;\
@@ -35,11 +40,14 @@ enum {
     NodeType_EXPR_START,
     NodeType_Ident,
     NodeType_IntLit,
+    NodeType_GlobalString,
+    NodeType_Unary,
     NodeType_Binary,
     NodeType_EXPR_END,
+    
     NodeType_STMT_START,
     NodeType_Return,
-    NodeType_VarDeclAssign,
+    NodeType_VarDecl,
     NodeType_STMT_END,
 };
 

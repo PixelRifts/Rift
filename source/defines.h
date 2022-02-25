@@ -38,6 +38,7 @@ typedef char b8;
 #endif
 
 #define trace printf("Trace\n")
+#define unreachable printf("How did we get here? In %s on line %d\n", __FILE_NAME__, __LINE__)
 
 #define FATAL(s)            \
 do {                    \

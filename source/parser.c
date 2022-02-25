@@ -70,9 +70,22 @@ static AstNode* P_AllocIntLitNode(P_Parser* parser, i64 val) {
     return node;
 }
 
+static AstNode* P_AllocGlobalStringNode(P_Parser* parser, string val) {
+    AstNode* node = P_AllocNode(parser, NodeType_GlobalString);
+    node->GlobalString = val;
+    return node;
+}
+
 static AstNode* P_AllocIdentNode(P_Parser* parser, string val) {
     AstNode* node = P_AllocNode(parser, NodeType_Ident);
     node->Ident = val;
+    return node;
+}
+
+static AstNode* P_AllocUnaryNode(P_Parser* parser, AstNode* operand, L_Token op) {
+    AstNode* node = P_AllocNode(parser, NodeType_Unary);
+    node->Unary.expr = operand;
+    node->Unary.op   = op;
     return node;
 }
 
@@ -90,11 +103,11 @@ static AstNode* P_AllocReturnNode(P_Parser* parser, AstNode* expr) {
     return node;
 }
 
-static AstNode* P_AllocVarDeclAssignNode(P_Parser* parser, L_Token type, L_Token name, AstNode* value) {
-    AstNode* node = P_AllocNode(parser, NodeType_VarDeclAssign);
-    node->VarDeclAssign.type = type;
-    node->VarDeclAssign.name = name;
-    node->VarDeclAssign.value = value;
+static AstNode* P_AllocVarDeclNode(P_Parser* parser, L_Token type, L_Token name, AstNode* value) {
+    AstNode* node = P_AllocNode(parser, NodeType_VarDecl);
+    node->VarDecl.type = type;
+    node->VarDecl.name = name;
+    node->VarDecl.value = value;
     return node;
 }
 
@@ -111,10 +124,28 @@ static AstNode* P_ExprIdent(P_Parser* parser) {
     return P_AllocIdentNode(parser, value);
 }
 
+static AstNode* P_ExprStringLit(P_Parser* parser) {
+    string value = { .str = (u8*) parser->prev.start + 1, .size = parser->prev.length - 2 };
+    return P_AllocGlobalStringNode(parser, value);
+}
+
+static AstNode* P_ExprUnaryNum(P_Parser* parser) {
+    L_Token op = parser->prev;
+    AstNode* expr = P_ExprUnary(parser, false);
+    return P_AllocUnaryNode(parser, expr, op);
+}
+
 static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
     switch (parser->curr.type) {
         case TokenType_IntLit: P_Advance(parser); return P_ExprIntegerLiteral(parser);
+        case TokenType_CstringLit: P_Advance(parser); return P_ExprStringLit(parser);
         case TokenType_Identifier: P_Advance(parser); return P_ExprIdent(parser);
+        
+        case TokenType_Plus:
+        case TokenType_Minus:
+        case TokenType_Tilde:
+        P_Advance(parser); return P_ExprUnaryNum(parser);
+        
         default: {
             if (is_rhs)
                 P_ReportParseError(parser, "Invalid Expression for Right Hand Side of %.*s\n", parser->prev.length, parser->prev.start);
@@ -155,9 +186,10 @@ static AstNode* P_Statement(P_Parser* parser) {
         L_Token type = parser->prev;
         P_Eat(parser, TokenType_Identifier);
         L_Token name = parser->prev;
-        P_Eat(parser, TokenType_Equal);
-        AstNode* value = P_Expression(parser, Prec_Invalid, false);
-        return P_AllocVarDeclAssignNode(parser, type, name, value);
+        AstNode* value = nullptr;
+        if (P_Match(parser, TokenType_Equal))
+            value = P_Expression(parser, Prec_Invalid, false);
+        return P_AllocVarDeclNode(parser, type, name, value);
     }
     return P_AllocErrorNode(parser);
 }
@@ -195,8 +227,17 @@ void PrintAst_Indent(AstNode* node, u32 indent) {
             printf("%lld\n", node->IntLit);
         } break;
         
+        case NodeType_GlobalString: {
+            printf("String Literal [%.*s]\n", str_expand(node->GlobalString));
+        } break;
+        
+        case NodeType_Unary: {
+            printf("Unary %.*s\n", str_expand(L_GetTypeName(node->Unary.op.type)));
+            PrintAst_Indent(node->Unary.expr, indent + 1);
+        } break;
+        
         case NodeType_Binary: {
-            printf("%.*s\n", str_expand(L_GetTypeName(node->Binary.op.type)));
+            printf("Binary %.*s\n", str_expand(L_GetTypeName(node->Binary.op.type)));
             PrintAst_Indent(node->Binary.left, indent + 1);
             PrintAst_Indent(node->Binary.right, indent + 1);
         } break;
@@ -206,9 +247,13 @@ void PrintAst_Indent(AstNode* node, u32 indent) {
             PrintAst_Indent(node->Return, indent + 1);
         } break;
         
-        case NodeType_VarDeclAssign: {
-            printf("Assign to %.*s\n", node->VarDeclAssign.name.length, node->VarDeclAssign.name.start);
-            PrintAst_Indent(node->VarDeclAssign.value, indent + 1);
+        case NodeType_VarDecl: {
+            if (node->VarDecl.value) {
+                printf("Assign to %.*s\n", node->VarDecl.name.length, node->VarDecl.name.start);
+                PrintAst_Indent(node->VarDecl.value, indent + 1);
+            } else {
+                printf("Declare %.*s\n", node->VarDecl.name.length, node->VarDecl.name.start);
+            }
         } break;
     }
 }
