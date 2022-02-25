@@ -1,6 +1,6 @@
 /*
  TODOS(voxel):
-- Better Error Output. Should show line with ~~~~^ underneath offending token
+- Better Error Output. Should show line with ----^ underneath offending token
 */
 
 #include "checker.h"
@@ -13,9 +13,9 @@
 b8 var_key_is_null(var_hash_table_key k) { return k.name.size == 0 && k.depth == 0; }
 b8 var_key_is_eq(var_hash_table_key a, var_hash_table_key b) { return str_eq(a.name, b.name) && a.depth == b.depth; }
 u32 hash_var_key(var_hash_table_key k) { return str_hash(k.name) + k.depth; }
-b8 var_val_is_null(var_hash_table_value v) { return v.type == BasicType_Invalid; }
-b8 var_val_is_tombstone(var_hash_table_value v) { return v.type == BasicType_End; }
-HashTable_Impl(var, var_key_is_null, var_key_is_eq, hash_var_key, (var_hash_table_value) { .type = BasicType_End }, var_val_is_null, var_val_is_tombstone);
+b8 var_val_is_null(var_hash_table_value v) { return v.type.type == BasicType_Invalid; }
+b8 var_val_is_tombstone(var_hash_table_value v) { return v.type.type == BasicType_End; }
+HashTable_Impl(var, var_key_is_null, var_key_is_eq, hash_var_key, (var_hash_table_value) { .type = (C_Type) { .type = BasicType_End } }, var_val_is_null, var_val_is_tombstone);
 
 static void C_Report(C_Checker* checker, L_Token token, const char* stage, const char* err, ...) {
     if (checker->errored) return;
@@ -60,6 +60,11 @@ static b8 C_CheckUnary(C_Type operand, L_TokenType op) {
 static C_Type C_GetType(C_Checker* checker, AstNode* node) {
     switch (node->type) {
         case NodeType_Ident: {
+            var_hash_table_key key = (var_hash_table_key) { .name = { .str = node->VarDecl.name.start, .size = node->VarDecl.name.length }, .depth = 0 };
+            var_hash_table_value val;
+            if (var_hash_table_get(&checker->var_table, key, &val)) {
+                return val.type;
+            }
             return (C_Type) { .type = BasicType_Invalid };
         } break;
         
@@ -98,7 +103,7 @@ static C_Type C_GetType(C_Checker* checker, AstNode* node) {
             if (var_hash_table_get(&checker->var_table, key, nullptr)) {
                 C_ReportCheckError(checker, node->VarDecl.name, "Variable %.*s already exists\n", node->VarDecl.name.length, node->VarDecl.name.start);
             }
-            var_hash_table_set(&checker->var_table, key, (var_hash_table_value) { .type = BasicType_Integer });
+            var_hash_table_set(&checker->var_table, key, (var_hash_table_value) { .type = (C_Type) { .type = BasicType_Integer } });
             return (C_Type) { .type = BasicType_Invalid };
         } break;
     }

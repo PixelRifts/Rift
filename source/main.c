@@ -35,15 +35,20 @@ int main(int argc, char **argv) {
         L_Init(&lexer, source_str);
         P_Parser parser = {0};
         P_Init(&parser, &lexer);
-        AstNode* node = P_Parse(&parser);
-        PrintAst(node);
-        fflush(stdout);
+        
         C_Checker checker = {0};
         C_Init(&checker);
-        C_CheckAst(&checker, node);
         BL_Emitter emitter = {0};
         BL_Init(&emitter, str_lit("blah.ll"));
-        BL_Emit(&emitter, node);
+        
+        AstNode* node = P_Parse(&parser);
+        while (node->type != NodeType_Error) {
+            C_CheckAst(&checker, node);
+            BL_Emit(&emitter, node);
+            node = P_Parse(&parser);
+        }
+        
+        
         BL_Free(&emitter);
         C_Free(&checker);
         P_Free(&parser);

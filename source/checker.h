@@ -29,7 +29,7 @@ typedef struct C_Type {
     };
 } C_Type;
 
-HashTable_Prototype(var, struct { string name; u32 depth; }, struct { C_BasicType type; });
+HashTable_Prototype(var, struct { string name; u32 depth; }, struct { C_Type type; });
 
 typedef struct C_Checker {
     b8 errored;

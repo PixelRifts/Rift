@@ -4,12 +4,19 @@
 #define LLVM_BACKEND_H
 
 #include "parser.h"
+#include "ds.h"
 #include "llvm-c/Core.h"
+#include "llvm-c/Analysis.h"
+
+HashTable_Prototype(llvmvar, struct { string name; u32 depth; }, struct { LLVMValueRef value; b8 not_null; b8 tombstone; });
+
 typedef struct BL_Emitter {
     string filename;
     LLVMModuleRef module;
     LLVMBasicBlockRef entry;
     LLVMBuilderRef builder;
+    
+    llvmvar_hash_table variables;
 } BL_Emitter;
 
 void BL_Init(BL_Emitter* emitter, string filename);
