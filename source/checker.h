@@ -11,7 +11,9 @@
 // Uses TYPE(Id, Name)
 #define BASIC_TYPES \
 TYPE(Invalid, str_lit("Invalid")) \
-TYPE(Integer, str_lit("Integer"))
+TYPE(Integer, str_lit("Integer")) \
+TYPE(Cstring, str_lit("Cstring")) \
+TYPE(Count, str_lit("__Count"))
 
 typedef u32 C_BasicType;
 enum {

@@ -3,16 +3,26 @@
 #ifndef CHECKER_DATA_H
 #define CHECKER_DATA_H
 
+const C_Type C_InvalidType = { BasicType_Invalid };
+const C_Type C_IntegerType = { BasicType_Integer };
+
+#define C_IntTypeConst { BasicType_Integer }
+
 //~ Unary Operators
 
+typedef struct C_UnaryOpTypes {
+    C_Type a;
+    C_Type ret;
+} C_UnaryOpTypes;
+
 typedef struct C_UnaryOpBinding {
-    C_BasicType* elems;
+    C_UnaryOpTypes* elems;
     u32 count;
 } C_UnaryOpBinding;
 
 const u32 uoperator_number_length = 1;
-C_BasicType uoperator_number[] = {
-    BasicType_Integer,
+C_UnaryOpTypes uoperator_number[] = {
+    { C_IntTypeConst, C_IntTypeConst },
 };
 
 #define associate(token, name) [token] = { uoperator_##name, uoperator_##name##_length }
@@ -28,24 +38,25 @@ C_UnaryOpBinding unary_operator_bindings[] = {
 
 //~ Binary Operators
 
-typedef struct C_BasicTypePair {
-    C_BasicType a;
-    C_BasicType b;
-} C_BasicTypePair;
+typedef struct C_BinaryOpTypes {
+    C_Type a;
+    C_Type b;
+    C_Type ret;
+} C_BinaryOpTypes;
 
 typedef struct C_BinaryOpBinding {
-    C_BasicTypePair* pairs;
+    C_BinaryOpTypes* pairs;
     u32 pairs_count;
 } C_BinaryOpBinding;
 
 const u32 operator_term_length = 1;
-C_BasicTypePair operator_term[] = {
-    { BasicType_Integer, BasicType_Integer }
+C_BinaryOpTypes operator_term[] = {
+    { C_IntTypeConst, C_IntTypeConst, C_IntTypeConst }
 };
 
 const u32 operator_factor_length = 1;
-C_BasicTypePair operator_factor[] = {
-    { BasicType_Integer, BasicType_Integer }
+C_BinaryOpTypes operator_factor[] = {
+    { C_IntTypeConst, C_IntTypeConst, C_IntTypeConst }
 };
 
 #define associate(token, name) [token] = { operator_##name, operator_##name##_length }

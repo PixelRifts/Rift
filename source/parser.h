@@ -27,11 +27,14 @@ AST_NODE(EXPR_END, str_lit(""), i8)\
 AST_NODE(STMT_START, str_lit(""), i8)\
 AST_NODE(Return, str_lit("Return Statement"), AstNode*)\
 AST_NODE(VarDecl, str_lit("Variable Decl Assignment Statement"), struct {\
-L_Token type;\
+AstNode* type;\
 L_Token name;\
 AstNode* value;\
 })\
-AST_NODE(STMT_END, str_lit(""), i8)
+AST_NODE(STMT_END, str_lit(""), i8)\
+AST_NODE(TYPE_START, str_lit(""), i8)\
+AST_NODE(IntegerType, str_lit("Integer Type"), L_Token)\
+AST_NODE(TYPE_END, str_lit(""), i8)
 
 typedef u32 P_NodeType;
 enum {
@@ -49,6 +52,10 @@ enum {
     NodeType_Return,
     NodeType_VarDecl,
     NodeType_STMT_END,
+    
+    NodeType_TYPE_START,
+    NodeType_IntegerType,
+    NodeType_TYPE_END,
 };
 
 #define AST_NODE(Id, Name, Type) Type Id;
@@ -60,6 +67,19 @@ struct AstNode {
     };
 };
 #undef AST_NODE
+
+typedef struct P_ParserSnap {
+    L_Lexer lexer;
+    
+    L_Token prev;
+    L_Token curr;
+    L_Token next;
+} P_ParserSnap;
+
+struct P_Parser;
+
+P_ParserSnap P_TakeSnapshot(struct P_Parser* parser);
+void P_ApplySnapshot(struct P_Parser* parser, P_ParserSnap snap);
 
 typedef struct P_Parser {
     M_Pool node_pool;

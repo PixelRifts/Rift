@@ -25,31 +25,21 @@ static void P_Report(P_Parser* parser, L_Token token, const char* stage, const c
 #define P_ReportLexError(parser, error, ...) P_Report(parser, parser->next, "Lexer", error, __VA_ARGS__)
 #define P_ReportParseError(parser, error, ...) P_Report(parser, parser->next, "Parser", error, __VA_ARGS__)
 
-//~ Token Helpers
-static void P_Advance(P_Parser* parser) {
-    parser->prev = parser->curr;
-    parser->curr = parser->next;
-    while (true) {
-        parser->next = L_LexToken(parser->lexer);
-        if (parser->next.type != TokenType_Error) break;
-        P_ReportLexError(parser, "Unexpected Token\n");
-        parser->errored = false;
-    }
+//~ Parser Snapshot stuff
+P_ParserSnap P_TakeSnapshot(P_Parser* parser) {
+    P_ParserSnap snap = {0};
+    snap.lexer = *parser->lexer;
+    snap.prev  =  parser->prev;
+    snap.curr  =  parser->curr;
+    snap.next  =  parser->next;
+    return snap;
 }
 
-static void P_Eat(P_Parser* parser, L_TokenType type) {
-    if (parser->curr.type != type) {
-        P_ReportParseError(parser, "Invalid Token. Expected %.*s got %.*s\n", str_expand(L_GetTypeName(type)), str_expand(L_GetTypeName(parser->curr.type)));
-    }
-    P_Advance(parser);
-}
-
-static b8 P_Match(P_Parser* parser, L_TokenType type) {
-    if (parser->curr.type == type) {
-        P_Advance(parser);
-        return true;
-    }
-    return false;
+void P_ApplySnapshot(P_Parser* parser, P_ParserSnap snap) {
+    *parser->lexer = snap.lexer;
+    parser->prev   = snap.prev;
+    parser->curr   = snap.curr;
+    parser->next   = snap.next;
 }
 
 //~ Node Allocation
@@ -64,6 +54,7 @@ static AstNode* P_AllocErrorNode(P_Parser* parser) {
     return node;
 }
 
+//- Expression Node Allocation 
 static AstNode* P_AllocIntLitNode(P_Parser* parser, i64 val) {
     AstNode* node = P_AllocNode(parser, NodeType_IntLit);
     node->IntLit = val;
@@ -97,18 +88,75 @@ static AstNode* P_AllocBinaryNode(P_Parser* parser, AstNode* lhs, AstNode* rhs, 
     return node;
 }
 
+//- Statement Node Allocation
 static AstNode* P_AllocReturnNode(P_Parser* parser, AstNode* expr) {
     AstNode* node = P_AllocNode(parser, NodeType_Return);
     node->Return = expr;
     return node;
 }
 
-static AstNode* P_AllocVarDeclNode(P_Parser* parser, L_Token type, L_Token name, AstNode* value) {
+static AstNode* P_AllocVarDeclNode(P_Parser* parser, AstNode* type, L_Token name, AstNode* value) {
     AstNode* node = P_AllocNode(parser, NodeType_VarDecl);
     node->VarDecl.type = type;
     node->VarDecl.name = name;
     node->VarDecl.value = value;
     return node;
+}
+
+//- Type Node Allocation
+static AstNode* P_AllocIntTypeNode(P_Parser* parser, L_Token type) {
+    AstNode* node = P_AllocNode(parser, NodeType_IntegerType);
+    node->IntegerType = type;
+    return node;
+}
+
+//~ Token Helpers
+static void P_Advance(P_Parser* parser) {
+    parser->prev = parser->curr;
+    parser->curr = parser->next;
+    while (true) {
+        parser->next = L_LexToken(parser->lexer);
+        if (parser->next.type != TokenType_Error) break;
+        P_ReportLexError(parser, "Unexpected Token: %.*s\n", str_expand(parser->next.lexeme));
+        parser->errored = false;
+    }
+}
+
+static void P_Eat(P_Parser* parser, L_TokenType type) {
+    if (parser->curr.type != type) {
+        P_ReportParseError(parser, "Invalid Token. Expected %.*s got %.*s\n", str_expand(L_GetTypeName(type)), str_expand(L_GetTypeName(parser->curr.type)));
+    }
+    P_Advance(parser);
+}
+
+static b8 P_Match(P_Parser* parser, L_TokenType type) {
+    if (parser->curr.type == type) {
+        P_Advance(parser);
+        return true;
+    }
+    return false;
+}
+
+static b8 P_IsType(P_Parser* parser) {
+    b8 ret;
+    P_ParserSnap snap = P_TakeSnapshot(parser);
+    
+    switch (parser->curr.type) {
+    case TokenType_Int: ret = true; break;
+        default: ret = false; break;
+    }
+    
+    P_ApplySnapshot(parser, snap);
+    return ret;
+}
+
+static AstNode* P_EatType(P_Parser* parser) {
+    switch (parser->curr.type) {
+        case TokenType_Int: P_Advance(parser); return P_AllocIntTypeNode(parser, parser->prev);
+        
+        default: P_ReportParseError(parser, "Could not consume type. Got %.*s token\n", str_expand(L_GetTypeName(parser->curr.type)));
+    }
+    return P_AllocErrorNode(parser);
 }
 
 //~ Expressions
@@ -182,13 +230,12 @@ static AstNode* P_Statement(P_Parser* parser) {
     if (P_Match(parser, TokenType_Return)) {
         AstNode* expr = P_Expression(parser, Prec_Invalid, false);
         return P_AllocReturnNode(parser, expr);
-    } else if (P_Match(parser, TokenType_Int)) {
-        L_Token type = parser->prev;
+    } else if (P_IsType(parser)) {
+        AstNode* type = P_EatType(parser);
         P_Eat(parser, TokenType_Identifier);
         L_Token name = parser->prev;
         AstNode* value = nullptr;
-        if (P_Match(parser, TokenType_Equal))
-            value = P_Expression(parser, Prec_Invalid, false);
+        if (P_Match(parser, TokenType_Equal)) value = P_Expression(parser, Prec_Invalid, false);
         return P_AllocVarDeclNode(parser, type, name, value);
     }
     return P_AllocErrorNode(parser);

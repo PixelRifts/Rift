@@ -1,4 +1,7 @@
 bin/
+hello.ll
+blah.ll
+a.exe
 example.bat
 generated.*
 .vscode
