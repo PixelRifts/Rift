@@ -69,8 +69,8 @@ typedef struct L_Lexer {
 
 typedef struct L_Token {
     L_TokenType type;
-    const char* start;
-    u32 line, column, length;
+    string lexeme;
+    u32 line, column;
 } L_Token;
 
 void L_Init(L_Lexer* lexer, string source);

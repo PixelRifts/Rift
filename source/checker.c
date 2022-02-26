@@ -10,12 +10,12 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
-b8 var_key_is_null(var_hash_table_key k) { return k.name.size == 0 && k.depth == 0; }
-b8 var_key_is_eq(var_hash_table_key a, var_hash_table_key b) { return str_eq(a.name, b.name) && a.depth == b.depth; }
-u32 hash_var_key(var_hash_table_key k) { return str_hash(k.name) + k.depth; }
-b8 var_val_is_null(var_hash_table_value v) { return v.type.type == BasicType_Invalid; }
-b8 var_val_is_tombstone(var_hash_table_value v) { return v.type.type == BasicType_End; }
-HashTable_Impl(var, var_key_is_null, var_key_is_eq, hash_var_key, (var_hash_table_value) { .type = (C_Type) { .type = BasicType_End } }, var_val_is_null, var_val_is_tombstone);
+b8 symbol_key_is_null(symbol_hash_table_key k) { return k.name.size == 0 && k.depth == 0; }
+b8 symbol_key_is_eq(symbol_hash_table_key a, symbol_hash_table_key b) { return str_eq(a.name, b.name) && a.depth == b.depth; }
+u32 hash_symbol_key(symbol_hash_table_key k) { return str_hash(k.name) + k.depth; }
+b8 symbol_val_is_null(symbol_hash_table_value v) { return v.type == SymbolType_Invalid; }
+b8 symbol_val_is_tombstone(symbol_hash_table_value v) { return v.type == SymbolType_Count; }
+HashTable_Impl(symbol, symbol_key_is_null, symbol_key_is_eq, hash_symbol_key, (symbol_hash_table_value) { .type = SymbolType_Count }, symbol_val_is_null, symbol_val_is_tombstone);
 
 static void C_Report(C_Checker* checker, L_Token token, const char* stage, const char* err, ...) {
     if (checker->errored) return;
@@ -60,10 +60,10 @@ static b8 C_CheckUnary(C_Type operand, L_TokenType op) {
 static C_Type C_GetType(C_Checker* checker, AstNode* node) {
     switch (node->type) {
         case NodeType_Ident: {
-            var_hash_table_key key = (var_hash_table_key) { .name = { .str = node->VarDecl.name.start, .size = node->VarDecl.name.length }, .depth = 0 };
-            var_hash_table_value val;
-            if (var_hash_table_get(&checker->var_table, key, &val)) {
-                return val.type;
+            symbol_hash_table_key key = (symbol_hash_table_key) { .name = node->VarDecl.name.lexeme, .depth = 0 };
+            symbol_hash_table_value val;
+            if (symbol_hash_table_get(&checker->symbol_table, key, &val)) {
+                if (val.type == SymbolType_Variable) return val.variable_type;
             }
             return (C_Type) { .type = BasicType_Invalid };
         } break;
@@ -99,11 +99,12 @@ static C_Type C_GetType(C_Checker* checker, AstNode* node) {
         } break;
         
         case NodeType_VarDecl: {
-            var_hash_table_key key = (var_hash_table_key) { .name = { .str = node->VarDecl.name.start, .size = node->VarDecl.name.length }, .depth = 0 };
-            if (var_hash_table_get(&checker->var_table, key, nullptr)) {
-                C_ReportCheckError(checker, node->VarDecl.name, "Variable %.*s already exists\n", node->VarDecl.name.length, node->VarDecl.name.start);
+            string var_name = node->VarDecl.name.lexeme;
+            symbol_hash_table_key key = (symbol_hash_table_key) { .name = var_name, .depth = 0 };
+            if (symbol_hash_table_get(&checker->symbol_table, key, nullptr)) {
+                C_ReportCheckError(checker, node->VarDecl.name, "Variable %.*s already exists\n", str_expand(var_name));
             }
-            var_hash_table_set(&checker->var_table, key, (var_hash_table_value) { .type = (C_Type) { .type = BasicType_Integer } });
+            symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Variable, .name = var_name, .variable_type = (C_Type) { .type = BasicType_Integer } });
             return (C_Type) { .type = BasicType_Invalid };
         } break;
     }
@@ -111,7 +112,7 @@ static C_Type C_GetType(C_Checker* checker, AstNode* node) {
 }
 
 void C_Init(C_Checker* checker) {
-    var_hash_table_init(&checker->var_table);
+    symbol_hash_table_init(&checker->symbol_table);
 }
 
 void C_CheckAst(C_Checker* checker, AstNode* node) {
@@ -119,5 +120,5 @@ void C_CheckAst(C_Checker* checker, AstNode* node) {
 }
 
 void C_Free(C_Checker* checker) {
-    var_hash_table_free(&checker->var_table);
+    symbol_hash_table_free(&checker->symbol_table);
 }

@@ -122,8 +122,7 @@ static b8 L_Match(L_Lexer* lexer, i8 expected) {
 static L_Token L_MakeToken(L_Lexer* lexer, L_TokenType type) {
     return (L_Token) {
         .type = type,
-        .start = lexer->start,
-        .length = (u32) (lexer->current - lexer->start),
+        .lexeme = (string) { .str = (u8*)lexer->start, .size = (u32) (lexer->current - lexer->start) },
         .line = lexer->line,
         .column = lexer->column,
     };
@@ -132,9 +131,9 @@ static L_Token L_MakeToken(L_Lexer* lexer, L_TokenType type) {
 static inline L_Token L_ErrorToken(L_Lexer* lexer, string msg) {
     return (L_Token) {
         .type = TokenType_Error,
-        .start = (const char*) msg.str,
-        .length = (u32) msg.size,
+        .lexeme = msg,
         .line = lexer->line,
+        .column = lexer->column,
     };
 }
 
@@ -487,5 +486,5 @@ L_Token L_LexToken(L_Lexer* lexer) {
 }
 
 void L_PrintToken(L_Token token) {
-    printf("%.*s: %.*s\n", token.length, token.start, str_expand(L_GetTypeName(token.type)));
+    printf("%.*s: %.*s\n", str_expand(token.lexeme), str_expand(L_GetTypeName(token.type)));
 }

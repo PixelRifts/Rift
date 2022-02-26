@@ -115,17 +115,17 @@ static AstNode* P_AllocVarDeclNode(P_Parser* parser, L_Token type, L_Token name,
 static AstNode* P_ExprUnary(P_Parser* parser, b8 rhs);
 
 static AstNode* P_ExprIntegerLiteral(P_Parser* parser) {
-    i64 value = atoll(parser->prev.start);
+    i64 value = atoll((const char*)parser->prev.lexeme.str);
     return P_AllocIntLitNode(parser, value);
 }
 
 static AstNode* P_ExprIdent(P_Parser* parser) {
-    string value = { .str = (u8*) parser->prev.start, .size = parser->prev.length };
+    string value = parser->prev.lexeme;
     return P_AllocIdentNode(parser, value);
 }
 
 static AstNode* P_ExprStringLit(P_Parser* parser) {
-    string value = { .str = (u8*) parser->prev.start + 1, .size = parser->prev.length - 2 };
+    string value = { .str = parser->prev.lexeme.str + 1, .size = parser->prev.lexeme.size - 2 };
     return P_AllocGlobalStringNode(parser, value);
 }
 
@@ -148,8 +148,8 @@ static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
         
         default: {
             if (is_rhs)
-                P_ReportParseError(parser, "Invalid Expression for Right Hand Side of %.*s\n", parser->prev.length, parser->prev.start);
-            else P_ReportParseError(parser, "Invalid Expression for Left Hand Side of %.*s\n", parser->prev.length, parser->prev.start);
+                P_ReportParseError(parser, "Invalid Expression for Right Hand Side of %.*s\n", str_expand(parser->prev.lexeme));
+            else P_ReportParseError(parser, "Invalid Expression for Left Hand Side of %.*s\n", str_expand(parser->prev.lexeme));
             return P_AllocErrorNode(parser);
         }
     }
@@ -249,10 +249,10 @@ void PrintAst_Indent(AstNode* node, u32 indent) {
         
         case NodeType_VarDecl: {
             if (node->VarDecl.value) {
-                printf("Assign to %.*s\n", node->VarDecl.name.length, node->VarDecl.name.start);
+                printf("Assign to %.*s\n", str_expand(node->VarDecl.name.lexeme));
                 PrintAst_Indent(node->VarDecl.value, indent + 1);
             } else {
-                printf("Declare %.*s\n", node->VarDecl.name.length, node->VarDecl.name.start);
+                printf("Declare %.*s\n", str_expand(node->VarDecl.name.lexeme));
             }
         } break;
     }

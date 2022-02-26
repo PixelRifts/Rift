@@ -106,12 +106,12 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         case NodeType_Return: return LLVMBuildRet(emitter->builder, BL_Emit(emitter, node->Return));
         
         case NodeType_VarDecl: {
-            char* hoist = malloc(node->VarDecl.name.length + 1);
-            memcpy(hoist, node->VarDecl.name.start, node->VarDecl.name.length);
-            hoist[node->VarDecl.name.length] = '\0';
+            char* hoist = malloc(node->VarDecl.name.lexeme.size + 1);
+            memcpy(hoist, node->VarDecl.name.lexeme.str, node->VarDecl.name.lexeme.size);
+            hoist[node->VarDecl.name.lexeme.size] = '\0';
             LLVMValueRef alloca = LLVMBuildAlloca(emitter->builder, LLVMInt64Type(), hoist);
             
-            llvmvar_hash_table_key key = (llvmvar_hash_table_key) { .name = (string) { .str = (u8*) node->VarDecl.name.start, .size = node->VarDecl.name.length }, .depth = 0 };
+            llvmvar_hash_table_key key = (llvmvar_hash_table_key) { .name = node->VarDecl.name.lexeme, .depth = 0 };
             llvmvar_hash_table_value val = (llvmvar_hash_table_value) { .value = alloca, .not_null = true, .tombstone = false };
             llvmvar_hash_table_set(&emitter->variables, key, val);
             
