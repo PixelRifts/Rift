@@ -3,8 +3,6 @@ SetLocal EnableDelayedExpansion
 
 SET cc=clang
 
-del /f generated.c
-
 REM Get's list of all C files
 SET c_filenames= 
 FOR /R %%f in (*.c) do (

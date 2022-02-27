@@ -94,10 +94,12 @@ static b8 C_CheckUnary(C_Type operand, L_TokenType op, C_Type* output) {
 static C_Type C_GetType(C_Checker* checker, AstNode* node) {
     switch (node->type) {
         case NodeType_Ident: {
-            symbol_hash_table_key key = (symbol_hash_table_key) { .name = node->VarDecl.name.lexeme, .depth = 0 };
+            symbol_hash_table_key key = (symbol_hash_table_key) { .name = node->Ident, .depth = 0 };
             symbol_hash_table_value val;
             if (symbol_hash_table_get(&checker->symbol_table, key, &val)) {
-                if (val.type == SymbolType_Variable) return val.variable_type;
+                if (val.type == SymbolType_Variable) {
+                    return val.variable_type;
+                }
             }
             return (C_Type) { .type = BasicType_Invalid };
         } break;
@@ -131,7 +133,26 @@ static C_Type C_GetType(C_Checker* checker, AstNode* node) {
         
         case NodeType_Return: {
             C_GetType(checker, node->Return);
-            return (C_Type) { .type = BasicType_Invalid };
+            return C_InvalidType;
+        } break;
+        
+        case NodeType_Assign: {
+            C_Type symboltype = {0};
+            
+            symbol_hash_table_key key = (symbol_hash_table_key) { .name = node->Assign.name.lexeme, .depth = 0 };
+            symbol_hash_table_value val;
+            if (symbol_hash_table_get(&checker->symbol_table, key, &val)) {
+                if (val.type != SymbolType_Variable)
+                    C_ReportCheckError(checker, node->Assign.name, "%.*s is not assignable\n", str_expand(node->Assign.name.lexeme));
+                symboltype = val.variable_type;
+            }
+            
+            C_Type valuetype = C_GetType(checker, node->Assign.value);
+            if (!C_CheckTypeEquals(symboltype, valuetype)) {
+                C_ReportCheckError(checker, node->Assign.name, "Assignment type mismatch. got types %.*s and %.*s\n", str_expand(C_GetBasicTypeName(symboltype)), str_expand(C_GetBasicTypeName(valuetype)));
+            }
+            
+            return C_InvalidType;
         } break;
         
         case NodeType_VarDecl: {

@@ -26,7 +26,11 @@ L_Token  op;\
 AST_NODE(EXPR_END, str_lit(""), i8)\
 AST_NODE(STMT_START, str_lit(""), i8)\
 AST_NODE(Return, str_lit("Return Statement"), AstNode*)\
-AST_NODE(VarDecl, str_lit("Variable Decl Assignment Statement"), struct {\
+AST_NODE(Assign, str_lit("Variable Assignment"), struct {\
+L_Token name;\
+AstNode* value;\
+})\
+AST_NODE(VarDecl, str_lit("Variable Declaration"), struct {\
 AstNode* type;\
 L_Token name;\
 AstNode* value;\
@@ -50,6 +54,7 @@ enum {
     
     NodeType_STMT_START,
     NodeType_Return,
+    NodeType_Assign,
     NodeType_VarDecl,
     NodeType_STMT_END,
     

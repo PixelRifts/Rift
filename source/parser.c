@@ -95,6 +95,13 @@ static AstNode* P_AllocReturnNode(P_Parser* parser, AstNode* expr) {
     return node;
 }
 
+static AstNode* P_AllocAssignNode(P_Parser* parser, L_Token name, AstNode* value) {
+    AstNode* node = P_AllocNode(parser, NodeType_Assign);
+    node->Assign.name = name;
+    node->Assign.value = value;
+    return node;
+}
+
 static AstNode* P_AllocVarDeclNode(P_Parser* parser, AstNode* type, L_Token name, AstNode* value) {
     AstNode* node = P_AllocNode(parser, NodeType_VarDecl);
     node->VarDecl.type = type;
@@ -142,7 +149,7 @@ static b8 P_IsType(P_Parser* parser) {
     P_ParserSnap snap = P_TakeSnapshot(parser);
     
     switch (parser->curr.type) {
-    case TokenType_Int: ret = true; break;
+        case TokenType_Int: ret = true; break;
         default: ret = false; break;
     }
     
@@ -237,6 +244,11 @@ static AstNode* P_Statement(P_Parser* parser) {
         AstNode* value = nullptr;
         if (P_Match(parser, TokenType_Equal)) value = P_Expression(parser, Prec_Invalid, false);
         return P_AllocVarDeclNode(parser, type, name, value);
+    } else if(P_Match(parser, TokenType_Identifier)) {
+        L_Token name = parser->prev;
+        P_Eat(parser, TokenType_Equal);
+        AstNode* value = P_Expression(parser, Prec_Invalid, false);
+        return P_AllocAssignNode(parser, name, value);
     }
     return P_AllocErrorNode(parser);
 }
@@ -294,9 +306,14 @@ void PrintAst_Indent(AstNode* node, u32 indent) {
             PrintAst_Indent(node->Return, indent + 1);
         } break;
         
+        case NodeType_Assign: {
+            printf("Assign to %.*s\n", str_expand(node->Assign.name.lexeme));
+            PrintAst_Indent(node->Assign.value, indent + 1);
+        } break;
+        
         case NodeType_VarDecl: {
             if (node->VarDecl.value) {
-                printf("Assign to %.*s\n", str_expand(node->VarDecl.name.lexeme));
+                printf("Declare %.*s and assign\n", str_expand(node->VarDecl.name.lexeme));
                 PrintAst_Indent(node->VarDecl.value, indent + 1);
             } else {
                 printf("Declare %.*s\n", str_expand(node->VarDecl.name.lexeme));

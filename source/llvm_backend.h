@@ -8,7 +8,14 @@
 #include "llvm-c/Core.h"
 #include "llvm-c/Analysis.h"
 
-HashTable_Prototype(llvmvar, struct { string name; u32 depth; }, struct { LLVMValueRef value; b8 not_null; b8 tombstone; });
+typedef struct BL_StackValue {
+    LLVMValueRef alloca;
+    LLVMValueRef loaded;
+    b8 not_null;
+    b8 tombstone;
+} BL_StackValue;
+
+HashTable_Prototype(llvmvar, struct { string name; u32 depth; }, BL_StackValue);
 
 typedef struct BL_Emitter {
     string filename;

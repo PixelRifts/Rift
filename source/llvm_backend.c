@@ -8,7 +8,7 @@ b8 llvmvar_key_is_eq(llvmvar_hash_table_key a, llvmvar_hash_table_key b) { retur
 u32 hash_llvmvar_key(llvmvar_hash_table_key k) { return str_hash(k.name) + k.depth; }
 b8 llvmvar_val_is_null(llvmvar_hash_table_value v) { return v.not_null == false; }
 b8 llvmvar_val_is_tombstone(llvmvar_hash_table_value v) { return v.tombstone == true; }
-HashTable_Impl(llvmvar, llvmvar_key_is_null, llvmvar_key_is_eq, hash_llvmvar_key, ((llvmvar_hash_table_value) { .value = (LLVMValueRef) {0}, .not_null = false, .tombstone = true }), llvmvar_val_is_null, llvmvar_val_is_tombstone);
+HashTable_Impl(llvmvar, llvmvar_key_is_null, llvmvar_key_is_eq, hash_llvmvar_key, ((llvmvar_hash_table_value) { .alloca = (LLVMValueRef) {0}, .loaded = (LLVMValueRef) {0}, .not_null = false, .tombstone = true }), llvmvar_val_is_null, llvmvar_val_is_tombstone);
 
 
 static void BL_Report(BL_Emitter* emitter, const char* stage, const char* err, ...) {
@@ -71,8 +71,7 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             llvmvar_hash_table_key key = (llvmvar_hash_table_key) { .name = node->Ident, .depth = 0 };
             llvmvar_hash_table_value val;
             if (llvmvar_hash_table_get(&emitter->variables, key, &val)) {
-                LLVMValueRef value_itself = LLVMBuildLoad2(emitter->builder, LLVMInt64Type(), val.value, "");
-                return value_itself;
+                return val.loaded;
             }
             return (LLVMValueRef) {0};
         }
@@ -105,21 +104,42 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         
         case NodeType_Return: return LLVMBuildRet(emitter->builder, BL_Emit(emitter, node->Return));
         
+        case NodeType_Assign: {
+            char* hoist = malloc(node->Assign.name.lexeme.size + 1);
+            memcpy(hoist, node->Assign.name.lexeme.str, node->Assign.name.lexeme.size);
+            hoist[node->Assign.name.lexeme.size] = '\0';
+            llvmvar_hash_table_key key = (llvmvar_hash_table_key) { .name = node->Assign.name.lexeme, .depth = 0 };
+            llvmvar_hash_table_value val;
+            if (llvmvar_hash_table_get(&emitter->variables, key, &val)) {
+                LLVMValueRef value = BL_Emit(emitter, node->Assign.value);
+                LLVMBuildStore(emitter->builder, value, val.alloca);
+                val.loaded = LLVMBuildLoad2(emitter->builder, LLVMInt64Type(), val.alloca, "");
+                llvmvar_hash_table_set(&emitter->variables, key, val);
+                
+                free(hoist);
+                return val.loaded;
+            } else {
+                free(hoist);
+                return (LLVMValueRef) {0};
+            }
+        }
+        
         case NodeType_VarDecl: {
             char* hoist = malloc(node->VarDecl.name.lexeme.size + 1);
             memcpy(hoist, node->VarDecl.name.lexeme.str, node->VarDecl.name.lexeme.size);
             hoist[node->VarDecl.name.lexeme.size] = '\0';
             LLVMValueRef alloca = LLVMBuildAlloca(emitter->builder, LLVMInt64Type(), hoist);
-            
-            llvmvar_hash_table_key key = (llvmvar_hash_table_key) { .name = node->VarDecl.name.lexeme, .depth = 0 };
-            llvmvar_hash_table_value val = (llvmvar_hash_table_value) { .value = alloca, .not_null = true, .tombstone = false };
-            llvmvar_hash_table_set(&emitter->variables, key, val);
-            
-            free(hoist);
             if (node->VarDecl.value) {
                 LLVMValueRef value = BL_Emit(emitter, node->VarDecl.value);
                 LLVMBuildStore(emitter->builder, value, alloca);
             }
+            LLVMValueRef loaded = LLVMBuildLoad2(emitter->builder, LLVMInt64Type(), alloca, "");
+            
+            llvmvar_hash_table_key key = (llvmvar_hash_table_key) { .name = node->VarDecl.name.lexeme, .depth = 0 };
+            llvmvar_hash_table_value val = (llvmvar_hash_table_value) { .alloca = alloca, .loaded = loaded, .not_null = true, .tombstone = false };
+            llvmvar_hash_table_set(&emitter->variables, key, val);
+            
+            free(hoist);
             return alloca;
         }
     }
@@ -132,7 +152,7 @@ void BL_Free(BL_Emitter* emitter) {
     llvmvar_hash_table_key key = (llvmvar_hash_table_key) { .name = str_lit("m"), .depth = 0 };
     llvmvar_hash_table_value val;
     llvmvar_hash_table_get(&emitter->variables, key, &val);
-    LLVMValueRef loaded_value = LLVMBuildLoad2(emitter->builder, LLVMInt64Type(), val.value, "");
+    LLVMValueRef loaded_value = LLVMBuildLoad2(emitter->builder, LLVMInt64Type(), val.alloca, "");
     LLVMValueRef printfargs[] = {
         LLVMBuildPointerCast(emitter->builder,
                              LLVMBuildGlobalString(emitter->builder, "%lld", "hello"),
