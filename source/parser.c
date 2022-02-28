@@ -199,7 +199,7 @@ static P_Type* P_EatType(P_Parser* parser) {
             L_Token func_token = parser->prev;
             P_Eat(parser, TokenType_OpenParenthesis);
             
-            string_array   temp_param_names = {0};
+            string_array temp_param_names = {0};
             type_array temp_param_types = {0};
             
             u32 arity = 0;

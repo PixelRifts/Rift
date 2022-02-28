@@ -13,7 +13,10 @@ entry:
   %2 = add i64 %0, %1
   store i64 %2, i64* %m, align 4
   %3 = load i64, i64* %m, align 4
-  %4 = call i64 (i8*, ...) @printf(i8* getelementptr inbounds ([5 x i8], [5 x i8]* @hello, i32 0, i32 0), i64 %3)
+  %phi = alloca i64, align 8
+  store i64 10, i64* %phi, align 4
+  %4 = load i64, i64* %phi, align 4
+  %5 = call i64 (i8*, ...) @printf(i8* getelementptr inbounds ([5 x i8], [5 x i8]* @hello, i32 0, i32 0), i64 %3)
   ret i32 0
 }
 

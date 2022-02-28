@@ -33,8 +33,10 @@ static LLVMTypeRef BL_PTypeToLLVMType(P_Type* type) {
             LLVMTypeRef* param_types = calloc(type->function.arity, sizeof(LLVMTypeRef));
             for (u32 i = 0; i < type->function.arity; i++)
                 param_types[i] = BL_PTypeToLLVMType(type->function.param_types[i]);
-            LLVMFunctionType(return_type, param_types, type->function.arity, false);
+            LLVMTypeRef ret = LLVMFunctionType(return_type, param_types, type->function.arity, false);
+            char* v = LLVMPrintTypeToString(ret);
             free(param_types);
+            return ret;
         } break;
     }
     return (LLVMTypeRef) {0};
