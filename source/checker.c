@@ -38,36 +38,27 @@ static void C_Report(C_Checker* checker, L_Token token, const char* stage, const
 //~ Type Stuff
 
 #define TYPE(Id, Name) case BasicType_##Id: return Name;
-static string C_GetBasicTypeName(C_Type type) {
-    switch (type.type) {
+static string C_GetBasicTypeName(P_Type* type) {
+    switch (type->type) {
         BASIC_TYPES
     }
     return str_lit("Invalid");
 }
 #undef TYPE
 
-static C_Type C_AstTypeToCheckerType(AstNode* type) {
-    assert(type->type >= NodeType_TYPE_START && type->type <= NodeType_TYPE_END && "Internal Error: Cannot Convert AstNode type to C_Type\n");
-    switch (type->type) {
-        case NodeType_IntegerType: return C_IntegerType;
-        default: assert(false && "Internal Error: Cannot Convert AstNode type to C_Type\n");
-    }
-    
-    return C_InvalidType;
-}
-
-static b8 C_CheckTypeEquals(C_Type a, C_Type b) {
-    if (a.type != b.type) return false;
-    switch (a.type) {
+static b8 C_CheckTypeEquals(P_Type* a, P_Type* b) {
+    if (a->type != b->type) return false;
+    switch (a->type) {
         // No extra Data associated with these types
         case BasicType_Integer:
+        case BasicType_Void:
         case BasicType_Cstring: return true;
     }
     
     return false;
 }
 
-static b8 C_CheckBinary(C_Type lhs, C_Type rhs, L_TokenType op, C_Type* output) {
+static b8 C_CheckBinary(P_Type* lhs, P_Type* rhs, L_TokenType op, P_Type** output) {
     C_BinaryOpBinding binding = binary_operator_bindings[op];
     for (u32 i = 0; i < binding.pairs_count; i++) {
         if (C_CheckTypeEquals(binding.pairs[i].a, lhs) && C_CheckTypeEquals(binding.pairs[i].b, rhs)) {
@@ -78,7 +69,7 @@ static b8 C_CheckBinary(C_Type lhs, C_Type rhs, L_TokenType op, C_Type* output) 
     return false;
 }
 
-static b8 C_CheckUnary(C_Type operand, L_TokenType op, C_Type* output) {
+static b8 C_CheckUnary(P_Type* operand, L_TokenType op, P_Type** output) {
     C_UnaryOpBinding binding = unary_operator_bindings[op];
     for (u32 i = 0; i < binding.count; i++) {
         if (C_CheckTypeEquals(binding.elems[i].a, operand)) {
@@ -91,7 +82,7 @@ static b8 C_CheckUnary(C_Type operand, L_TokenType op, C_Type* output) {
 
 //~ Checking
 
-static C_Type C_GetType(C_Checker* checker, AstNode* node) {
+static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
     switch (node->type) {
         case NodeType_Ident: {
             symbol_hash_table_key key = (symbol_hash_table_key) { .name = node->Ident, .depth = 0 };
@@ -101,20 +92,20 @@ static C_Type C_GetType(C_Checker* checker, AstNode* node) {
                     return val.variable_type;
                 }
             }
-            return (C_Type) { .type = BasicType_Invalid };
+            return &C_InvalidType;
         } break;
         
         case NodeType_IntLit: {
-            return (C_Type) { .type = BasicType_Integer };
+            return &C_IntegerType;
         } break;
         
         case NodeType_GlobalString: {
-            return (C_Type) { .type = BasicType_Cstring };
+            return &C_CstringType;
         } break;
         
         case NodeType_Unary: {
-            C_Type xpr = C_GetType(checker, node->Unary.expr);
-            C_Type output;
+            P_Type* xpr = C_GetType(checker, node->Unary.expr);
+            P_Type* output;
             if (!C_CheckUnary(xpr, node->Unary.op.type, &output)) {
                 C_ReportCheckError(checker, node->Unary.op, "Cannot apply unary operator %.*s to type %.*s\n", str_expand(L_GetTypeName(node->Unary.op.type)), str_expand(C_GetBasicTypeName(xpr)));
             }
@@ -122,9 +113,9 @@ static C_Type C_GetType(C_Checker* checker, AstNode* node) {
         } break;
         
         case NodeType_Binary: {
-            C_Type lhs = C_GetType(checker, node->Binary.left);
-            C_Type rhs = C_GetType(checker, node->Binary.right);
-            C_Type output;
+            P_Type* lhs = C_GetType(checker, node->Binary.left);
+            P_Type* rhs = C_GetType(checker, node->Binary.right);
+            P_Type* output;
             if (!C_CheckBinary(lhs, rhs, node->Binary.op.type, &output)) {
                 C_ReportCheckError(checker, node->Binary.op, "Cannot apply binary operator %.*s to types %.*s and %.*s\n", str_expand(L_GetTypeName(node->Binary.op.type)), str_expand(C_GetBasicTypeName(lhs)), str_expand(C_GetBasicTypeName(rhs)));
             }
@@ -133,11 +124,11 @@ static C_Type C_GetType(C_Checker* checker, AstNode* node) {
         
         case NodeType_Return: {
             C_GetType(checker, node->Return);
-            return C_InvalidType;
+            return &C_InvalidType;
         } break;
         
         case NodeType_Assign: {
-            C_Type symboltype = {0};
+            P_Type* symboltype = {0};
             
             symbol_hash_table_key key = (symbol_hash_table_key) { .name = node->Assign.name.lexeme, .depth = 0 };
             symbol_hash_table_value val;
@@ -147,27 +138,27 @@ static C_Type C_GetType(C_Checker* checker, AstNode* node) {
                 symboltype = val.variable_type;
             }
             
-            C_Type valuetype = C_GetType(checker, node->Assign.value);
+            P_Type* valuetype = C_GetType(checker, node->Assign.value);
             if (!C_CheckTypeEquals(symboltype, valuetype)) {
                 C_ReportCheckError(checker, node->Assign.name, "Assignment type mismatch. got types %.*s and %.*s\n", str_expand(C_GetBasicTypeName(symboltype)), str_expand(C_GetBasicTypeName(valuetype)));
             }
             
-            return C_InvalidType;
+            return &C_InvalidType;
         } break;
         
         case NodeType_VarDecl: {
             string var_name = node->VarDecl.name.lexeme;
-            C_Type type = C_AstTypeToCheckerType(node->VarDecl.type);
+            P_Type* type = node->VarDecl.type;
             
             symbol_hash_table_key key = (symbol_hash_table_key) { .name = var_name, .depth = 0 };
             if (symbol_hash_table_get(&checker->symbol_table, key, nullptr)) {
                 C_ReportCheckError(checker, node->VarDecl.name, "Variable %.*s already exists\n", str_expand(var_name));
             }
             symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Variable, .name = var_name, .variable_type = type });
-            return C_InvalidType;
+            return &C_InvalidType;
         } break;
     }
-    return (C_Type) { .type = BasicType_Invalid };
+    return &C_InvalidType;
 }
 
 void C_Init(C_Checker* checker) {

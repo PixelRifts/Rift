@@ -364,6 +364,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                     }
                 }
                 case 'a': return L_MatchType(lexer, 2, str_lit("lse"), TokenType_False);
+                case 'u': return L_MatchType(lexer, 2, str_lit("nc"), TokenType_Func);
             }
             return TokenType_Identifier;
         }

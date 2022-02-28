@@ -3,12 +3,13 @@
 #ifndef LLVM_BACKEND_H
 #define LLVM_BACKEND_H
 
-#include "parser.h"
+#include "checker.h"
 #include "ds.h"
 #include "llvm-c/Core.h"
 #include "llvm-c/Analysis.h"
 
 typedef struct BL_StackValue {
+    LLVMTypeRef type;
     LLVMValueRef alloca;
     LLVMValueRef loaded;
     b8 not_null;

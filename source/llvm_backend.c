@@ -8,8 +8,7 @@ b8 llvmvar_key_is_eq(llvmvar_hash_table_key a, llvmvar_hash_table_key b) { retur
 u32 hash_llvmvar_key(llvmvar_hash_table_key k) { return str_hash(k.name) + k.depth; }
 b8 llvmvar_val_is_null(llvmvar_hash_table_value v) { return v.not_null == false; }
 b8 llvmvar_val_is_tombstone(llvmvar_hash_table_value v) { return v.tombstone == true; }
-HashTable_Impl(llvmvar, llvmvar_key_is_null, llvmvar_key_is_eq, hash_llvmvar_key, ((llvmvar_hash_table_value) { .alloca = (LLVMValueRef) {0}, .loaded = (LLVMValueRef) {0}, .not_null = false, .tombstone = true }), llvmvar_val_is_null, llvmvar_val_is_tombstone);
-
+HashTable_Impl(llvmvar, llvmvar_key_is_null, llvmvar_key_is_eq, hash_llvmvar_key, ((llvmvar_hash_table_value) { .type = (LLVMTypeRef) {0}, .alloca = (LLVMValueRef) {0}, .loaded = (LLVMValueRef) {0}, .not_null = false, .tombstone = true }), llvmvar_val_is_null, llvmvar_val_is_tombstone);
 
 static void BL_Report(BL_Emitter* emitter, const char* stage, const char* err, ...) {
     fprintf(stderr, "%s Error: ", stage);
@@ -19,10 +18,27 @@ static void BL_Report(BL_Emitter* emitter, const char* stage, const char* err, .
     va_end(va);
 }
 
-#define BL_ReportLexError(emitter, error, ...) BL_Report(emitter, "Codegen", error, __VA_ARGS__)
+#define BL_ReportCodegenError(emitter, error, ...) BL_Report(emitter, "Codegen", error, __VA_ARGS__)
 
 static LLVMTypeRef printffunctype;
 static LLVMValueRef printffunc;
+static LLVMValueRef mainfunc;
+
+static LLVMTypeRef BL_PTypeToLLVMType(P_Type* type) {
+    switch (type->type) {
+        case BasicType_Void: return LLVMVoidType();
+        case BasicType_Integer: return LLVMInt64Type();
+        case BasicType_Function: {
+            LLVMTypeRef return_type = BL_PTypeToLLVMType(type->function.return_type);
+            LLVMTypeRef* param_types = calloc(type->function.arity, sizeof(LLVMTypeRef));
+            for (u32 i = 0; i < type->function.arity; i++)
+                param_types[i] = BL_PTypeToLLVMType(type->function.param_types[i]);
+            LLVMFunctionType(return_type, param_types, type->function.arity, false);
+            free(param_types);
+        } break;
+    }
+    return (LLVMTypeRef) {0};
+}
 
 void BL_Init(BL_Emitter* emitter, string filename) {
     emitter->filename = filename;
@@ -31,8 +47,8 @@ void BL_Init(BL_Emitter* emitter, string filename) {
     
     LLVMTypeRef param_types[] = {};
     LLVMTypeRef function_type = LLVMFunctionType(LLVMInt32Type(), param_types, 0, 0);
-    LLVMValueRef fn = LLVMAddFunction(emitter->module, "main", function_type);
-    emitter->entry = LLVMAppendBasicBlock(fn, "entry");
+    mainfunc = LLVMAddFunction(emitter->module, "main", function_type);
+    emitter->entry = LLVMAppendBasicBlock(mainfunc, "entry");
     emitter->builder = LLVMCreateBuilder();
     LLVMPositionBuilderAtEnd(emitter->builder, emitter->entry);
     
@@ -113,7 +129,7 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             if (llvmvar_hash_table_get(&emitter->variables, key, &val)) {
                 LLVMValueRef value = BL_Emit(emitter, node->Assign.value);
                 LLVMBuildStore(emitter->builder, value, val.alloca);
-                val.loaded = LLVMBuildLoad2(emitter->builder, LLVMInt64Type(), val.alloca, "");
+                val.loaded = LLVMBuildLoad2(emitter->builder, val.type, val.alloca, "");
                 llvmvar_hash_table_set(&emitter->variables, key, val);
                 
                 free(hoist);
@@ -128,15 +144,17 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             char* hoist = malloc(node->VarDecl.name.lexeme.size + 1);
             memcpy(hoist, node->VarDecl.name.lexeme.str, node->VarDecl.name.lexeme.size);
             hoist[node->VarDecl.name.lexeme.size] = '\0';
-            LLVMValueRef alloca = LLVMBuildAlloca(emitter->builder, LLVMInt64Type(), hoist);
+            LLVMTypeRef var_type = BL_PTypeToLLVMType(node->VarDecl.type);
+            
+            LLVMValueRef alloca = LLVMBuildAlloca(emitter->builder, var_type, hoist);
             if (node->VarDecl.value) {
                 LLVMValueRef value = BL_Emit(emitter, node->VarDecl.value);
                 LLVMBuildStore(emitter->builder, value, alloca);
             }
-            LLVMValueRef loaded = LLVMBuildLoad2(emitter->builder, LLVMInt64Type(), alloca, "");
+            LLVMValueRef loaded = LLVMBuildLoad2(emitter->builder, var_type, alloca, "");
             
             llvmvar_hash_table_key key = (llvmvar_hash_table_key) { .name = node->VarDecl.name.lexeme, .depth = 0 };
-            llvmvar_hash_table_value val = (llvmvar_hash_table_value) { .alloca = alloca, .loaded = loaded, .not_null = true, .tombstone = false };
+            llvmvar_hash_table_value val = (llvmvar_hash_table_value) { .alloca = alloca, .loaded = loaded, .type = var_type, .not_null = true, .tombstone = false };
             llvmvar_hash_table_set(&emitter->variables, key, val);
             
             free(hoist);
@@ -152,12 +170,11 @@ void BL_Free(BL_Emitter* emitter) {
     llvmvar_hash_table_key key = (llvmvar_hash_table_key) { .name = str_lit("m"), .depth = 0 };
     llvmvar_hash_table_value val;
     llvmvar_hash_table_get(&emitter->variables, key, &val);
-    LLVMValueRef loaded_value = LLVMBuildLoad2(emitter->builder, LLVMInt64Type(), val.alloca, "");
     LLVMValueRef printfargs[] = {
         LLVMBuildPointerCast(emitter->builder,
                              LLVMBuildGlobalString(emitter->builder, "%lld", "hello"),
                              int_8_type_ptr, "0"),
-        loaded_value,
+        val.loaded,
     };
     
     LLVMBuildCall2(emitter->builder, printffunctype, printffunc, printfargs, 2, "");
@@ -165,14 +182,16 @@ void BL_Free(BL_Emitter* emitter) {
     
     char* error = nullptr;
     LLVMVerifyModule(emitter->module, LLVMPrintMessageAction, &error);
-    if (error) printf("%s", error);
-    error = nullptr;
+    if (error) {
+        printf("%s", error);
+        LLVMDisposeMessage(error);
+        error = nullptr;
+    }
     
     llvmvar_hash_table_free(&emitter->variables);
     
     LLVMPrintModuleToFile(emitter->module, (char*)emitter->filename.str, &error);
     
-    if (error) printf("%s", error);
     LLVMDisposeBuilder(emitter->builder);
     LLVMDisposeModule(emitter->module);
 }

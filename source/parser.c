@@ -8,8 +8,11 @@
 #include "parser_data.h"
 
 #include <stdio.h>
+#include <string.h>
 #include <stdarg.h>
 #include <stdlib.h>
+
+Array_Impl(type_array, P_Type*);
 
 static void P_Report(P_Parser* parser, L_Token token, const char* stage, const char* err, ...) {
     if (parser->errored) return;
@@ -102,7 +105,7 @@ static AstNode* P_AllocAssignNode(P_Parser* parser, L_Token name, AstNode* value
     return node;
 }
 
-static AstNode* P_AllocVarDeclNode(P_Parser* parser, AstNode* type, L_Token name, AstNode* value) {
+static AstNode* P_AllocVarDeclNode(P_Parser* parser, P_Type* type, L_Token name, AstNode* value) {
     AstNode* node = P_AllocNode(parser, NodeType_VarDecl);
     node->VarDecl.type = type;
     node->VarDecl.name = name;
@@ -110,11 +113,38 @@ static AstNode* P_AllocVarDeclNode(P_Parser* parser, AstNode* type, L_Token name
     return node;
 }
 
-//- Type Node Allocation
-static AstNode* P_AllocIntTypeNode(P_Parser* parser, L_Token type) {
-    AstNode* node = P_AllocNode(parser, NodeType_IntegerType);
-    node->IntegerType = type;
+//- Type Allocation
+static P_Type* P_AllocType(P_Parser* parser, P_BasicType type) {
+    P_Type* node = pool_alloc(&parser->type_pool);
+    node->type = type;
     return node;
+}
+
+static P_Type* P_AllocErrorType(P_Parser* parser) {
+    P_Type* node = P_AllocType(parser, BasicType_Invalid);
+    return node;
+}
+
+static P_Type* P_AllocIntType(P_Parser* parser, L_Token tok) {
+    P_Type* type = P_AllocType(parser, BasicType_Integer);
+    type->token = tok;
+    return type;
+}
+
+static P_Type* P_AllocVoidType(P_Parser* parser, L_Token tok) {
+    P_Type* type = P_AllocType(parser, BasicType_Void);
+    type->token = tok;
+    return type;
+}
+
+static P_Type* P_AllocFunctionType(P_Parser* parser, P_Type* return_type, P_Type** param_types, string* param_names, u32 arity, L_Token func_token) {
+    P_Type* type = P_AllocType(parser, BasicType_Function);
+    type->token = func_token;
+    type->function.return_type = return_type;
+    type->function.param_types = param_types;
+    type->function.param_names = param_names;
+    type->function.arity = arity;
+    return type;
 }
 
 //~ Token Helpers
@@ -150,6 +180,8 @@ static b8 P_IsType(P_Parser* parser) {
     
     switch (parser->curr.type) {
         case TokenType_Int: ret = true; break;
+        case TokenType_Void: ret = true; break;
+        case TokenType_Func: ret = true; break;
         default: ret = false; break;
     }
     
@@ -157,13 +189,58 @@ static b8 P_IsType(P_Parser* parser) {
     return ret;
 }
 
-static AstNode* P_EatType(P_Parser* parser) {
+static P_Type* P_EatType(P_Parser* parser) {
     switch (parser->curr.type) {
-        case TokenType_Int: P_Advance(parser); return P_AllocIntTypeNode(parser, parser->prev);
+        case TokenType_Int: P_Advance(parser); return P_AllocIntType(parser, parser->prev);
+        case TokenType_Void: P_Advance(parser); return P_AllocVoidType(parser, parser->prev);
+        
+        case TokenType_Func: {
+            P_Advance(parser);
+            L_Token func_token = parser->prev;
+            P_Eat(parser, TokenType_OpenParenthesis);
+            
+            string_array   temp_param_names = {0};
+            type_array temp_param_types = {0};
+            
+            u32 arity = 0;
+            
+            while (!P_Match(parser, TokenType_CloseParenthesis)) {
+                type_array_add(&temp_param_types, P_EatType(parser));
+                
+                if (P_Match(parser, TokenType_Identifier)) {
+                    string name = parser->prev.lexeme;
+                    string_array_add(&temp_param_names, name);
+                } else {
+                    string_array_add(&temp_param_names, str_lit(""));
+                }
+                
+                arity++;
+                
+                if (!P_Match(parser, TokenType_Comma)) {
+                    P_Eat(parser, TokenType_CloseParenthesis);
+                    break;
+                }
+            }
+            
+            // NOTE(voxel): please stop being lazy and implement arena_raise already
+            string* param_names = arena_alloc(&parser->arena, sizeof(string) * arity);
+            memcpy(param_names, temp_param_names.elems, sizeof(string) * arity);
+            P_Type** param_types = arena_alloc(&parser->arena, sizeof(AstNode*) * arity);
+            memcpy(param_types, temp_param_types.elems, sizeof(P_Type*) * arity);
+            
+            P_Type* return_type = nullptr;
+            if (P_Match(parser, TokenType_ThinArrow))
+                return_type = P_EatType(parser);
+            if (!return_type) return_type = P_AllocVoidType(parser, (L_Token){0});
+            
+            string_array_free(&temp_param_names);
+            type_array_free(&temp_param_types);
+            return P_AllocFunctionType(parser, return_type, param_types, param_names, arity, func_token);
+        }
         
         default: P_ReportParseError(parser, "Could not consume type. Got %.*s token\n", str_expand(L_GetTypeName(parser->curr.type)));
     }
-    return P_AllocErrorNode(parser);
+    return P_AllocErrorType(parser);
 }
 
 //~ Expressions
@@ -238,13 +315,13 @@ static AstNode* P_Statement(P_Parser* parser) {
         AstNode* expr = P_Expression(parser, Prec_Invalid, false);
         return P_AllocReturnNode(parser, expr);
     } else if (P_IsType(parser)) {
-        AstNode* type = P_EatType(parser);
+        P_Type* type = P_EatType(parser);
         P_Eat(parser, TokenType_Identifier);
         L_Token name = parser->prev;
         AstNode* value = nullptr;
         if (P_Match(parser, TokenType_Equal)) value = P_Expression(parser, Prec_Invalid, false);
         return P_AllocVarDeclNode(parser, type, name, value);
-    } else if(P_Match(parser, TokenType_Identifier)) {
+    } else if (P_Match(parser, TokenType_Identifier)) {
         L_Token name = parser->prev;
         P_Eat(parser, TokenType_Equal);
         AstNode* value = P_Expression(parser, Prec_Invalid, false);
@@ -256,6 +333,8 @@ static AstNode* P_Statement(P_Parser* parser) {
 void P_Init(P_Parser* parser, L_Lexer* lexer) {
     parser->lexer = lexer;
     pool_init(&parser->node_pool, sizeof(AstNode));
+    pool_init(&parser->type_pool, sizeof(P_Type));
+    arena_init(&parser->arena);
     
     P_Advance(parser); // Next
     P_Advance(parser); // Curr
@@ -267,62 +346,7 @@ AstNode* P_Parse(P_Parser* parser) {
 }
 
 void P_Free(P_Parser* parser) {
+    arena_free(&parser->arena);
     pool_free(&parser->node_pool);
-}
-
-void PrintAst_Indent(AstNode* node, u32 indent) {
-    for (u32 k = 0; k < indent; k++) printf(" ");
-    
-    switch (node->type) {
-        case NodeType_Error: {
-            printf("ERROR NODE\n");
-        } break;
-        
-        case NodeType_Ident: {
-            printf("Identifier [%.*s]\n", str_expand(node->Ident));
-        } break;
-        
-        case NodeType_IntLit: {
-            printf("%lld\n", node->IntLit);
-        } break;
-        
-        case NodeType_GlobalString: {
-            printf("String Literal [%.*s]\n", str_expand(node->GlobalString));
-        } break;
-        
-        case NodeType_Unary: {
-            printf("Unary %.*s\n", str_expand(L_GetTypeName(node->Unary.op.type)));
-            PrintAst_Indent(node->Unary.expr, indent + 1);
-        } break;
-        
-        case NodeType_Binary: {
-            printf("Binary %.*s\n", str_expand(L_GetTypeName(node->Binary.op.type)));
-            PrintAst_Indent(node->Binary.left, indent + 1);
-            PrintAst_Indent(node->Binary.right, indent + 1);
-        } break;
-        
-        case NodeType_Return: {
-            printf("Return\n");
-            PrintAst_Indent(node->Return, indent + 1);
-        } break;
-        
-        case NodeType_Assign: {
-            printf("Assign to %.*s\n", str_expand(node->Assign.name.lexeme));
-            PrintAst_Indent(node->Assign.value, indent + 1);
-        } break;
-        
-        case NodeType_VarDecl: {
-            if (node->VarDecl.value) {
-                printf("Declare %.*s and assign\n", str_expand(node->VarDecl.name.lexeme));
-                PrintAst_Indent(node->VarDecl.value, indent + 1);
-            } else {
-                printf("Declare %.*s\n", str_expand(node->VarDecl.name.lexeme));
-            }
-        } break;
-    }
-}
-
-void PrintAst(AstNode* node) {
-    PrintAst_Indent(node, 0);
-    printf("\n");
+    pool_free(&parser->type_pool);
 }

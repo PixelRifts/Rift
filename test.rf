@@ -1,3 +1,3 @@
 int b = 1 + 2 * 3
-int m = b + 2 * b // 21
+int m = b + 2 * b
 

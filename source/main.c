@@ -48,7 +48,6 @@ int main(int argc, char **argv) {
             node = P_Parse(&parser);
         }
         
-        
         BL_Free(&emitter);
         C_Free(&checker);
         P_Free(&parser);

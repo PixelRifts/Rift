@@ -6,6 +6,7 @@
 #include "defines.h"
 #include "lexer.h"
 #include "mem.h"
+#include "ds.h"
 
 /* Uses AST_NODE(Id, Name, Type) */
 #define AST_NODES \
@@ -31,14 +32,16 @@ L_Token name;\
 AstNode* value;\
 })\
 AST_NODE(VarDecl, str_lit("Variable Declaration"), struct {\
-AstNode* type;\
+P_Type* type;\
 L_Token name;\
 AstNode* value;\
 })\
-AST_NODE(STMT_END, str_lit(""), i8)\
-AST_NODE(TYPE_START, str_lit(""), i8)\
-AST_NODE(IntegerType, str_lit("Integer Type"), L_Token)\
-AST_NODE(TYPE_END, str_lit(""), i8)
+AST_NODE(FuncDecl, str_lit("Function Declaration"), struct {\
+P_Type* function_type;\
+L_Token name;\
+AstNode* body;\
+})\
+AST_NODE(STMT_END, str_lit(""), i8)
 
 typedef u32 P_NodeType;
 enum {
@@ -57,11 +60,28 @@ enum {
     NodeType_Assign,
     NodeType_VarDecl,
     NodeType_STMT_END,
-    
-    NodeType_TYPE_START,
-    NodeType_IntegerType,
-    NodeType_TYPE_END,
 };
+
+typedef u32 P_BasicType;
+enum {
+    BasicType_Invalid,
+    BasicType_Integer,
+    BasicType_Void,
+    BasicType_Function,
+    BasicType_Cstring,
+    BasicType_Count
+};
+
+typedef struct P_Type P_Type;
+struct P_Type {
+    P_BasicType type;
+    L_Token token;
+    
+    union {
+        struct { P_Type* return_type; P_Type** param_types; string* param_names; u32 arity; } function;
+    };
+};
+
 
 #define AST_NODE(Id, Name, Type) Type Id;
 typedef struct AstNode AstNode;
@@ -86,8 +106,12 @@ struct P_Parser;
 P_ParserSnap P_TakeSnapshot(struct P_Parser* parser);
 void P_ApplySnapshot(struct P_Parser* parser, P_ParserSnap snap);
 
+Array_Prototype(type_array, P_Type*);
+
 typedef struct P_Parser {
     M_Pool node_pool;
+    M_Pool type_pool;
+    M_Arena arena;
     
     L_Lexer* lexer;
     
@@ -102,6 +126,5 @@ typedef struct P_Parser {
 void P_Init(P_Parser* parser, L_Lexer* lexer);
 AstNode* P_Parse(P_Parser* parser);
 void P_Free(P_Parser* parser);
-void PrintAst(AstNode* node);
 
 #endif //PARSER_H

@@ -207,3 +207,34 @@ string_const string_list_flatten(M_Arena* arena, string_const_list* list) {
     }
     return final;
 }
+
+void string_array_add(string_const_array* array, string data) {
+    if (array->len + 1 > array->cap) {
+        void* prev = array->elems;
+        u32 new_cap = array->cap == 0 ? 8 : array->cap * 2;
+        array->elems = calloc(new_cap, sizeof(string));
+        memmove(array->elems, prev, array->len * sizeof(string));
+        free(prev);
+    }
+    array->elems[array->len++] = data;
+}
+
+string string_array_remove(string_const_array* array, int idx) {
+    if (idx >= array->len || idx < 0) return (string) {0};
+    string value = array->elems[idx];
+    if (idx == array->len - 1) {
+        array->len--;
+        return value;
+    }
+    string* from = array->elems + idx + 1;
+    string* to = array->elems + idx;
+    memmove(to, from, sizeof(string) * (array->len - idx - 1));
+    array->len--;
+    return value;
+}
+
+void string_array_free(string_const_array* array) {
+    array->cap = 0;
+    array->len = 0;
+    free(array->elems);
+}

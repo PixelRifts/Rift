@@ -4,7 +4,6 @@
 #define DS_H
 
 #include "defines.h"
-#include "str.h"
 #include "mem.h"
 
 #define DoubleCapacity(x) ((x) <= 0 ? 8 : x * 2)
@@ -19,8 +18,8 @@ u32 len;\
 Data* elems;\
 } Name;\
 void Name##_add(Name* array, Data data);\
-Data Name##_remove(Name* array, int idx);
-
+Data Name##_remove(Name* array, int idx);\
+void Name##_free(Name* array);
 
 #define Array_Impl(Name, Data)\
 void Name##_add(Name* array, Data data) {\
@@ -45,6 +44,11 @@ Data* to = array->elems + idx;\
 memmove(to, from, sizeof(Data) * (array->len - idx - 1));\
 array->len--;\
 return value;\
+}\
+void Name##_free(Name* array) {\
+array->cap = 0;\
+array->len = 0;\
+free(array->elems);\
 }
 
 #define Stack_Prototype(Name, Data)\
@@ -55,7 +59,8 @@ Data* elems;\
 } Name;\
 void Name##_push(Name* stack, Data data);\
 Data Name##_pop(Name* stack);\
-Data Name##_peek(Name* stack);
+Data Name##_peek(Name* stack);\
+void Name##_free(Name* stack);
 
 #define Stack_Impl(Name, Data)\
 void Name##_push(Name* stack, Data data) {\
@@ -75,6 +80,11 @@ return stack->elems[--stack->len];\
 Data Name##_peek(Name* stack) {\
 if (stack->len == 0) return (Data){0};\
 return stack->elems[stack->len - 1];\
+}\
+void Name##_free(Name* stack) {\
+stack->cap = 0;\
+stack->len = 0;\
+free(stack->elems);\
 }
 
 #define HashTable_MaxLoad 0.75

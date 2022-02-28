@@ -28,6 +28,17 @@ typedef struct string_const_list {
 } string_const_list;
 typedef string_const_list string_list;
 
+typedef struct string_const_array {
+    u32 cap;
+    u32 len;
+    string * elems;
+} string_const_array;
+typedef string_const_array string_array;
+
+void string_array_add(string_const_array* array, string data);
+string_const string_array_remove(string_const_array* array, int idx);
+void string_array_free(string_const_array* array);
+
 //-
 
 #define str_lit(s) (string_const) { .str = (u8*)(s), .size = sizeof(s) - 1 }
