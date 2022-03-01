@@ -1,10 +1,4 @@
 {
-    khi: func() = func() {
-        k: int = 20;
-        return;
-    };
-    lambda: func() = func() {
-        k: int = 30;
-        return;
-    };
+    k : int = (10 + 10);
 }
+m : int = 10;

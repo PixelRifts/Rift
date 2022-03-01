@@ -53,9 +53,11 @@ static AstNode* P_AllocNode(P_Parser* parser, P_NodeType type) {
     return node;
 }
 
+static AstNode* error_node_instance;
 static AstNode* P_AllocErrorNode(P_Parser* parser) {
-    AstNode* node = P_AllocNode(parser, NodeType_Error);
-    return node;
+    if (!error_node_instance)
+        return P_AllocNode(parser, NodeType_Error);
+    return error_node_instance;
 }
 
 //- Expression Node Allocation 
@@ -304,9 +306,10 @@ static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
         }
         
         default: {
+            P_Advance(parser);
             if (is_rhs)
                 P_ReportParseError(parser, "Invalid Expression for Right Hand Side of %.*s\n", str_expand(parser->prev.lexeme));
-            else P_ReportParseError(parser, "Invalid Expression for Left Hand Side of %.*s\n", str_expand(parser->prev.lexeme));
+            else P_ReportParseError(parser, "Invalid Unary Expression %.*s\n", str_expand(parser->prev.lexeme));
             return P_AllocErrorNode(parser);
         }
     }
@@ -340,6 +343,7 @@ static AstNode* P_Statement(P_Parser* parser) {
         AstNode* expr = nullptr;
         if (!P_Match(parser, TokenType_Semicolon))
             expr = P_Expression(parser, Prec_Invalid, false);
+        parser->errored = false;
         return P_AllocReturnNode(parser, expr);
     } else if (P_Match(parser, TokenType_Identifier)) {
         L_Token name = parser->prev;
@@ -355,6 +359,7 @@ static AstNode* P_Statement(P_Parser* parser) {
         P_Eat(parser, TokenType_Equal);
         AstNode* value = P_Expression(parser, Prec_Invalid, false);
         P_Eat(parser, TokenType_Semicolon);
+        parser->errored = false;
         return P_AllocAssignNode(parser, name, value);
     } else if (P_Match(parser, TokenType_OpenBrace)) {
         node_array temp_statements = {0};
@@ -363,6 +368,7 @@ static AstNode* P_Statement(P_Parser* parser) {
         while (!P_Match(parser, TokenType_CloseBrace)) {
             AstNode* stmt = P_Statement(parser);
             node_array_add(&temp_statements, stmt);
+            if (stmt->type == NodeType_Error) P_Advance(parser);
             count++;
         }
         
@@ -372,6 +378,7 @@ static AstNode* P_Statement(P_Parser* parser) {
         
         node_array_free(&temp_statements);
         P_Scope scope = { .type = ScopeType_None };
+        parser->errored = false;
         return P_AllocBlockNode(parser, scope, statements, count);
     }
     return P_AllocErrorNode(parser);

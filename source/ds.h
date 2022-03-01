@@ -28,6 +28,7 @@ void* prev = array->elems;\
 u32 new_cap = DoubleCapacity(array->cap);\
 array->elems = calloc(new_cap, sizeof(Data));\
 memmove(array->elems, prev, array->len * sizeof(Data));\
+array->cap = new_cap;\
 free(prev);\
 }\
 array->elems[array->len++] = data;\
