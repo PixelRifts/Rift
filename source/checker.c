@@ -158,6 +158,10 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             return output;
         } break;
         
+        case NodeType_Group: {
+            return C_GetType(checker, node->Group);
+        } break;
+        
         case NodeType_Lambda: {
             C_GetType(checker, node->Lambda.body);
             return node->Lambda.function_type;

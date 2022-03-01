@@ -95,6 +95,12 @@ static AstNode* P_AllocBinaryNode(P_Parser* parser, AstNode* lhs, AstNode* rhs, 
     return node;
 }
 
+static AstNode* P_AllocGroupNode(P_Parser* parser, AstNode* expr) {
+    AstNode* node = P_AllocNode(parser, NodeType_Group);
+    node->Group = expr;
+    return node;
+}
+
 static AstNode* P_AllocLambdaNode(P_Parser* parser, P_Type* function_type, L_Token func, AstNode* body) {
     AstNode* node = P_AllocNode(parser, NodeType_Lambda);
     node->Lambda.function_type = function_type;
@@ -266,6 +272,7 @@ static P_Type* P_EatType(P_Parser* parser) {
 //~ Expressions
 static AstNode* P_ExprUnary(P_Parser* parser, b8 rhs);
 static AstNode* P_Statement(P_Parser* parser);
+static AstNode* P_Expression(P_Parser* parser, Prec prec_in, b8 is_rhs);
 
 static AstNode* P_ExprIntegerLiteral(P_Parser* parser) {
     i64 value = atoll((const char*)parser->prev.lexeme.str);
@@ -292,6 +299,12 @@ static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
         case TokenType_IntLit: P_Advance(parser); return P_ExprIntegerLiteral(parser);
         case TokenType_CstringLit: P_Advance(parser); return P_ExprStringLit(parser);
         case TokenType_Identifier: P_Advance(parser); return P_ExprIdent(parser);
+        case TokenType_OpenParenthesis: {
+            P_Advance(parser);
+            AstNode* in = P_Expression(parser, Prec_Invalid, false);
+            P_Eat(parser, TokenType_CloseParenthesis);
+            return P_AllocGroupNode(parser, in);
+        }
         
         case TokenType_Plus:
         case TokenType_Minus:

@@ -27,6 +27,7 @@ AstNode* left;\
 AstNode* right;\
 L_Token  op;\
 })\
+AST_NODE(Group, str_lit("Group Expression"), AstNode*)\
 AST_NODE(Lambda, str_lit("Lambda Expression"), struct {\
 P_Scope scope;\
 P_Type* function_type;\
@@ -62,6 +63,7 @@ enum {
     NodeType_GlobalString,
     NodeType_Unary,
     NodeType_Binary,
+    NodeType_Group,
     NodeType_Lambda,
     NodeType_EXPR_END,
     

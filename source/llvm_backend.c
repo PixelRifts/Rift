@@ -120,6 +120,10 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             return BL_BuildBinary(emitter, node->Binary.op, left, right);
         }
         
+        case NodeType_Group: {
+            return BL_Emit(emitter, node->Group);
+        }
+        
         case NodeType_Return: {
             if (!node->Return) {
                 return LLVMBuildRet(emitter->builder, (LLVMValueRef) {0});
