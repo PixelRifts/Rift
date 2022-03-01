@@ -39,6 +39,7 @@ static void C_Report(C_Checker* checker, L_Token token, const char* stage, const
 
 #define TYPE(Id, Name) case BasicType_##Id: return Name;
 static string C_GetBasicTypeName(P_Type* type) {
+    if (!type) return str_lit("Invalid");
     switch (type->type) {
         BASIC_TYPES
     }
@@ -47,6 +48,7 @@ static string C_GetBasicTypeName(P_Type* type) {
 #undef TYPE
 
 static b8 C_CheckTypeEquals(P_Type* a, P_Type* b) {
+    if (!a || !b) return false; 
     if (a->type != b->type) return false;
     switch (a->type) {
         // No extra Data associated with these types
@@ -81,17 +83,41 @@ static b8 C_CheckUnary(P_Type* operand, L_TokenType op, P_Type** output) {
 }
 
 //~ Checking
+static b8 C_GetSymbol(C_Checker* checker, symbol_hash_table_key key_prototype, symbol_hash_table_value* val) {
+    for (i32 i = checker->scope_depth; i >= 0; i--) {
+        key_prototype.depth = (u32) i;
+        if (symbol_hash_table_get(&checker->symbol_table, key_prototype, val))
+            return true;
+    }
+    return false;
+}
+
+static void C_PushScope(C_Checker* checker) {
+    checker->scope_depth++;
+}
+
+static void C_PopScope(C_Checker* checker) {
+    for (u32 k = 0; k < checker->symbol_table.cap; k++) {
+        symbol_hash_table_entry e = checker->symbol_table.elems[k];
+        if (!symbol_key_is_null(e.key)) {
+            if (e.value.depth == checker->scope_depth) {
+                symbol_hash_table_del(&checker->symbol_table, e.key);
+            }
+        }
+    }
+    checker->scope_depth--;
+}
 
 static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
     switch (node->type) {
         case NodeType_Ident: {
-            symbol_hash_table_key key = (symbol_hash_table_key) { .name = node->Ident, .depth = 0 };
+            symbol_hash_table_key key = (symbol_hash_table_key) { .name = node->Ident.lexeme, .depth = checker->scope_depth };
             symbol_hash_table_value val;
-            if (symbol_hash_table_get(&checker->symbol_table, key, &val)) {
+            if (C_GetSymbol(checker, key, &val)) {
                 if (val.type == SymbolType_Variable) {
                     return val.variable_type;
                 }
-            }
+            } else C_ReportCheckError(checker, node->Ident, "Undefined Variable %.*s\n", str_expand(node->Ident.lexeme));
             return &C_InvalidType;
         } break;
         
@@ -127,12 +153,23 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             return &C_InvalidType;
         } break;
         
+        case NodeType_Block: {
+            C_PushScope(checker);
+            for (u32 i = 0; i < node->Block.count; i++) {
+                AstNode* statement = node->Block.statements[i];
+                C_GetType(checker, statement);
+            }
+            C_PopScope(checker);
+            
+            return &C_InvalidType;
+        } break;
+        
         case NodeType_Assign: {
             P_Type* symboltype = {0};
             
             symbol_hash_table_key key = (symbol_hash_table_key) { .name = node->Assign.name.lexeme, .depth = 0 };
             symbol_hash_table_value val;
-            if (symbol_hash_table_get(&checker->symbol_table, key, &val)) {
+            if (C_GetSymbol(checker, key, &val)) {
                 if (val.type != SymbolType_Variable)
                     C_ReportCheckError(checker, node->Assign.name, "%.*s is not assignable\n", str_expand(node->Assign.name.lexeme));
                 symboltype = val.variable_type;
@@ -150,11 +187,15 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             string var_name = node->VarDecl.name.lexeme;
             P_Type* type = node->VarDecl.type;
             
+            P_Type* valuetype = C_GetType(checker, node->VarDecl.value);
+            if (!C_CheckTypeEquals(type, valuetype)) {
+                C_ReportCheckError(checker, node->Assign.name, "Assignment type mismatch. got types %.*s and %.*s\n", str_expand(C_GetBasicTypeName(type)), str_expand(C_GetBasicTypeName(valuetype)));
+            }
             symbol_hash_table_key key = (symbol_hash_table_key) { .name = var_name, .depth = 0 };
             if (symbol_hash_table_get(&checker->symbol_table, key, nullptr)) {
                 C_ReportCheckError(checker, node->VarDecl.name, "Variable %.*s already exists\n", str_expand(var_name));
             }
-            symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Variable, .name = var_name, .variable_type = type });
+            symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Variable, .name = var_name, .depth = checker->scope_depth, .variable_type = type });
             return &C_InvalidType;
         } break;
     }
@@ -162,6 +203,7 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
 }
 
 void C_Init(C_Checker* checker) {
+    memset(checker, 0, sizeof(*checker));
     symbol_hash_table_init(&checker->symbol_table);
 }
 

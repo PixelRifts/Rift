@@ -1,2 +1,7 @@
-int b = 1 + 2 * 3
-int m = b + 2 * b
+{
+    b : int = 1 + 2 * 3;
+    {
+        k : int = 10;
+    }
+    m : int = b + 2 * k;
+}

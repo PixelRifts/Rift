@@ -60,7 +60,7 @@ command_list =
 		.cursor_at_end = true,
 		.cmd =
 		{
-			{ "example.bat", .os = "win" },
+			{ "a.exe", .os = "win" },
 		},
 	},
 	{
@@ -71,7 +71,7 @@ command_list =
 		.cursor_at_end = true,
 		.cmd =
 		{
-			{ "clang generated.c -Wno-parentheses-equality -o generated.exe", .os = "win" },
+			{ "clang blah.ll", .os = "win" },
 		},
 	},
 };

@@ -12,9 +12,12 @@
 #define AST_NODES \
 AST_NODE(Error, str_lit(""), i8)\
 AST_NODE(EXPR_START, str_lit(""), i8)\
-AST_NODE(Ident, str_lit("Identifier Expression"), string)\
+AST_NODE(Ident, str_lit("Identifier Expression"), L_Token)\
 AST_NODE(IntLit, str_lit("Integer Literal"), i64)\
-AST_NODE(GlobalString, str_lit("Global String Literal"), string)\
+AST_NODE(GlobalString, str_lit("Global String Literal"), struct {\
+L_Token token;\
+string value;\
+})\
 AST_NODE(Unary, str_lit("Unary Expression"), struct {\
 AstNode* expr;\
 L_Token  op;\
@@ -24,9 +27,19 @@ AstNode* left;\
 AstNode* right;\
 L_Token  op;\
 })\
+AST_NODE(Lambda, str_lit("Lambda Expression"), struct {\
+P_Type* function_type;\
+L_Token name;\
+AstNode* body;\
+})\
 AST_NODE(EXPR_END, str_lit(""), i8)\
 AST_NODE(STMT_START, str_lit(""), i8)\
 AST_NODE(Return, str_lit("Return Statement"), AstNode*)\
+AST_NODE(Block, str_lit("Block Statement"), struct {\
+P_Scope scope;\
+AstNode** statements;\
+u32 count;\
+})\
 AST_NODE(Assign, str_lit("Variable Assignment"), struct {\
 L_Token name;\
 AstNode* value;\
@@ -35,11 +48,6 @@ AST_NODE(VarDecl, str_lit("Variable Declaration"), struct {\
 P_Type* type;\
 L_Token name;\
 AstNode* value;\
-})\
-AST_NODE(FuncDecl, str_lit("Function Declaration"), struct {\
-P_Type* function_type;\
-L_Token name;\
-AstNode* body;\
 })\
 AST_NODE(STMT_END, str_lit(""), i8)
 
@@ -53,10 +61,12 @@ enum {
     NodeType_GlobalString,
     NodeType_Unary,
     NodeType_Binary,
+    NodeType_Lambda,
     NodeType_EXPR_END,
     
     NodeType_STMT_START,
     NodeType_Return,
+    NodeType_Block,
     NodeType_Assign,
     NodeType_VarDecl,
     NodeType_STMT_END,
@@ -82,6 +92,17 @@ struct P_Type {
     };
 };
 
+typedef u32 P_ScopeType;
+enum {
+    ScopeType_Invalid,
+    ScopeType_None,
+    ScopeType_Count
+};
+
+typedef struct P_Scope {
+    P_ScopeType type;
+    // There will be more stuff here probably
+} P_Scope;
 
 #define AST_NODE(Id, Name, Type) Type Id;
 typedef struct AstNode AstNode;
@@ -107,6 +128,7 @@ P_ParserSnap P_TakeSnapshot(struct P_Parser* parser);
 void P_ApplySnapshot(struct P_Parser* parser, P_ParserSnap snap);
 
 Array_Prototype(type_array, P_Type*);
+Array_Prototype(node_array, AstNode*);
 
 typedef struct P_Parser {
     M_Pool node_pool;

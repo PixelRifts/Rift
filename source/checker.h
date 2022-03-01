@@ -34,6 +34,7 @@ typedef struct C_Symbol {
     C_SymbolFlags flags;
     
     string name;
+    u32 depth;
     
     union {
         P_Type* variable_type;
@@ -47,6 +48,8 @@ typedef struct C_Checker {
     u8 error_count;
     
     symbol_hash_table symbol_table;
+    
+    u32 scope_depth;
 } C_Checker;
 
 P_Type C_AstTypeToCheckerType(AstNode* type);

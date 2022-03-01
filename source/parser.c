@@ -13,6 +13,7 @@
 #include <stdlib.h>
 
 Array_Impl(type_array, P_Type*);
+Array_Impl(node_array, AstNode*);
 
 static void P_Report(P_Parser* parser, L_Token token, const char* stage, const char* err, ...) {
     if (parser->errored) return;
@@ -64,13 +65,14 @@ static AstNode* P_AllocIntLitNode(P_Parser* parser, i64 val) {
     return node;
 }
 
-static AstNode* P_AllocGlobalStringNode(P_Parser* parser, string val) {
+static AstNode* P_AllocGlobalStringNode(P_Parser* parser, L_Token token, string val) {
     AstNode* node = P_AllocNode(parser, NodeType_GlobalString);
-    node->GlobalString = val;
+    node->GlobalString.token = token;
+    node->GlobalString.value = val;
     return node;
 }
 
-static AstNode* P_AllocIdentNode(P_Parser* parser, string val) {
+static AstNode* P_AllocIdentNode(P_Parser* parser, L_Token val) {
     AstNode* node = P_AllocNode(parser, NodeType_Ident);
     node->Ident = val;
     return node;
@@ -95,6 +97,14 @@ static AstNode* P_AllocBinaryNode(P_Parser* parser, AstNode* lhs, AstNode* rhs, 
 static AstNode* P_AllocReturnNode(P_Parser* parser, AstNode* expr) {
     AstNode* node = P_AllocNode(parser, NodeType_Return);
     node->Return = expr;
+    return node;
+}
+
+static AstNode* P_AllocBlockNode(P_Parser* parser, P_Scope scope, AstNode** statements, u32 count) {
+    AstNode* node = P_AllocNode(parser, NodeType_Block);
+    node->Block.scope = scope;
+    node->Block.statements = statements;
+    node->Block.count = count;
     return node;
 }
 
@@ -222,7 +232,7 @@ static P_Type* P_EatType(P_Parser* parser) {
                 }
             }
             
-            // NOTE(voxel): please stop being lazy and implement arena_raise already
+            // TODO(voxel): please stop being lazy and implement arena_raise already
             string* param_names = arena_alloc(&parser->arena, sizeof(string) * arity);
             memcpy(param_names, temp_param_names.elems, sizeof(string) * arity);
             P_Type** param_types = arena_alloc(&parser->arena, sizeof(AstNode*) * arity);
@@ -252,13 +262,12 @@ static AstNode* P_ExprIntegerLiteral(P_Parser* parser) {
 }
 
 static AstNode* P_ExprIdent(P_Parser* parser) {
-    string value = parser->prev.lexeme;
-    return P_AllocIdentNode(parser, value);
+    return P_AllocIdentNode(parser, parser->prev);
 }
 
 static AstNode* P_ExprStringLit(P_Parser* parser) {
     string value = { .str = parser->prev.lexeme.str + 1, .size = parser->prev.lexeme.size - 2 };
-    return P_AllocGlobalStringNode(parser, value);
+    return P_AllocGlobalStringNode(parser, parser->prev, value);
 }
 
 static AstNode* P_ExprUnaryNum(P_Parser* parser) {
@@ -277,6 +286,11 @@ static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
         case TokenType_Minus:
         case TokenType_Tilde:
         P_Advance(parser); return P_ExprUnaryNum(parser);
+        
+        case TokenType_Func: {
+            //P_Type* func_type = P_EatType(parser);
+            // Eat Block
+        }
         
         default: {
             if (is_rhs)
@@ -313,19 +327,40 @@ static AstNode* P_Expression(P_Parser* parser, Prec prec_in, b8 is_rhs) {
 static AstNode* P_Statement(P_Parser* parser) {
     if (P_Match(parser, TokenType_Return)) {
         AstNode* expr = P_Expression(parser, Prec_Invalid, false);
+        P_Eat(parser, TokenType_Semicolon);
         return P_AllocReturnNode(parser, expr);
-    } else if (P_IsType(parser)) {
-        P_Type* type = P_EatType(parser);
-        P_Eat(parser, TokenType_Identifier);
-        L_Token name = parser->prev;
-        AstNode* value = nullptr;
-        if (P_Match(parser, TokenType_Equal)) value = P_Expression(parser, Prec_Invalid, false);
-        return P_AllocVarDeclNode(parser, type, name, value);
     } else if (P_Match(parser, TokenType_Identifier)) {
         L_Token name = parser->prev;
+        
+        if (P_Match(parser, TokenType_Colon)) {
+            P_Type* type = P_EatType(parser);
+            AstNode* value = nullptr;
+            if (P_Match(parser, TokenType_Equal)) value = P_Expression(parser, Prec_Invalid, false);
+            P_Eat(parser, TokenType_Semicolon);
+            return P_AllocVarDeclNode(parser, type, name, value);
+        }
+        
         P_Eat(parser, TokenType_Equal);
         AstNode* value = P_Expression(parser, Prec_Invalid, false);
+        P_Eat(parser, TokenType_Semicolon);
         return P_AllocAssignNode(parser, name, value);
+    } else if (P_Match(parser, TokenType_OpenBrace)) {
+        node_array temp_statements = {0};
+        u32 count = 0;
+        
+        while (!P_Match(parser, TokenType_CloseBrace)) {
+            AstNode* stmt = P_Statement(parser);
+            node_array_add(&temp_statements, stmt);
+            count++;
+        }
+        
+        // NOTE(voxel): please stop being lazy and implement arena_raise already
+        AstNode** statements = arena_alloc(&parser->arena, sizeof(AstNode*) * count);
+        memcpy(statements, temp_statements.elems, sizeof(AstNode*) * count);
+        
+        node_array_free(&temp_statements);
+        P_Scope scope = { .type = ScopeType_None };
+        return P_AllocBlockNode(parser, scope, statements, count);
     }
     return P_AllocErrorNode(parser);
 }

@@ -85,7 +85,7 @@ static LLVMValueRef BL_BuildUnary(BL_Emitter* emitter, L_Token op, LLVMValueRef 
 LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
     switch (node->type) {
         case NodeType_Ident: {
-            llvmvar_hash_table_key key = (llvmvar_hash_table_key) { .name = node->Ident, .depth = 0 };
+            llvmvar_hash_table_key key = (llvmvar_hash_table_key) { .name = node->Ident.lexeme, .depth = 0 };
             llvmvar_hash_table_value val;
             if (llvmvar_hash_table_get(&emitter->variables, key, &val)) {
                 return val.loaded;
@@ -98,9 +98,9 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         case NodeType_GlobalString: {
             static char global_string_name = 48;
             
-            char* hoist = malloc(node->GlobalString.size + 1);
-            memcpy(hoist, node->GlobalString.str, node->GlobalString.size);
-            hoist[node->GlobalString.size] = '\0';
+            char* hoist = malloc(node->GlobalString.value.size + 1);
+            memcpy(hoist, node->GlobalString.value.str, node->GlobalString.value.size);
+            hoist[node->GlobalString.value.size] = '\0';
             LLVMValueRef ret = LLVMBuildGlobalString(emitter->builder, hoist, &global_string_name);
             global_string_name++;
             free(hoist);
@@ -120,6 +120,12 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         }
         
         case NodeType_Return: return LLVMBuildRet(emitter->builder, BL_Emit(emitter, node->Return));
+        
+        case NodeType_Block: {
+            for (u32 i = 0; i < node->Block.count; i++) {
+                BL_Emit(emitter, node->Block.statements[i]);
+            }
+        }
         
         case NodeType_Assign: {
             char* hoist = malloc(node->Assign.name.lexeme.size + 1);
@@ -173,7 +179,7 @@ void BL_Free(BL_Emitter* emitter) {
     llvmvar_hash_table_get(&emitter->variables, key, &val);
     LLVMValueRef printfargs[] = {
         LLVMBuildPointerCast(emitter->builder,
-                             LLVMBuildGlobalString(emitter->builder, "%lld", "hello"),
+                             LLVMBuildGlobalString(emitter->builder, "%lld\n", ""),
                              int_8_type_ptr, "0"),
         val.loaded,
     };
