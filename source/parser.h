@@ -28,8 +28,9 @@ AstNode* right;\
 L_Token  op;\
 })\
 AST_NODE(Lambda, str_lit("Lambda Expression"), struct {\
+P_Scope scope;\
 P_Type* function_type;\
-L_Token name;\
+L_Token func;\
 AstNode* body;\
 })\
 AST_NODE(EXPR_END, str_lit(""), i8)\

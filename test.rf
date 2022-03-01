@@ -1,7 +1,10 @@
 {
-    b : int = 1 + 2 * 3;
-    {
-        k : int = 10;
-    }
-    m : int = b + 2 * k;
+    khi: func() = func() {
+        k: int = 20;
+        return;
+    };
+    lambda: func() = func() {
+        k: int = 30;
+        return;
+    };
 }

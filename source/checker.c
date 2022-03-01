@@ -55,6 +55,16 @@ static b8 C_CheckTypeEquals(P_Type* a, P_Type* b) {
         case BasicType_Integer:
         case BasicType_Void:
         case BasicType_Cstring: return true;
+        
+        case BasicType_Function: {
+            if (!C_CheckTypeEquals(a->function.return_type, b->function.return_type)) return false;
+            if (a->function.arity != b->function.arity) return false;
+            for (u32 i = 0; i < a->function.arity; i++) {
+                if (!C_CheckTypeEquals(a->function.param_types[i], b->function.param_types[i]))
+                    return false;
+            }
+            return true;
+        }
     }
     
     return false;
@@ -148,8 +158,13 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             return output;
         } break;
         
+        case NodeType_Lambda: {
+            C_GetType(checker, node->Lambda.body);
+            return node->Lambda.function_type;
+        } break;
+        
         case NodeType_Return: {
-            C_GetType(checker, node->Return);
+            if (node->Return) C_GetType(checker, node->Return);
             return &C_InvalidType;
         } break;
         
@@ -187,9 +202,11 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             string var_name = node->VarDecl.name.lexeme;
             P_Type* type = node->VarDecl.type;
             
-            P_Type* valuetype = C_GetType(checker, node->VarDecl.value);
-            if (!C_CheckTypeEquals(type, valuetype)) {
-                C_ReportCheckError(checker, node->Assign.name, "Assignment type mismatch. got types %.*s and %.*s\n", str_expand(C_GetBasicTypeName(type)), str_expand(C_GetBasicTypeName(valuetype)));
+            if (node->VarDecl.value) {
+                P_Type* valuetype = C_GetType(checker, node->VarDecl.value);
+                if (!C_CheckTypeEquals(type, valuetype)) {
+                    C_ReportCheckError(checker, node->Assign.name, "Assignment type mismatch. got types %.*s and %.*s\n", str_expand(C_GetBasicTypeName(type)), str_expand(C_GetBasicTypeName(valuetype)));
+                }
             }
             symbol_hash_table_key key = (symbol_hash_table_key) { .name = var_name, .depth = 0 };
             if (symbol_hash_table_get(&checker->symbol_table, key, nullptr)) {

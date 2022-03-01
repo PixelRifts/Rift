@@ -93,6 +93,14 @@ static AstNode* P_AllocBinaryNode(P_Parser* parser, AstNode* lhs, AstNode* rhs, 
     return node;
 }
 
+static AstNode* P_AllocLambdaNode(P_Parser* parser, P_Type* function_type, L_Token func, AstNode* body) {
+    AstNode* node = P_AllocNode(parser, NodeType_Lambda);
+    node->Lambda.function_type = function_type;
+    node->Lambda.func = func;
+    node->Lambda.body = body;
+    return node;
+}
+
 //- Statement Node Allocation
 static AstNode* P_AllocReturnNode(P_Parser* parser, AstNode* expr) {
     AstNode* node = P_AllocNode(parser, NodeType_Return);
@@ -255,6 +263,7 @@ static P_Type* P_EatType(P_Parser* parser) {
 
 //~ Expressions
 static AstNode* P_ExprUnary(P_Parser* parser, b8 rhs);
+static AstNode* P_Statement(P_Parser* parser);
 
 static AstNode* P_ExprIntegerLiteral(P_Parser* parser) {
     i64 value = atoll((const char*)parser->prev.lexeme.str);
@@ -288,8 +297,10 @@ static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
         P_Advance(parser); return P_ExprUnaryNum(parser);
         
         case TokenType_Func: {
-            //P_Type* func_type = P_EatType(parser);
-            // Eat Block
+            L_Token func_token = parser->curr;
+            P_Type* func_type = P_EatType(parser);
+            AstNode* body = P_Statement(parser);
+            return P_AllocLambdaNode(parser, func_type, func_token, body);
         }
         
         default: {
@@ -326,8 +337,9 @@ static AstNode* P_Expression(P_Parser* parser, Prec prec_in, b8 is_rhs) {
 
 static AstNode* P_Statement(P_Parser* parser) {
     if (P_Match(parser, TokenType_Return)) {
-        AstNode* expr = P_Expression(parser, Prec_Invalid, false);
-        P_Eat(parser, TokenType_Semicolon);
+        AstNode* expr = nullptr;
+        if (!P_Match(parser, TokenType_Semicolon))
+            expr = P_Expression(parser, Prec_Invalid, false);
         return P_AllocReturnNode(parser, expr);
     } else if (P_Match(parser, TokenType_Identifier)) {
         L_Token name = parser->prev;

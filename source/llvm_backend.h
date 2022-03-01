@@ -16,15 +16,15 @@ typedef struct BL_StackValue {
     b8 tombstone;
 } BL_StackValue;
 
-HashTable_Prototype(llvmvar, struct { string name; u32 depth; }, BL_StackValue);
+HashTable_Prototype(llvmsymbol, struct { string name; u32 depth; }, BL_StackValue);
 
 typedef struct BL_Emitter {
     string filename;
     LLVMModuleRef module;
-    LLVMBasicBlockRef entry;
     LLVMBuilderRef builder;
+    LLVMBasicBlockRef current_block;
     
-    llvmvar_hash_table variables;
+    llvmsymbol_hash_table variables;
 } BL_Emitter;
 
 void BL_Init(BL_Emitter* emitter, string filename);
