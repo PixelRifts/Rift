@@ -86,7 +86,7 @@ static LLVMValueRef BL_BuildUnary(BL_Emitter* emitter, L_Token op, LLVMValueRef 
 LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
     switch (node->type) {
         case NodeType_Ident: {
-            llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->Ident.lexeme, .depth = 0 };
+            llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->Ident, .depth = 0 };
             llvmsymbol_hash_table_value val;
             if (llvmsymbol_hash_table_get(&emitter->variables, key, &val)) {
                 return val.loaded;
@@ -111,13 +111,13 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         
         case NodeType_Unary: {
             LLVMValueRef operand = BL_Emit(emitter, node->Unary.expr);
-            return BL_BuildUnary(emitter, node->Unary.op, operand);
+            return BL_BuildUnary(emitter, node->id, operand);
         }
         
         case NodeType_Binary: {
             LLVMValueRef left = BL_Emit(emitter, node->Binary.left);
             LLVMValueRef right = BL_Emit(emitter, node->Binary.right);
-            return BL_BuildBinary(emitter, node->Binary.op, left, right);
+            return BL_BuildBinary(emitter, node->id, left, right);
         }
         
         case NodeType_Group: {
@@ -154,10 +154,10 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         }
         
         case NodeType_Assign: {
-            char* hoist = malloc(node->Assign.name.lexeme.size + 1);
-            memcpy(hoist, node->Assign.name.lexeme.str, node->Assign.name.lexeme.size);
-            hoist[node->Assign.name.lexeme.size] = '\0';
-            llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->Assign.name.lexeme, .depth = 0 };
+            char* hoist = malloc(node->id.lexeme.size + 1);
+            memcpy(hoist, node->id.lexeme.str, node->id.lexeme.size);
+            hoist[node->id.lexeme.size] = '\0';
+            llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->id.lexeme, .depth = 0 };
             llvmsymbol_hash_table_value val;
             if (llvmsymbol_hash_table_get(&emitter->variables, key, &val)) {
                 LLVMValueRef value = BL_Emit(emitter, node->Assign.value);
@@ -174,9 +174,9 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         }
         
         case NodeType_VarDecl: {
-            char* hoist = malloc(node->VarDecl.name.lexeme.size + 1);
-            memcpy(hoist, node->VarDecl.name.lexeme.str, node->VarDecl.name.lexeme.size);
-            hoist[node->VarDecl.name.lexeme.size] = '\0';
+            char* hoist = malloc(node->id.lexeme.size + 1);
+            memcpy(hoist, node->id.lexeme.str, node->id.lexeme.size);
+            hoist[node->id.lexeme.size] = '\0';
             
             LLVMTypeRef var_type = BL_PTypeToLLVMType(node->VarDecl.type);
             if (node->VarDecl.type->type == BasicType_Function)
@@ -189,7 +189,7 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             }
             LLVMValueRef loaded = LLVMBuildLoad2(emitter->builder, var_type, alloca, "");
             
-            llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->VarDecl.name.lexeme, .depth = 0 };
+            llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->id.lexeme, .depth = 0 };
             llvmsymbol_hash_table_value val = (llvmsymbol_hash_table_value) { .alloca = alloca, .loaded = loaded, .type = var_type, .not_null = true, .tombstone = false };
             llvmsymbol_hash_table_set(&emitter->variables, key, val);
             

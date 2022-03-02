@@ -69,21 +69,22 @@ static AstNode* P_AllocIntLitNode(P_Parser* parser, i64 val) {
 
 static AstNode* P_AllocGlobalStringNode(P_Parser* parser, L_Token token, string val) {
     AstNode* node = P_AllocNode(parser, NodeType_GlobalString);
-    node->GlobalString.token = token;
+    node->id = token;
     node->GlobalString.value = val;
     return node;
 }
 
 static AstNode* P_AllocIdentNode(P_Parser* parser, L_Token val) {
     AstNode* node = P_AllocNode(parser, NodeType_Ident);
-    node->Ident = val;
+    node->Ident = val.lexeme;
+    node->id = val;
     return node;
 }
 
 static AstNode* P_AllocUnaryNode(P_Parser* parser, AstNode* operand, L_Token op) {
     AstNode* node = P_AllocNode(parser, NodeType_Unary);
     node->Unary.expr = operand;
-    node->Unary.op   = op;
+    node->id = op;
     return node;
 }
 
@@ -91,42 +92,45 @@ static AstNode* P_AllocBinaryNode(P_Parser* parser, AstNode* lhs, AstNode* rhs, 
     AstNode* node = P_AllocNode(parser, NodeType_Binary);
     node->Binary.left  = lhs;
     node->Binary.right = rhs;
-    node->Binary.op    = op;
+    node->id = op;
     return node;
 }
 
-static AstNode* P_AllocGroupNode(P_Parser* parser, AstNode* expr) {
+static AstNode* P_AllocGroupNode(P_Parser* parser, AstNode* expr, L_Token token) {
     AstNode* node = P_AllocNode(parser, NodeType_Group);
     node->Group = expr;
+    node->id = token;
     return node;
 }
 
 static AstNode* P_AllocLambdaNode(P_Parser* parser, P_Type* function_type, L_Token func, AstNode* body) {
     AstNode* node = P_AllocNode(parser, NodeType_Lambda);
     node->Lambda.function_type = function_type;
-    node->Lambda.func = func;
+    node->id = func;
     node->Lambda.body = body;
     return node;
 }
 
 //- Statement Node Allocation
-static AstNode* P_AllocReturnNode(P_Parser* parser, AstNode* expr) {
+static AstNode* P_AllocReturnNode(P_Parser* parser, AstNode* expr, L_Token token) {
     AstNode* node = P_AllocNode(parser, NodeType_Return);
     node->Return = expr;
+    node->id = token;
     return node;
 }
 
-static AstNode* P_AllocBlockNode(P_Parser* parser, P_Scope scope, AstNode** statements, u32 count) {
+static AstNode* P_AllocBlockNode(P_Parser* parser, P_Scope scope, AstNode** statements, u32 count, L_Token token) {
     AstNode* node = P_AllocNode(parser, NodeType_Block);
     node->Block.scope = scope;
     node->Block.statements = statements;
     node->Block.count = count;
+    node->id = token;
     return node;
 }
 
 static AstNode* P_AllocAssignNode(P_Parser* parser, L_Token name, AstNode* value) {
     AstNode* node = P_AllocNode(parser, NodeType_Assign);
-    node->Assign.name = name;
+    node->id = name;
     node->Assign.value = value;
     return node;
 }
@@ -134,7 +138,7 @@ static AstNode* P_AllocAssignNode(P_Parser* parser, L_Token name, AstNode* value
 static AstNode* P_AllocVarDeclNode(P_Parser* parser, P_Type* type, L_Token name, AstNode* value) {
     AstNode* node = P_AllocNode(parser, NodeType_VarDecl);
     node->VarDecl.type = type;
-    node->VarDecl.name = name;
+    node->id = name;
     node->VarDecl.value = value;
     return node;
 }
@@ -301,9 +305,10 @@ static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
         case TokenType_Identifier: P_Advance(parser); return P_ExprIdent(parser);
         case TokenType_OpenParenthesis: {
             P_Advance(parser);
+            L_Token tok = parser->prev;
             AstNode* in = P_Expression(parser, Prec_Invalid, false);
             P_Eat(parser, TokenType_CloseParenthesis);
-            return P_AllocGroupNode(parser, in);
+            return P_AllocGroupNode(parser, in, tok);
         }
         
         case TokenType_Plus:
@@ -353,11 +358,12 @@ static AstNode* P_Expression(P_Parser* parser, Prec prec_in, b8 is_rhs) {
 
 static AstNode* P_Statement(P_Parser* parser) {
     if (P_Match(parser, TokenType_Return)) {
+        L_Token tok = parser->prev;
         AstNode* expr = nullptr;
         if (!P_Match(parser, TokenType_Semicolon))
             expr = P_Expression(parser, Prec_Invalid, false);
         parser->errored = false;
-        return P_AllocReturnNode(parser, expr);
+        return P_AllocReturnNode(parser, expr, tok);
     } else if (P_Match(parser, TokenType_Identifier)) {
         L_Token name = parser->prev;
         
@@ -365,7 +371,14 @@ static AstNode* P_Statement(P_Parser* parser) {
             P_Type* type = P_EatType(parser);
             AstNode* value = nullptr;
             if (P_Match(parser, TokenType_Equal)) value = P_Expression(parser, Prec_Invalid, false);
-            P_Eat(parser, TokenType_Semicolon);
+            
+            // Eat semicolon only if value is not a lambda
+            if (value) {
+                if (value->type != NodeType_Lambda) {
+                    P_Eat(parser, TokenType_Semicolon);
+                }
+            } else P_Eat(parser, TokenType_Semicolon);
+            
             return P_AllocVarDeclNode(parser, type, name, value);
         }
         
@@ -375,6 +388,7 @@ static AstNode* P_Statement(P_Parser* parser) {
         parser->errored = false;
         return P_AllocAssignNode(parser, name, value);
     } else if (P_Match(parser, TokenType_OpenBrace)) {
+        L_Token tok = parser->prev;
         node_array temp_statements = {0};
         u32 count = 0;
         
@@ -392,7 +406,7 @@ static AstNode* P_Statement(P_Parser* parser) {
         node_array_free(&temp_statements);
         P_Scope scope = { .type = ScopeType_None };
         parser->errored = false;
-        return P_AllocBlockNode(parser, scope, statements, count);
+        return P_AllocBlockNode(parser, scope, statements, count, tok);
     }
     return P_AllocErrorNode(parser);
 }

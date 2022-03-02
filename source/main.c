@@ -43,7 +43,10 @@ int main(int argc, char **argv) {
         
         AstNode* node = P_Parse(&parser);
         while (node->type != NodeType_Error) {
-            C_CheckAst(&checker, node);
+            if (!parser.errored)
+                C_CheckAst(&checker, node);
+            parser.errored = false;
+            parser.error_count = 0;
             if (!checker.errored)
                 BL_Emit(&emitter, node);
             checker.errored = false;

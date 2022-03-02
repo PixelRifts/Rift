@@ -12,26 +12,22 @@
 #define AST_NODES \
 AST_NODE(Error, str_lit(""), i8)\
 AST_NODE(EXPR_START, str_lit(""), i8)\
-AST_NODE(Ident, str_lit("Identifier Expression"), L_Token)\
+AST_NODE(Ident, str_lit("Identifier Expression"), string)\
 AST_NODE(IntLit, str_lit("Integer Literal"), i64)\
 AST_NODE(GlobalString, str_lit("Global String Literal"), struct {\
-L_Token token;\
 string value;\
 })\
 AST_NODE(Unary, str_lit("Unary Expression"), struct {\
 AstNode* expr;\
-L_Token  op;\
 })\
 AST_NODE(Binary, str_lit("Binary Expression"), struct {\
 AstNode* left;\
 AstNode* right;\
-L_Token  op;\
 })\
 AST_NODE(Group, str_lit("Group Expression"), AstNode*)\
 AST_NODE(Lambda, str_lit("Lambda Expression"), struct {\
 P_Scope scope;\
 P_Type* function_type;\
-L_Token func;\
 AstNode* body;\
 })\
 AST_NODE(EXPR_END, str_lit(""), i8)\
@@ -43,12 +39,10 @@ AstNode** statements;\
 u32 count;\
 })\
 AST_NODE(Assign, str_lit("Variable Assignment"), struct {\
-L_Token name;\
 AstNode* value;\
 })\
 AST_NODE(VarDecl, str_lit("Variable Declaration"), struct {\
 P_Type* type;\
-L_Token name;\
 AstNode* value;\
 })\
 AST_NODE(STMT_END, str_lit(""), i8)
@@ -74,6 +68,15 @@ enum {
     NodeType_VarDecl,
     NodeType_STMT_END,
 };
+
+// Uses TYPE(Id, Name)
+#define BASIC_TYPES \
+TYPE(Invalid, str_lit("Invalid")) \
+TYPE(Integer, str_lit("Integer")) \
+TYPE(Void, str_lit("Void")) \
+TYPE(Function, str_lit("Function")) \
+TYPE(Cstring, str_lit("Cstring")) \
+TYPE(Count, str_lit("__Count"))
 
 typedef u32 P_BasicType;
 enum {
@@ -111,6 +114,7 @@ typedef struct P_Scope {
 typedef struct AstNode AstNode;
 struct AstNode {
     P_NodeType type;
+    L_Token id;
     union {
         AST_NODES
     };

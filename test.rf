@@ -1,4 +1,5 @@
-{
-    k : int = (1 + 2) * 3;
+k : int = (1 + 2) * 3;
+lambda : func(int) -> int = func(int) -> int {
+    return;
 }
 m : int = 10;

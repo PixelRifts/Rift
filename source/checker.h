@@ -8,13 +8,6 @@
 #include "mem.h"
 #include "ds.h"
 
-// Uses TYPE(Id, Name)
-#define BASIC_TYPES \
-TYPE(Invalid, str_lit("Invalid")) \
-TYPE(Integer, str_lit("Integer")) \
-TYPE(Cstring, str_lit("Cstring")) \
-TYPE(Count, str_lit("__Count"))
-
 typedef u32 C_SymbolType;
 enum {
     SymbolType_Invalid,
@@ -43,6 +36,14 @@ typedef struct C_Symbol {
 
 HashTable_Prototype(symbol, struct { string name; u32 depth; }, C_Symbol);
 
+typedef struct C_ScopeContext C_ScopeContext;
+struct C_ScopeContext {
+    C_ScopeContext* upper;
+    
+    P_Type* function_return_type;
+    b8 is_in_func_body;
+};
+
 typedef struct C_Checker {
     b8 errored;
     u8 error_count;
@@ -50,6 +51,13 @@ typedef struct C_Checker {
     symbol_hash_table symbol_table;
     
     u32 scope_depth;
+    
+    P_Type* function_return_type;
+    b8 is_in_func_body;
+    b8 found_return;
+    b8 no_scope;
+    
+    C_ScopeContext* current_scope_context;
 } C_Checker;
 
 P_Type C_AstTypeToCheckerType(AstNode* type);

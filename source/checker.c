@@ -102,11 +102,26 @@ static b8 C_GetSymbol(C_Checker* checker, symbol_hash_table_key key_prototype, s
     return false;
 }
 
-static void C_PushScope(C_Checker* checker) {
+static C_ScopeContext* C_PushScope(C_Checker* checker, P_Type* new_fn_ret, b8 is_lambda_body) {
     checker->scope_depth++;
+    C_ScopeContext* scope = malloc(sizeof(C_ScopeContext));
+    memset(scope, 0, sizeof(C_ScopeContext));
+    scope->upper = checker->current_scope_context;
+    scope->function_return_type = checker->function_return_type;
+    scope->is_in_func_body = checker->is_in_func_body;
+    
+    checker->current_scope_context = scope;
+    checker->is_in_func_body = false;
+    
+    if (is_lambda_body) {
+        checker->function_return_type = new_fn_ret;
+        checker->is_in_func_body = true;
+    }
+    
+    return scope;
 }
 
-static void C_PopScope(C_Checker* checker) {
+static void C_PopScope(C_Checker* checker, C_ScopeContext* scope) {
     for (u32 k = 0; k < checker->symbol_table.cap; k++) {
         symbol_hash_table_entry e = checker->symbol_table.elems[k];
         if (!symbol_key_is_null(e.key)) {
@@ -115,19 +130,26 @@ static void C_PopScope(C_Checker* checker) {
             }
         }
     }
+    
+    checker->current_scope_context = scope->upper;
+    checker->function_return_type = scope->function_return_type;
+    checker->is_in_func_body = scope->is_in_func_body;
+    
+    free(checker->current_scope_context);
+    
     checker->scope_depth--;
 }
 
 static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
     switch (node->type) {
         case NodeType_Ident: {
-            symbol_hash_table_key key = (symbol_hash_table_key) { .name = node->Ident.lexeme, .depth = checker->scope_depth };
+            symbol_hash_table_key key = (symbol_hash_table_key) { .name = node->Ident, .depth = checker->scope_depth };
             symbol_hash_table_value val;
             if (C_GetSymbol(checker, key, &val)) {
                 if (val.type == SymbolType_Variable) {
                     return val.variable_type;
                 }
-            } else C_ReportCheckError(checker, node->Ident, "Undefined Variable %.*s\n", str_expand(node->Ident.lexeme));
+            } else C_ReportCheckError(checker, node->id, "Undefined Variable %.*s\n", str_expand(node->Ident));
             return &C_InvalidType;
         } break;
         
@@ -142,8 +164,8 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
         case NodeType_Unary: {
             P_Type* xpr = C_GetType(checker, node->Unary.expr);
             P_Type* output;
-            if (!C_CheckUnary(xpr, node->Unary.op.type, &output)) {
-                C_ReportCheckError(checker, node->Unary.op, "Cannot apply unary operator %.*s to type %.*s\n", str_expand(L_GetTypeName(node->Unary.op.type)), str_expand(C_GetBasicTypeName(xpr)));
+            if (!C_CheckUnary(xpr, node->id.type, &output)) {
+                C_ReportCheckError(checker, node->id, "Cannot apply unary operator %.*s to type %.*s\n", str_expand(L_GetTypeName(node->id.type)), str_expand(C_GetBasicTypeName(xpr)));
             }
             return output;
         } break;
@@ -152,8 +174,8 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             P_Type* lhs = C_GetType(checker, node->Binary.left);
             P_Type* rhs = C_GetType(checker, node->Binary.right);
             P_Type* output;
-            if (!C_CheckBinary(lhs, rhs, node->Binary.op.type, &output)) {
-                C_ReportCheckError(checker, node->Binary.op, "Cannot apply binary operator %.*s to types %.*s and %.*s\n", str_expand(L_GetTypeName(node->Binary.op.type)), str_expand(C_GetBasicTypeName(lhs)), str_expand(C_GetBasicTypeName(rhs)));
+            if (!C_CheckBinary(lhs, rhs, node->id.type, &output)) {
+                C_ReportCheckError(checker, node->id, "Cannot apply binary operator %.*s to types %.*s and %.*s\n", str_expand(L_GetTypeName(node->id.type)), str_expand(C_GetBasicTypeName(lhs)), str_expand(C_GetBasicTypeName(rhs)));
             }
             return output;
         } break;
@@ -163,22 +185,40 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
         } break;
         
         case NodeType_Lambda: {
+            C_PushScope(checker, node->Lambda.function_type->function.return_type, true);
+            
+            checker->no_scope = true;
             C_GetType(checker, node->Lambda.body);
+            checker->no_scope = false;
+            
+            C_PushScope(checker, node->Lambda.function_type->function.return_type, false);
             return node->Lambda.function_type;
         } break;
         
         case NodeType_Return: {
-            if (node->Return) C_GetType(checker, node->Return);
+            if (node->Return) {
+                P_Type* returned = C_GetType(checker, node->Return);
+                if (!C_CheckTypeEquals(returned, checker->function_return_type)) {
+                    C_ReportCheckError(checker, node->id, "Return Type %.*s does not match with return type of function %.*s\n", str_expand(C_GetBasicTypeName(returned)), str_expand(C_GetBasicTypeName(checker->function_return_type)));
+                }
+            } else {
+                if (!C_CheckTypeEquals(&C_VoidType, checker->function_return_type)) {
+                    C_ReportCheckError(checker, node->id, "Return Type %.*s does not match with return type of function %.*s\n", str_expand(C_GetBasicTypeName(&C_VoidType)), str_expand(C_GetBasicTypeName(checker->function_return_type)));
+                }
+            }
+            
+            if (checker->is_in_func_body) checker->found_return = true;
+            
             return &C_InvalidType;
         } break;
         
         case NodeType_Block: {
-            C_PushScope(checker);
+            C_ScopeContext* scope_ctx = C_PushScope(checker, nullptr, false);
             for (u32 i = 0; i < node->Block.count; i++) {
                 AstNode* statement = node->Block.statements[i];
                 C_GetType(checker, statement);
             }
-            C_PopScope(checker);
+            C_PopScope(checker, scope_ctx);
             
             return &C_InvalidType;
         } break;
@@ -186,35 +226,35 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
         case NodeType_Assign: {
             P_Type* symboltype = {0};
             
-            symbol_hash_table_key key = (symbol_hash_table_key) { .name = node->Assign.name.lexeme, .depth = 0 };
+            symbol_hash_table_key key = (symbol_hash_table_key) { .name = node->id.lexeme, .depth = 0 };
             symbol_hash_table_value val;
             if (C_GetSymbol(checker, key, &val)) {
                 if (val.type != SymbolType_Variable)
-                    C_ReportCheckError(checker, node->Assign.name, "%.*s is not assignable\n", str_expand(node->Assign.name.lexeme));
+                    C_ReportCheckError(checker, node->id, "%.*s is not assignable\n", str_expand(node->id.lexeme));
                 symboltype = val.variable_type;
             }
             
             P_Type* valuetype = C_GetType(checker, node->Assign.value);
             if (!C_CheckTypeEquals(symboltype, valuetype)) {
-                C_ReportCheckError(checker, node->Assign.name, "Assignment type mismatch. got types %.*s and %.*s\n", str_expand(C_GetBasicTypeName(symboltype)), str_expand(C_GetBasicTypeName(valuetype)));
+                C_ReportCheckError(checker, node->id, "Assignment type mismatch. got types %.*s and %.*s\n", str_expand(C_GetBasicTypeName(symboltype)), str_expand(C_GetBasicTypeName(valuetype)));
             }
             
             return &C_InvalidType;
         } break;
         
         case NodeType_VarDecl: {
-            string var_name = node->VarDecl.name.lexeme;
+            string var_name = node->id.lexeme;
             P_Type* type = node->VarDecl.type;
             
             if (node->VarDecl.value) {
                 P_Type* valuetype = C_GetType(checker, node->VarDecl.value);
                 if (!C_CheckTypeEquals(type, valuetype)) {
-                    C_ReportCheckError(checker, node->Assign.name, "Assignment type mismatch. got types %.*s and %.*s\n", str_expand(C_GetBasicTypeName(type)), str_expand(C_GetBasicTypeName(valuetype)));
+                    C_ReportCheckError(checker, node->id, "Assignment type mismatch. got types %.*s and %.*s\n", str_expand(C_GetBasicTypeName(type)), str_expand(C_GetBasicTypeName(valuetype)));
                 }
             }
             symbol_hash_table_key key = (symbol_hash_table_key) { .name = var_name, .depth = 0 };
             if (symbol_hash_table_get(&checker->symbol_table, key, nullptr)) {
-                C_ReportCheckError(checker, node->VarDecl.name, "Variable %.*s already exists\n", str_expand(var_name));
+                C_ReportCheckError(checker, node->id, "Variable %.*s already exists\n", str_expand(var_name));
             }
             symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Variable, .name = var_name, .depth = checker->scope_depth, .variable_type = type });
             return &C_InvalidType;
