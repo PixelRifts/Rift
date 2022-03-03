@@ -32,13 +32,6 @@
 LLVM_C_EXTERN_C_BEGIN
 
 /**
- * @defgroup LLVMCExecutionEngineLLJIT LLJIT
- * @ingroup LLVMCExecutionEngine
- *
- * @{
- */
-
-/**
  * A function for constructing an ObjectLinkingLayer instance to be used
  * by an LLJIT instance.
  *
@@ -241,10 +234,6 @@ LLVMOrcIRTransformLayerRef LLVMOrcLLJITGetIRTransformLayer(LLVMOrcLLJITRef J);
  * by the caller.
  */
 const char *LLVMOrcLLJITGetDataLayoutStr(LLVMOrcLLJITRef J);
-
-/**
- * @}
- */
 
 LLVM_C_EXTERN_C_END
 

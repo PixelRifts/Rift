@@ -111,11 +111,27 @@ static AstNode* P_AllocLambdaNode(P_Parser* parser, P_Type* function_type, L_Tok
     return node;
 }
 
+static AstNode* P_AllocCallNode(P_Parser* parser, AstNode* callee, AstNode** params, u32 arity, L_Token token) {
+    AstNode* node = P_AllocNode(parser, NodeType_Call);
+    node->id = token;
+    node->Call.callee = callee;
+    node->Call.params = params;
+    node->Call.arity  = arity;
+    return node;
+}
+
 //- Statement Node Allocation
 static AstNode* P_AllocReturnNode(P_Parser* parser, AstNode* expr, L_Token token) {
     AstNode* node = P_AllocNode(parser, NodeType_Return);
     node->Return = expr;
     node->id = token;
+    return node;
+}
+
+static AstNode* P_AllocExprStatementNode(P_Parser* parser, AstNode* expr) {
+    AstNode* node = P_AllocNode(parser, NodeType_ExprStatement);
+    node->ExprStatement = expr;
+    node->id = expr->id;
     return node;
 }
 
@@ -334,10 +350,36 @@ static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
     return P_AllocErrorNode(parser);
 }
 
+static AstNode* P_ExprInfix(P_Parser* parser, L_Token op, Prec prec, AstNode* lhs) {
+    switch (op.type) {
+        case TokenType_Plus:
+        case TokenType_Minus:
+        case TokenType_Star:
+        case TokenType_Slash: {
+            AstNode* rhs = P_Expression(parser, prec, true);
+            return P_AllocBinaryNode(parser, lhs, rhs, op);
+        }
+        
+        case TokenType_OpenParenthesis: {
+            node_array temp_args = {0};
+            u32 arity = 0;
+            
+            while (!P_Match(parser, TokenType_CloseParenthesis)) {
+                AstNode* param = P_Expression(parser, Prec_Invalid, false);
+                node_array_add(&temp_args, param);
+                arity++;
+            }
+            
+            AstNode** args = arena_alloc(&parser->arena, sizeof(AstNode*) * arity);
+            return P_AllocCallNode(parser, lhs, args, arity, op);
+        }
+    }
+    return P_AllocErrorNode(parser);
+}
+
 static AstNode* P_Expression(P_Parser* parser, Prec prec_in, b8 is_rhs) {
     AstNode* lhs = P_ExprUnary(parser, is_rhs);
     if (lhs->type == NodeType_Error) return P_AllocErrorNode(parser);
-    AstNode* rhs;
     
     if (infix_expr_precs[parser->curr.type] != Prec_Invalid) {
         P_Advance(parser);
@@ -346,9 +388,8 @@ static AstNode* P_Expression(P_Parser* parser, Prec prec_in, b8 is_rhs) {
             if (infix_expr_precs[op.type] == Prec_Invalid) break;
             
             if (infix_expr_precs[op.type] >= prec_in) {
-                rhs = P_Expression(parser, infix_expr_precs[op.type] + 1, true);
-                if (rhs->type == NodeType_Error) return P_AllocErrorNode(parser);
-                lhs = P_AllocBinaryNode(parser, lhs, rhs, op);
+                lhs = P_ExprInfix(parser, op, infix_expr_precs[op.type] + 1, lhs);
+                if (lhs->type == NodeType_Error) return P_AllocErrorNode(parser);
             } else break;
         }
     }

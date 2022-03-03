@@ -19,13 +19,6 @@
 
 LLVM_C_EXTERN_C_BEGIN
 
-/**
- * @defgroup LLVMCCoreComdat Comdats
- * @ingroup LLVMCCore
- *
- * @{
- */
-
 typedef enum {
   LLVMAnyComdatSelectionKind,        ///< The linker may choose any COMDAT.
   LLVMExactMatchComdatSelectionKind, ///< The data referenced by the COMDAT must
@@ -72,10 +65,6 @@ LLVMComdatSelectionKind LLVMGetComdatSelectionKind(LLVMComdatRef C);
  * @see llvm::Comdat::setSelectionKind()
  */
 void LLVMSetComdatSelectionKind(LLVMComdatRef C, LLVMComdatSelectionKind Kind);
-
-/**
- * @}
- */
 
 LLVM_C_EXTERN_C_END
 

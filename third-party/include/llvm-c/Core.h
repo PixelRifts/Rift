@@ -15,7 +15,6 @@
 #ifndef LLVM_C_CORE_H
 #define LLVM_C_CORE_H
 
-#include "llvm-c/Deprecated.h"
 #include "llvm-c/ErrorHandling.h"
 #include "llvm-c/ExternC.h"
 #include "llvm-c/Types.h"
@@ -1581,10 +1580,10 @@ LLVMTypeRef LLVMX86AMXType(void);
       macro(ConstantVector)                 \
       macro(GlobalValue)                    \
         macro(GlobalAlias)                  \
+        macro(GlobalIFunc)                  \
         macro(GlobalObject)                 \
           macro(Function)                   \
           macro(GlobalVariable)             \
-          macro(GlobalIFunc)                \
       macro(UndefValue)                     \
       macro(PoisonValue)                    \
     macro(Instruction)                      \
@@ -2152,18 +2151,13 @@ LLVMValueRef LLVMConstFCmp(LLVMRealPredicate Predicate,
 LLVMValueRef LLVMConstShl(LLVMValueRef LHSConstant, LLVMValueRef RHSConstant);
 LLVMValueRef LLVMConstLShr(LLVMValueRef LHSConstant, LLVMValueRef RHSConstant);
 LLVMValueRef LLVMConstAShr(LLVMValueRef LHSConstant, LLVMValueRef RHSConstant);
-LLVM_ATTRIBUTE_C_DEPRECATED(
-    LLVMValueRef LLVMConstGEP(LLVMValueRef ConstantVal,
-                              LLVMValueRef *ConstantIndices,
-                              unsigned NumIndices),
-    "Use LLVMConstGEP2 instead to support opaque pointers");
+LLVMValueRef LLVMConstGEP(LLVMValueRef ConstantVal,
+                          LLVMValueRef *ConstantIndices, unsigned NumIndices);
 LLVMValueRef LLVMConstGEP2(LLVMTypeRef Ty, LLVMValueRef ConstantVal,
                            LLVMValueRef *ConstantIndices, unsigned NumIndices);
-LLVM_ATTRIBUTE_C_DEPRECATED(
-    LLVMValueRef LLVMConstInBoundsGEP(LLVMValueRef ConstantVal,
-                                      LLVMValueRef *ConstantIndices,
-                                      unsigned NumIndices),
-    "Use LLVMConstInBoundsGEP2 instead to support opaque pointers");
+LLVMValueRef LLVMConstInBoundsGEP(LLVMValueRef ConstantVal,
+                                  LLVMValueRef *ConstantIndices,
+                                  unsigned NumIndices);
 LLVMValueRef LLVMConstInBoundsGEP2(LLVMTypeRef Ty, LLVMValueRef ConstantVal,
                                    LLVMValueRef *ConstantIndices,
                                    unsigned NumIndices);
@@ -2383,20 +2377,8 @@ void LLVMSetExternallyInitialized(LLVMValueRef GlobalVar, LLVMBool IsExtInit);
  *
  * @{
  */
-
-LLVM_ATTRIBUTE_C_DEPRECATED(
-    LLVMValueRef LLVMAddAlias(LLVMModuleRef M, LLVMTypeRef Ty,
-                              LLVMValueRef Aliasee, const char *Name),
-    "Use LLVMAddAlias2 instead to support opaque pointers");
-
-/**
- * Add a GlobalAlias with the given value type, address space and aliasee.
- *
- * @see llvm::GlobalAlias::create()
- */
-LLVMValueRef LLVMAddAlias2(LLVMModuleRef M, LLVMTypeRef ValueTy,
-                           unsigned AddrSpace, LLVMValueRef Aliasee,
-                           const char *Name);
+LLVMValueRef LLVMAddAlias(LLVMModuleRef M, LLVMTypeRef Ty, LLVMValueRef Aliasee,
+                          const char *Name);
 
 /**
  * Obtain a GlobalAlias value from a Module by its name.
@@ -3305,7 +3287,7 @@ void LLVMSetInstructionCallConv(LLVMValueRef Instr, unsigned CC);
  */
 unsigned LLVMGetInstructionCallConv(LLVMValueRef Instr);
 
-void LLVMSetInstrParamAlignment(LLVMValueRef Instr, LLVMAttributeIndex Idx,
+void LLVMSetInstrParamAlignment(LLVMValueRef Instr, unsigned index,
                                 unsigned Align);
 
 void LLVMAddCallSiteAttribute(LLVMValueRef C, LLVMAttributeIndex Idx,
@@ -3504,7 +3486,7 @@ LLVMTypeRef LLVMGetAllocatedType(LLVMValueRef Alloca);
  */
 
 /**
- * Check whether the given GEP operator is inbounds.
+ * Check whether the given GEP instruction is inbounds.
  */
 LLVMBool LLVMIsInBounds(LLVMValueRef GEP);
 
@@ -3512,11 +3494,6 @@ LLVMBool LLVMIsInBounds(LLVMValueRef GEP);
  * Set the given GEP instruction to be inbounds or not.
  */
 void LLVMSetIsInBounds(LLVMValueRef GEP, LLVMBool InBounds);
-
-/**
- * Get the source element type of the given GEP operator.
- */
-LLVMTypeRef LLVMGetGEPSourceElementType(LLVMValueRef GEP);
 
 /**
  * @}
@@ -3568,7 +3545,7 @@ LLVMBasicBlockRef LLVMGetIncomingBlock(LLVMValueRef PhiNode, unsigned Index);
 
 /**
  * Obtain the number of indices.
- * NB: This also works on GEP operators.
+ * NB: This also works on GEP.
  */
 unsigned LLVMGetNumIndices(LLVMValueRef Inst);
 
@@ -3634,19 +3611,9 @@ void LLVMSetCurrentDebugLocation2(LLVMBuilderRef Builder, LLVMMetadataRef Loc);
  * current debug location for the given builder.  If the builder has no current
  * debug location, this function is a no-op.
  *
- * @deprecated LLVMSetInstDebugLocation is deprecated in favor of the more general
- *             LLVMAddMetadataToInst.
- *
  * @see llvm::IRBuilder::SetInstDebugLocation()
  */
 void LLVMSetInstDebugLocation(LLVMBuilderRef Builder, LLVMValueRef Inst);
-
-/**
- * Adds the metadata registered with the given builder to the given instruction.
- *
- * @see llvm::IRBuilder::AddMetadataToInst()
- */
-void LLVMAddMetadataToInst(LLVMBuilderRef Builder, LLVMValueRef Inst);
 
 /**
  * Get the dafult floating-point math metadata for a given builder.
@@ -3688,12 +3655,12 @@ LLVMValueRef LLVMBuildSwitch(LLVMBuilderRef, LLVMValueRef V,
                              LLVMBasicBlockRef Else, unsigned NumCases);
 LLVMValueRef LLVMBuildIndirectBr(LLVMBuilderRef B, LLVMValueRef Addr,
                                  unsigned NumDests);
-LLVM_ATTRIBUTE_C_DEPRECATED(
-    LLVMValueRef LLVMBuildInvoke(LLVMBuilderRef, LLVMValueRef Fn,
-                                 LLVMValueRef *Args, unsigned NumArgs,
-                                 LLVMBasicBlockRef Then,
-                                 LLVMBasicBlockRef Catch, const char *Name),
-    "Use LLVMBuildInvoke2 instead to support opaque pointers");
+// LLVMBuildInvoke is deprecated in favor of LLVMBuildInvoke2, in preparation
+// for opaque pointer types.
+LLVMValueRef LLVMBuildInvoke(LLVMBuilderRef, LLVMValueRef Fn,
+                             LLVMValueRef *Args, unsigned NumArgs,
+                             LLVMBasicBlockRef Then, LLVMBasicBlockRef Catch,
+                             const char *Name);
 LLVMValueRef LLVMBuildInvoke2(LLVMBuilderRef, LLVMTypeRef Ty, LLVMValueRef Fn,
                               LLVMValueRef *Args, unsigned NumArgs,
                               LLVMBasicBlockRef Then, LLVMBasicBlockRef Catch,
@@ -3887,27 +3854,23 @@ LLVMValueRef LLVMBuildAlloca(LLVMBuilderRef, LLVMTypeRef Ty, const char *Name);
 LLVMValueRef LLVMBuildArrayAlloca(LLVMBuilderRef, LLVMTypeRef Ty,
                                   LLVMValueRef Val, const char *Name);
 LLVMValueRef LLVMBuildFree(LLVMBuilderRef, LLVMValueRef PointerVal);
-LLVM_ATTRIBUTE_C_DEPRECATED(
-    LLVMValueRef LLVMBuildLoad(LLVMBuilderRef, LLVMValueRef PointerVal,
-                               const char *Name),
-    "Use LLVMBuildLoad2 instead to support opaque pointers");
+// LLVMBuildLoad is deprecated in favor of LLVMBuildLoad2, in preparation for
+// opaque pointer types.
+LLVMValueRef LLVMBuildLoad(LLVMBuilderRef, LLVMValueRef PointerVal,
+                           const char *Name);
 LLVMValueRef LLVMBuildLoad2(LLVMBuilderRef, LLVMTypeRef Ty,
                             LLVMValueRef PointerVal, const char *Name);
 LLVMValueRef LLVMBuildStore(LLVMBuilderRef, LLVMValueRef Val, LLVMValueRef Ptr);
-LLVM_ATTRIBUTE_C_DEPRECATED(
-    LLVMValueRef LLVMBuildGEP(LLVMBuilderRef B, LLVMValueRef Pointer,
-                              LLVMValueRef *Indices, unsigned NumIndices,
-                              const char *Name),
-    "Use LLVMBuildGEP2 instead to support opaque pointers");
-LLVM_ATTRIBUTE_C_DEPRECATED(
-    LLVMValueRef LLVMBuildInBoundsGEP(LLVMBuilderRef B, LLVMValueRef Pointer,
-                                      LLVMValueRef *Indices,
-                                      unsigned NumIndices, const char *Name),
-    "Use LLVMBuildInBoundsGEP2 instead to support opaque pointers");
-LLVM_ATTRIBUTE_C_DEPRECATED(
-    LLVMValueRef LLVMBuildStructGEP(LLVMBuilderRef B, LLVMValueRef Pointer,
-                                    unsigned Idx, const char *Name),
-    "Use LLVMBuildStructGEP2 instead to support opaque pointers");
+// LLVMBuildGEP, LLVMBuildInBoundsGEP, and LLVMBuildStructGEP are deprecated in
+// favor of LLVMBuild*GEP2, in preparation for opaque pointer types.
+LLVMValueRef LLVMBuildGEP(LLVMBuilderRef B, LLVMValueRef Pointer,
+                          LLVMValueRef *Indices, unsigned NumIndices,
+                          const char *Name);
+LLVMValueRef LLVMBuildInBoundsGEP(LLVMBuilderRef B, LLVMValueRef Pointer,
+                                  LLVMValueRef *Indices, unsigned NumIndices,
+                                  const char *Name);
+LLVMValueRef LLVMBuildStructGEP(LLVMBuilderRef B, LLVMValueRef Pointer,
+                                unsigned Idx, const char *Name);
 LLVMValueRef LLVMBuildGEP2(LLVMBuilderRef B, LLVMTypeRef Ty,
                            LLVMValueRef Pointer, LLVMValueRef *Indices,
                            unsigned NumIndices, const char *Name);
@@ -3987,11 +3950,11 @@ LLVMValueRef LLVMBuildFCmp(LLVMBuilderRef, LLVMRealPredicate Op,
 
 /* Miscellaneous instructions */
 LLVMValueRef LLVMBuildPhi(LLVMBuilderRef, LLVMTypeRef Ty, const char *Name);
-LLVM_ATTRIBUTE_C_DEPRECATED(
-    LLVMValueRef LLVMBuildCall(LLVMBuilderRef, LLVMValueRef Fn,
-                               LLVMValueRef *Args, unsigned NumArgs,
-                               const char *Name),
-    "Use LLVMBuildCall2 instead to support opaque pointers");
+// LLVMBuildCall is deprecated in favor of LLVMBuildCall2, in preparation for
+// opaque pointer types.
+LLVMValueRef LLVMBuildCall(LLVMBuilderRef, LLVMValueRef Fn,
+                           LLVMValueRef *Args, unsigned NumArgs,
+                           const char *Name);
 LLVMValueRef LLVMBuildCall2(LLVMBuilderRef, LLVMTypeRef, LLVMValueRef Fn,
                             LLVMValueRef *Args, unsigned NumArgs,
                             const char *Name);
@@ -4118,7 +4081,6 @@ void LLVMDisposeMemoryBuffer(LLVMMemoryBufferRef MemBuf);
 
 /**
  * @defgroup LLVMCCorePassRegistry Pass Registry
- * @ingroup LLVMCCore
  *
  * @{
  */
@@ -4133,7 +4095,6 @@ LLVMPassRegistryRef LLVMGetGlobalPassRegistry(void);
 
 /**
  * @defgroup LLVMCCorePassManagers Pass Managers
- * @ingroup LLVMCCore
  *
  * @{
  */

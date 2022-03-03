@@ -18,12 +18,6 @@
 
 LLVM_C_EXTERN_C_BEGIN
 
-/**
- * @addtogroup LLVMCError
- *
- * @{
- */
-
 typedef void (*LLVMFatalErrorHandler)(const char *Reason);
 
 /**
@@ -47,10 +41,6 @@ void LLVMResetFatalErrorHandler(void);
  * crash.
  */
 void LLVMEnablePrettyStackTrace(void);
-
-/**
- * @}
- */
 
 LLVM_C_EXTERN_C_END
 

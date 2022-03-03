@@ -1,18 +1,21 @@
 ; ModuleID = 'Testing'
 source_filename = "Testing"
+target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
+target triple = "x86_64-pc-windows-msvc"
 
-@0 = private unnamed_addr constant [6 x i8] c"%lld\0A\00", align 1
-
-define i32 @main() {
-entry:
-  %k = alloca i64, align 8
-  store i64 9, i64* %k, align 4
-  %0 = load i64, i64* %k, align 4
-  %m = alloca i64, align 8
-  store i64 10, i64* %m, align 4
-  %1 = load i64, i64* %m, align 4
-  %2 = call i64 (i8*, ...) @printf(i8* getelementptr inbounds ([6 x i8], [6 x i8]* @0, i32 0, i32 0), i64 %1)
-  ret i32 0
-}
+@k = global i64 9
 
 declare i64 @printf(i8*, ...)
+
+define i64 @hahayes() {
+entry:
+  ret i64 12
+}
+
+define i64 @main() {
+entry:
+  %m = alloca i64, align 8
+  %0 = call i64 @hahayes()
+  %1 = load i64, i64* %m, align 8
+  ret i64 0
+}

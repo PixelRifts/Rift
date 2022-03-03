@@ -140,13 +140,19 @@ static void C_PopScope(C_Checker* checker, C_ScopeContext* scope) {
     checker->scope_depth--;
 }
 
+static void C_CheckInFunction(C_Checker* checker, AstNode* node) {
+    if (memcmp(checker->function_return_type, &C_NullType, sizeof(P_Type)) == 0) {
+        C_ReportCheckError(checker, node->id, "Cannot have statements outside of functions\n");
+    }
+}
+
 static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
     switch (node->type) {
         case NodeType_Ident: {
             symbol_hash_table_key key = (symbol_hash_table_key) { .name = node->Ident, .depth = checker->scope_depth };
             symbol_hash_table_value val;
             if (C_GetSymbol(checker, key, &val)) {
-                if (val.type == SymbolType_Variable) {
+                if (val.type == SymbolType_Variable || val.type == SymbolType_Function) {
                     return val.variable_type;
                 }
             } else C_ReportCheckError(checker, node->id, "Undefined Variable %.*s\n", str_expand(node->Ident));
@@ -195,7 +201,31 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             return node->Lambda.function_type;
         } break;
         
+        case NodeType_Call: {
+            P_Type* callee_type = C_GetType(checker, node->Call.callee);
+            if (callee_type->type != BasicType_Function) {
+                C_ReportCheckError(checker, node->id, "Cannot call expression of type %.*s\n", str_expand(C_GetBasicTypeName(callee_type)));
+                return &C_InvalidType;
+            }
+            
+            if (callee_type->function.arity != node->Call.arity) {
+                C_ReportCheckError(checker, node->id, "Wrong number of arguments passed to function %.*s. Expected %u got %u\n", str_expand(node->id.lexeme), callee_type->function.arity, node->Call.arity);
+                return &C_InvalidType;
+            }
+            
+            for (u32 i = 0; i < node->Call.arity; i++) {
+                P_Type* curr_type = C_GetType(checker, node->Call.params[i]);
+                if (!C_CheckTypeEquals(curr_type, callee_type->function.param_types[i])) {
+                    C_ReportCheckError(checker, node->id, "Argument %u mismatched. Expected %.*s, got %.*s\n", i, str_expand(C_GetBasicTypeName(callee_type->function.param_types[i])), str_expand(C_GetBasicTypeName(curr_type)));
+                    return &C_InvalidType;
+                }
+            }
+            
+            return callee_type->function.return_type;
+        }
+        
         case NodeType_Return: {
+            C_CheckInFunction(checker, node);
             if (node->Return) {
                 P_Type* returned = C_GetType(checker, node->Return);
                 if (!C_CheckTypeEquals(returned, checker->function_return_type)) {
@@ -212,7 +242,13 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             return &C_InvalidType;
         } break;
         
+        case NodeType_ExprStatement: {
+            C_GetType(checker, node->ExprStatement);
+            return &C_InvalidType;
+        } break;
+        
         case NodeType_Block: {
+            C_CheckInFunction(checker, node);
             C_ScopeContext* scope_ctx = C_PushScope(checker, nullptr, false);
             for (u32 i = 0; i < node->Block.count; i++) {
                 AstNode* statement = node->Block.statements[i];
@@ -224,6 +260,7 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
         } break;
         
         case NodeType_Assign: {
+            C_CheckInFunction(checker, node);
             P_Type* symboltype = {0};
             
             symbol_hash_table_key key = (symbol_hash_table_key) { .name = node->id.lexeme, .depth = 0 };
@@ -246,17 +283,32 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             string var_name = node->id.lexeme;
             P_Type* type = node->VarDecl.type;
             
+            
             if (node->VarDecl.value) {
                 P_Type* valuetype = C_GetType(checker, node->VarDecl.value);
                 if (!C_CheckTypeEquals(type, valuetype)) {
                     C_ReportCheckError(checker, node->id, "Assignment type mismatch. got types %.*s and %.*s\n", str_expand(C_GetBasicTypeName(type)), str_expand(C_GetBasicTypeName(valuetype)));
                 }
+                
+                if (node->VarDecl.value->type == NodeType_Lambda) {
+                    
+                    symbol_hash_table_key key = (symbol_hash_table_key) { .name = var_name, .depth = 0 };
+                    if (symbol_hash_table_get(&checker->symbol_table, key, nullptr)) {
+                        C_ReportCheckError(checker, node->id, "Symbol %.*s already exists\n", str_expand(var_name));
+                    }
+                    symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Function, .name = var_name, .depth = checker->scope_depth, .variable_type = type });
+                    
+                } else {
+                    
+                    symbol_hash_table_key key = (symbol_hash_table_key) { .name = var_name, .depth = 0 };
+                    if (symbol_hash_table_get(&checker->symbol_table, key, nullptr)) {
+                        C_ReportCheckError(checker, node->id, "Symbol %.*s already exists\n", str_expand(var_name));
+                    }
+                    symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Variable, .name = var_name, .depth = checker->scope_depth, .variable_type = type });
+                    
+                }
             }
-            symbol_hash_table_key key = (symbol_hash_table_key) { .name = var_name, .depth = 0 };
-            if (symbol_hash_table_get(&checker->symbol_table, key, nullptr)) {
-                C_ReportCheckError(checker, node->id, "Variable %.*s already exists\n", str_expand(var_name));
-            }
-            symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Variable, .name = var_name, .depth = checker->scope_depth, .variable_type = type });
+            
             return &C_InvalidType;
         } break;
     }

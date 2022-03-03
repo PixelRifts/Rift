@@ -7,6 +7,8 @@
 #include "ds.h"
 #include "llvm-c/Core.h"
 #include "llvm-c/Analysis.h"
+#include "llvm-c/Target.h"
+#include "llvm-c/TargetMachine.h"
 
 typedef struct BL_StackValue {
     LLVMTypeRef type;
@@ -23,6 +25,7 @@ typedef struct BL_Emitter {
     LLVMModuleRef module;
     LLVMBuilderRef builder;
     LLVMBasicBlockRef current_block;
+    b8 is_in_function;
     
     llvmsymbol_hash_table variables;
 } BL_Emitter;

@@ -3,6 +3,7 @@
 #ifndef CHECKER_DATA_H
 #define CHECKER_DATA_H
 
+const P_Type C_NullType    = { 0 };
 const P_Type C_InvalidType = { BasicType_Invalid };
 const P_Type C_VoidType    = { BasicType_Void };
 const P_Type C_IntegerType = { BasicType_Integer };

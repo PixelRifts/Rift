@@ -8,6 +8,7 @@ enum Prec {
     Prec_Invalid,
     Prec_Term,
     Prec_Factor,
+    Prec_Call,
     Prec_None,
 };
 
@@ -16,6 +17,7 @@ u32 infix_expr_precs[] = {
     [TokenType_Minus] = Prec_Term,
     [TokenType_Star] = Prec_Factor,
     [TokenType_Slash] = Prec_Factor,
+    [TokenType_OpenParenthesis] = Prec_Call,
     [TokenType_TokenTypeCount] = Prec_Invalid,
 };
 

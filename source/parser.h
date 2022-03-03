@@ -30,9 +30,15 @@ P_Scope scope;\
 P_Type* function_type;\
 AstNode* body;\
 })\
+AST_NODE(Call, str_lit("Call Expression"), struct {\
+AstNode* callee;\
+AstNode** params;\
+u32 arity;\
+})\
 AST_NODE(EXPR_END, str_lit(""), i8)\
 AST_NODE(STMT_START, str_lit(""), i8)\
 AST_NODE(Return, str_lit("Return Statement"), AstNode*)\
+AST_NODE(ExprStatement, str_lit("Return Statement"), AstNode*)\
 AST_NODE(Block, str_lit("Block Statement"), struct {\
 P_Scope scope;\
 AstNode** statements;\
@@ -59,10 +65,12 @@ enum {
     NodeType_Binary,
     NodeType_Group,
     NodeType_Lambda,
+    NodeType_Call,
     NodeType_EXPR_END,
     
     NodeType_STMT_START,
     NodeType_Return,
+    NodeType_ExprStatement,
     NodeType_Block,
     NodeType_Assign,
     NodeType_VarDecl,

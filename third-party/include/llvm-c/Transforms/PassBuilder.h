@@ -18,13 +18,6 @@
 #include "llvm-c/TargetMachine.h"
 #include "llvm-c/Types.h"
 
-/**
- * @defgroup LLVMCCoreNewPM New Pass Manager
- * @ingroup LLVMCCore
- *
- * @{
- */
-
 LLVM_C_EXTERN_C_BEGIN
 
 /**
@@ -57,7 +50,7 @@ LLVMErrorRef LLVMRunPasses(LLVMModuleRef M, const char *Passes,
  * responsible for it. The client should call LLVMDisposePassBuilderOptions
  * to free the pass builder options.
  */
-LLVMPassBuilderOptionsRef LLVMCreatePassBuilderOptions(void);
+LLVMPassBuilderOptionsRef LLVMCreatePassBuilderOptions();
 
 /**
  * Toggle adding the VerifierPass for the PassBuilder, ensuring all functions
@@ -103,10 +96,6 @@ void LLVMPassBuilderOptionsSetMergeFunctions(LLVMPassBuilderOptionsRef Options,
  * Dispose of a heap-allocated PassBuilderOptions instance
  */
 void LLVMDisposePassBuilderOptions(LLVMPassBuilderOptionsRef Options);
-
-/**
- * @}
- */
 
 LLVM_C_EXTERN_C_END
 

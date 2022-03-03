@@ -12,6 +12,7 @@ typedef u32 C_SymbolType;
 enum {
     SymbolType_Invalid,
     SymbolType_Variable,
+    SymbolType_Function,
     SymbolType_Count
 };
 

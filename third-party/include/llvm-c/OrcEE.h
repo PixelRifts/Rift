@@ -33,13 +33,6 @@
 LLVM_C_EXTERN_C_BEGIN
 
 /**
- * @defgroup LLVMCExecutionEngineORCEE ExecutionEngine-based ORC Utils
- * @ingroup LLVMCExecutionEngine
- *
- * @{
- */
-
-/**
  * Create a RTDyldObjectLinkingLayer instance using the standard
  * SectionMemoryManager for memory management.
  */
@@ -56,10 +49,6 @@ LLVMOrcCreateRTDyldObjectLinkingLayerWithSectionMemoryManager(
 void LLVMOrcRTDyldObjectLinkingLayerRegisterJITEventListener(
     LLVMOrcObjectLayerRef RTDyldObjLinkingLayer,
     LLVMJITEventListenerRef Listener);
-
-/**
- * @}
- */
 
 LLVM_C_EXTERN_C_END
 

@@ -22,7 +22,6 @@ static void BL_Report(BL_Emitter* emitter, const char* stage, const char* err, .
 
 static LLVMTypeRef printffunctype;
 static LLVMValueRef printffunc;
-static LLVMValueRef mainfunc;
 
 static LLVMTypeRef BL_PTypeToLLVMType(P_Type* type) {
     switch (type->type) {
@@ -41,25 +40,42 @@ static LLVMTypeRef BL_PTypeToLLVMType(P_Type* type) {
     return (LLVMTypeRef) {0};
 }
 
+#define INITIALIZE_TARGET(X) do { \
+LLVMInitialize ## X ## AsmParser(); \
+LLVMInitialize ## X ## AsmPrinter(); \
+LLVMInitialize ## X ## TargetInfo(); \
+LLVMInitialize ## X ## Target(); \
+LLVMInitialize ## X ## Disassembler(); \
+LLVMInitialize ## X ## TargetMC(); \
+} while(0)
+
 void BL_Init(BL_Emitter* emitter, string filename) {
+    memset(emitter, 0, sizeof(BL_Emitter));
     emitter->filename = filename;
     
     emitter->module = LLVMModuleCreateWithName("Testing");
-    
-    LLVMTypeRef param_types[] = {};
-    LLVMTypeRef function_type = LLVMFunctionType(LLVMInt32Type(), param_types, 0, 0);
     emitter->builder = LLVMCreateBuilder();
     
-    mainfunc = LLVMAddFunction(emitter->module, "main", function_type);
-    emitter->current_block = LLVMAppendBasicBlock(mainfunc, "entry");
-    LLVMPositionBuilderAtEnd(emitter->builder, emitter->current_block);
+    INITIALIZE_TARGET(X86);
+    
+    LLVMTargetRef target;
+    const char* error = nullptr;
+    printf("%s\n", LLVMGetDefaultTargetTriple());
+    if (LLVMGetTargetFromTriple(LLVMGetDefaultTargetTriple(), &target, &error) != 0) {
+        printf("%s\n", error);
+        fflush(stdout);
+    }
+    LLVMSetTarget(emitter->module, LLVMGetDefaultTargetTriple());
+    LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(target, LLVMGetDefaultTargetTriple(), "", "", LLVMCodeGenLevelNone, LLVMRelocDefault, LLVMCodeModelDefault);
+    LLVMTargetDataRef target_data = LLVMCreateTargetDataLayout(target_machine);
+    LLVMSetModuleDataLayout(emitter->module, target_data);
+    
+    llvmsymbol_hash_table_init(&emitter->variables);
     
     LLVMTypeRef int_8_type_ptr = LLVMPointerType(LLVMInt8Type(), 0);
     LLVMTypeRef printf_function_args_type[] = { int_8_type_ptr };
     printffunctype = LLVMFunctionType(LLVMInt64Type(), printf_function_args_type, 1, true);
     printffunc = LLVMAddFunction(emitter->module, "printf", printffunctype);
-    
-    llvmsymbol_hash_table_init(&emitter->variables);
 }
 
 static LLVMValueRef BL_BuildBinary(BL_Emitter* emitter, L_Token token, LLVMValueRef left, LLVMValueRef right) {
@@ -124,6 +140,36 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             return BL_Emit(emitter, node->Group);
         }
         
+        case NodeType_Lambda: {
+            LLVMBasicBlockRef prev = emitter->current_block;
+            
+            LLVMTypeRef function_type = BL_PTypeToLLVMType(node->Lambda.function_type);
+            LLVMValueRef func = LLVMAddFunction(emitter->module, "", function_type);
+            emitter->current_block = LLVMAppendBasicBlock(func, "entry");
+            LLVMPositionBuilderAtEnd(emitter->builder, emitter->current_block);
+            emitter->is_in_function = true;
+            
+            BL_Emit(emitter, node->Lambda.body);
+            
+            emitter->is_in_function = false;
+            emitter->current_block = prev;
+            LLVMPositionBuilderAtEnd(emitter->builder, emitter->current_block);
+            return func;
+        }
+        
+        case NodeType_Call: {
+            // Change key.name when implementing function pointers
+            llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->Call.callee->id.lexeme, .depth = 0 };
+            llvmsymbol_hash_table_value val;
+            llvmsymbol_hash_table_get(&emitter->variables, key, &val);
+            
+            LLVMValueRef* params = malloc(node->Call.arity * sizeof(LLVMValueRef));
+            for (u32 i = 0; i < node->Call.arity; i++) {
+                params[i] = BL_Emit(emitter, node->Call.params[i]);
+            }
+            return LLVMBuildCall2(emitter->builder, val.type, val.alloca, params, node->Call.arity, "");
+        }
+        
         case NodeType_Return: {
             if (!node->Return) {
                 return LLVMBuildRet(emitter->builder, (LLVMValueRef) {0});
@@ -131,19 +177,8 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             return LLVMBuildRet(emitter->builder, BL_Emit(emitter, node->Return));
         }
         
-        case NodeType_Lambda: {
-            LLVMBasicBlockRef prev = emitter->current_block;
-            
-            LLVMTypeRef function_type = BL_PTypeToLLVMType(node->Lambda.function_type);
-            LLVMValueRef func = LLVMAddFunction(emitter->module, "f", function_type);
-            emitter->current_block = LLVMAppendBasicBlock(func, "entry");
-            LLVMPositionBuilderAtEnd(emitter->builder, emitter->current_block);
-            
-            BL_Emit(emitter, node->Lambda.body);
-            
-            emitter->current_block = prev;
-            LLVMPositionBuilderAtEnd(emitter->builder, emitter->current_block);
-            return func;
+        case NodeType_ExprStatement: {
+            return BL_Emit(emitter, node->ExprStatement);
         }
         
         case NodeType_Block: {
@@ -178,55 +213,63 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             memcpy(hoist, node->id.lexeme.str, node->id.lexeme.size);
             hoist[node->id.lexeme.size] = '\0';
             
+            LLVMValueRef addr = {0};
+            LLVMValueRef ref = {0};
+            
             LLVMTypeRef var_type = BL_PTypeToLLVMType(node->VarDecl.type);
-            if (node->VarDecl.type->type == BasicType_Function)
+            if (node->VarDecl.type->type == BasicType_Function && node->VarDecl.value->type != NodeType_Lambda)
                 var_type = LLVMPointerType(var_type, 0);
             
-            LLVMValueRef alloca = LLVMBuildAlloca(emitter->builder, var_type, hoist);
-            if (node->VarDecl.value) {
-                LLVMValueRef value = BL_Emit(emitter, node->VarDecl.value);
-                LLVMBuildStore(emitter->builder, value, alloca);
+            if (emitter->is_in_function) {
+                
+                addr = LLVMBuildAlloca(emitter->builder, var_type, hoist);
+                if (node->VarDecl.value) {
+                    if (node->VarDecl.value->type == NodeType_Lambda) {
+                        addr = BL_Emit(emitter, node->VarDecl.value);
+                        LLVMSetValueName2(addr, hoist, node->id.lexeme.size);
+                    } else {
+                        BL_Emit(emitter, node->VarDecl.value);
+                        //LLVMBuildStore(emitter->builder, value, addr);
+                    }
+                } else {
+                    // TODO(voxel): @default_init
+                }
+                ref = LLVMBuildLoad2(emitter->builder, var_type, addr, "");
+                
+            } else {
+                if (node->VarDecl.value) {
+                    if (node->VarDecl.value->type == NodeType_Lambda) {
+                        addr = BL_Emit(emitter, node->VarDecl.value);
+                        LLVMSetValueName2(addr, hoist, node->id.lexeme.size);
+                    } else {
+                        addr = LLVMAddGlobal(emitter->module, var_type, hoist);
+                        LLVMSetInitializer(addr, BL_Emit(emitter, node->VarDecl.value));
+                    }
+                } else {
+                    addr = LLVMAddGlobal(emitter->module, var_type, hoist);
+                    // TODO(voxel): @default_init
+                }
             }
-            LLVMValueRef loaded = LLVMBuildLoad2(emitter->builder, var_type, alloca, "");
             
             llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->id.lexeme, .depth = 0 };
-            llvmsymbol_hash_table_value val = (llvmsymbol_hash_table_value) { .alloca = alloca, .loaded = loaded, .type = var_type, .not_null = true, .tombstone = false };
+            llvmsymbol_hash_table_value val = (llvmsymbol_hash_table_value) { .alloca = addr, .loaded = ref, .type = var_type, .not_null = true, .tombstone = false };
             llvmsymbol_hash_table_set(&emitter->variables, key, val);
             
             free(hoist);
-            return alloca;
+            return addr;
+            
         }
     }
     return (LLVMValueRef) {0};
 }
 
 void BL_Free(BL_Emitter* emitter) {
-    LLVMTypeRef int_8_type_ptr = LLVMPointerType(LLVMInt8Type(), 0);
-    
-    llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = str_lit("m"), .depth = 0 };
-    llvmsymbol_hash_table_value val;
-    llvmsymbol_hash_table_get(&emitter->variables, key, &val);
-    LLVMValueRef printfargs[] = {
-        LLVMBuildPointerCast(emitter->builder,
-                             LLVMBuildGlobalString(emitter->builder, "%lld\n", ""),
-                             int_8_type_ptr, "0"),
-        val.loaded,
-    };
-    
-    LLVMBuildCall2(emitter->builder, printffunctype, printffunc, printfargs, 2, "");
-    LLVMBuildRet(emitter->builder, LLVMConstInt(LLVMInt32Type(), 0, false));
-    
     char* error = nullptr;
-    LLVMVerifyModule(emitter->module, LLVMPrintMessageAction, &error);
-    if (error) {
-        printf("%s", error);
-        LLVMDisposeMessage(error);
-        error = nullptr;
-    }
+    LLVMVerifyModule(emitter->module, LLVMPrintMessageAction, nullptr);
+    LLVMPrintModuleToFile(emitter->module, (char*)emitter->filename.str, &error);
     
     llvmsymbol_hash_table_free(&emitter->variables);
     
-    LLVMPrintModuleToFile(emitter->module, (char*)emitter->filename.str, &error);
     
     LLVMDisposeBuilder(emitter->builder);
     LLVMDisposeModule(emitter->module);

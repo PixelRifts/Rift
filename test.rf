@@ -1,5 +1,10 @@
 k : int = (1 + 2) * 3;
-lambda : func(int) -> int = func(int) -> int {
-    return;
+
+hahayes : func() -> int = func() -> int {
+    return 10 + 2;
 }
-m : int = 10;
+
+main : func() -> int = func() -> int {
+    m : int = hahayes();
+    return 0;
+}
