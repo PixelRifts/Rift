@@ -28,6 +28,7 @@ AST_NODE(Group, str_lit("Group Expression"), AstNode*)\
 AST_NODE(Lambda, str_lit("Lambda Expression"), struct {\
 P_Scope scope;\
 P_Type* function_type;\
+string* param_names;\
 AstNode* body;\
 })\
 AST_NODE(Call, str_lit("Call Expression"), struct {\
@@ -102,7 +103,7 @@ struct P_Type {
     L_Token token;
     
     union {
-        struct { P_Type* return_type; P_Type** param_types; string* param_names; u32 arity; } function;
+        struct { P_Type* return_type; P_Type** param_types; u32 arity; } function;
     };
 };
 

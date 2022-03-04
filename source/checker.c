@@ -191,13 +191,23 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
         } break;
         
         case NodeType_Lambda: {
-            C_PushScope(checker, node->Lambda.function_type->function.return_type, true);
+            C_ScopeContext* scope_context = C_PushScope(checker, node->Lambda.function_type->function.return_type, true);
+            
+            for (u32 i = 0; i < node->Lambda.function_type->function.arity; i++) {
+                string var_name = node->Lambda.param_names[i];
+                P_Type* type = node->Lambda.function_type->function.param_types[i];
+                symbol_hash_table_key key = (symbol_hash_table_key) { .name = var_name, .depth = 0 };
+                if (symbol_hash_table_get(&checker->symbol_table, key, nullptr)) {
+                    C_ReportCheckError(checker, node->id, "Parameters have the same name %.*s\n", str_expand(var_name));
+                }
+                symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Variable, .name = var_name, .depth = checker->scope_depth, .variable_type = type });
+            }
             
             checker->no_scope = true;
             C_GetType(checker, node->Lambda.body);
             checker->no_scope = false;
             
-            C_PushScope(checker, node->Lambda.function_type->function.return_type, false);
+            C_PopScope(checker, scope_context);
             return node->Lambda.function_type;
         } break;
         
@@ -282,7 +292,6 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
         case NodeType_VarDecl: {
             string var_name = node->id.lexeme;
             P_Type* type = node->VarDecl.type;
-            
             
             if (node->VarDecl.value) {
                 P_Type* valuetype = C_GetType(checker, node->VarDecl.value);

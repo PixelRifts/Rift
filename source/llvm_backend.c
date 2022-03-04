@@ -60,13 +60,12 @@ void BL_Init(BL_Emitter* emitter, string filename) {
     
     LLVMTargetRef target;
     const char* error = nullptr;
-    printf("%s\n", LLVMGetDefaultTargetTriple());
     if (LLVMGetTargetFromTriple(LLVMGetDefaultTargetTriple(), &target, &error) != 0) {
-        printf("%s\n", error);
+        printf("Target From Triple: %s\n", error);
         fflush(stdout);
     }
     LLVMSetTarget(emitter->module, LLVMGetDefaultTargetTriple());
-    LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(target, LLVMGetDefaultTargetTriple(), "", "", LLVMCodeGenLevelNone, LLVMRelocDefault, LLVMCodeModelDefault);
+    LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(target, LLVMGetDefaultTargetTriple(), "", "", LLVMCodeGenLevelDefault, LLVMRelocDefault, LLVMCodeModelDefault);
     LLVMTargetDataRef target_data = LLVMCreateTargetDataLayout(target_machine);
     LLVMSetModuleDataLayout(emitter->module, target_data);
     
@@ -148,6 +147,19 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             emitter->current_block = LLVMAppendBasicBlock(func, "entry");
             LLVMPositionBuilderAtEnd(emitter->builder, emitter->current_block);
             emitter->is_in_function = true;
+            
+            for (u32 i = 0; i < node->Lambda.function_type->function.arity; i++) {
+                string var_name = node->Lambda.param_names[i];
+                LLVMTypeRef type = BL_PTypeToLLVMType(node->Lambda.function_type->function.param_types[i]);
+                
+                LLVMValueRef alloca = LLVMBuildAlloca(emitter->builder, type, "");
+                LLVMBuildStore(emitter->builder, LLVMGetParam(func, i), alloca);
+                LLVMValueRef loaded = LLVMBuildLoad(emitter->builder, alloca, "");
+                
+                llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = var_name, .depth = 0 };
+                llvmsymbol_hash_table_value val = { .type = type, .alloca = alloca, .loaded = loaded };
+                llvmsymbol_hash_table_set(&emitter->variables, key, val);
+            }
             
             BL_Emit(emitter, node->Lambda.body);
             
@@ -266,10 +278,32 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
 void BL_Free(BL_Emitter* emitter) {
     char* error = nullptr;
     LLVMVerifyModule(emitter->module, LLVMPrintMessageAction, nullptr);
+    
+#if 1
     LLVMPrintModuleToFile(emitter->module, (char*)emitter->filename.str, &error);
+#else
+    LLVMExecutionEngineRef engine;
+    LLVMLinkInMCJIT();
+    LLVMInitializeNativeTarget();
+    if (LLVMCreateExecutionEngineForModule(&engine, emitter->module, &error) != 0) {
+        fprintf(stderr, "Failed to create execution engine\n");
+        fflush(stderr);
+    }
+    if (error) {
+        fprintf(stderr, "Execution Engine Error: %s\n", error);
+        fflush(stderr);
+        LLVMDisposeErrorMessage(error);
+    }
+    
+    llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = str_lit("main"), .depth = 0 };
+    llvmsymbol_hash_table_value val;
+    llvmsymbol_hash_table_get(&emitter->variables, key, &val);
+    
+    LLVMRunFunction(engine, val.alloca, 0, nullptr);
+    
+#endif
     
     llvmsymbol_hash_table_free(&emitter->variables);
-    
     
     LLVMDisposeBuilder(emitter->builder);
     LLVMDisposeModule(emitter->module);

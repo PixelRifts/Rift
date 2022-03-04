@@ -45,10 +45,12 @@ int main(int argc, char **argv) {
         while (node->type != NodeType_Error) {
             if (!parser.errored)
                 C_CheckAst(&checker, node);
+            
+            if (!(checker.errored || parser.errored))
+                BL_Emit(&emitter, node);
+            
             parser.errored = false;
             parser.error_count = 0;
-            if (!checker.errored)
-                BL_Emit(&emitter, node);
             checker.errored = false;
             checker.error_count = 0;
             node = P_Parse(&parser);

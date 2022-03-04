@@ -103,9 +103,10 @@ static AstNode* P_AllocGroupNode(P_Parser* parser, AstNode* expr, L_Token token)
     return node;
 }
 
-static AstNode* P_AllocLambdaNode(P_Parser* parser, P_Type* function_type, L_Token func, AstNode* body) {
+static AstNode* P_AllocLambdaNode(P_Parser* parser, P_Type* function_type, string* param_names, L_Token func, AstNode* body) {
     AstNode* node = P_AllocNode(parser, NodeType_Lambda);
     node->Lambda.function_type = function_type;
+    node->Lambda.param_names = param_names;
     node->id = func;
     node->Lambda.body = body;
     return node;
@@ -183,12 +184,11 @@ static P_Type* P_AllocVoidType(P_Parser* parser, L_Token tok) {
     return type;
 }
 
-static P_Type* P_AllocFunctionType(P_Parser* parser, P_Type* return_type, P_Type** param_types, string* param_names, u32 arity, L_Token func_token) {
+static P_Type* P_AllocFunctionType(P_Parser* parser, P_Type* return_type, P_Type** param_types, u32 arity, L_Token func_token) {
     P_Type* type = P_AllocType(parser, BasicType_Function);
     type->token = func_token;
     type->function.return_type = return_type;
     type->function.param_types = param_types;
-    type->function.param_names = param_names;
     type->function.arity = arity;
     return type;
 }
@@ -245,20 +245,12 @@ static P_Type* P_EatType(P_Parser* parser) {
             L_Token func_token = parser->prev;
             P_Eat(parser, TokenType_OpenParenthesis);
             
-            string_array temp_param_names = {0};
             type_array temp_param_types = {0};
             
             u32 arity = 0;
             
             while (!P_Match(parser, TokenType_CloseParenthesis)) {
                 type_array_add(&temp_param_types, P_EatType(parser));
-                
-                if (P_Match(parser, TokenType_Identifier)) {
-                    string name = parser->prev.lexeme;
-                    string_array_add(&temp_param_names, name);
-                } else {
-                    string_array_add(&temp_param_names, str_lit(""));
-                }
                 
                 arity++;
                 
@@ -269,19 +261,16 @@ static P_Type* P_EatType(P_Parser* parser) {
             }
             
             // TODO(voxel): please stop being lazy and implement arena_raise already
-            string* param_names = arena_alloc(&parser->arena, sizeof(string) * arity);
-            memcpy(param_names, temp_param_names.elems, sizeof(string) * arity);
             P_Type** param_types = arena_alloc(&parser->arena, sizeof(AstNode*) * arity);
             memcpy(param_types, temp_param_types.elems, sizeof(P_Type*) * arity);
             
             P_Type* return_type = nullptr;
             if (P_Match(parser, TokenType_ThinArrow))
                 return_type = P_EatType(parser);
-            if (!return_type) return_type = P_AllocVoidType(parser, (L_Token){0});
+            if (!return_type) return_type = P_AllocVoidType(parser, func_token);
             
-            string_array_free(&temp_param_names);
             type_array_free(&temp_param_types);
-            return P_AllocFunctionType(parser, return_type, param_types, param_names, arity, func_token);
+            return P_AllocFunctionType(parser, return_type, param_types, arity, func_token);
         }
         
         default: P_ReportParseError(parser, "Could not consume type. Got %.*s token\n", str_expand(L_GetTypeName(parser->curr.type)));
@@ -334,9 +323,46 @@ static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
         
         case TokenType_Func: {
             L_Token func_token = parser->curr;
-            P_Type* func_type = P_EatType(parser);
+            P_Advance(parser);
+            P_Eat(parser, TokenType_OpenParenthesis);
+            
+            type_array temp_param_types = {0};
+            string_array temp_param_names = {0};
+            
+            u32 arity = 0;
+            
+            while (!P_Match(parser, TokenType_CloseParenthesis)) {
+                P_Eat(parser, TokenType_Identifier);
+                string_array_add(&temp_param_names, parser->prev.lexeme);
+                
+                P_Eat(parser, TokenType_Colon);
+                type_array_add(&temp_param_types, P_EatType(parser));
+                
+                arity++;
+                
+                if (!P_Match(parser, TokenType_Comma)) {
+                    P_Eat(parser, TokenType_CloseParenthesis);
+                    break;
+                }
+            }
+            
+            // TODO(voxel): please stop being lazy and implement arena_raise already
+            string* param_names = arena_alloc(&parser->arena, sizeof(string) * arity);
+            memcpy(param_names, temp_param_names.elems, sizeof(string) * arity);
+            P_Type** param_types = arena_alloc(&parser->arena, sizeof(AstNode*) * arity);
+            memcpy(param_types, temp_param_types.elems, sizeof(P_Type*) * arity);
+            
+            P_Type* return_type = nullptr;
+            if (P_Match(parser, TokenType_ThinArrow))
+                return_type = P_EatType(parser);
+            if (!return_type) return_type = P_AllocVoidType(parser, func_token);
+            
+            string_array_free(&temp_param_names);
+            type_array_free(&temp_param_types);
+            P_Type* func_type = P_AllocFunctionType(parser, return_type, param_types, arity, func_token);
+            
             AstNode* body = P_Statement(parser);
-            return P_AllocLambdaNode(parser, func_type, func_token, body);
+            return P_AllocLambdaNode(parser, func_type, param_names, func_token, body);
         }
         
         default: {
@@ -371,6 +397,8 @@ static AstNode* P_ExprInfix(P_Parser* parser, L_Token op, Prec prec, AstNode* lh
             }
             
             AstNode** args = arena_alloc(&parser->arena, sizeof(AstNode*) * arity);
+            memcpy(args, temp_args.elems, sizeof(AstNode*) * arity);
+            
             return P_AllocCallNode(parser, lhs, args, arity, op);
         }
     }
