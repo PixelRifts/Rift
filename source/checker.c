@@ -259,12 +259,13 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
         
         case NodeType_Block: {
             C_CheckInFunction(checker, node);
-            C_ScopeContext* scope_ctx = C_PushScope(checker, nullptr, false);
+            C_ScopeContext* scope_ctx;
+            if (!checker->no_scope) scope_ctx = C_PushScope(checker, nullptr, false);
             for (u32 i = 0; i < node->Block.count; i++) {
                 AstNode* statement = node->Block.statements[i];
                 C_GetType(checker, statement);
             }
-            C_PopScope(checker, scope_ctx);
+            if (!checker->no_scope) C_PopScope(checker, scope_ctx);
             
             return &C_InvalidType;
         } break;
@@ -295,6 +296,13 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             
             if (node->VarDecl.value) {
                 P_Type* valuetype = C_GetType(checker, node->VarDecl.value);
+                
+                // Infer type
+                if (type == nullptr) {
+                    node->VarDecl.type = valuetype;
+                    type = valuetype;
+                }
+                
                 if (!C_CheckTypeEquals(type, valuetype)) {
                     C_ReportCheckError(checker, node->id, "Assignment type mismatch. got types %.*s and %.*s\n", str_expand(C_GetBasicTypeName(type)), str_expand(C_GetBasicTypeName(valuetype)));
                 }
@@ -316,6 +324,9 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
                     symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Variable, .name = var_name, .depth = checker->scope_depth, .variable_type = type });
                     
                 }
+            } else {
+                if (type == nullptr) 
+                    C_ReportCheckError(checker, node->id, "Variable %.*s has neither type nor value. At least one of these should be specified\n", str_expand(var_name));
             }
             
             return &C_InvalidType;

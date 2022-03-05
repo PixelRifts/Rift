@@ -15,11 +15,3 @@ entry:
   %3 = add i64 10, %2
   ret i64 %3
 }
-
-define i64 @main() {
-entry:
-  %m = alloca i64, align 8
-  %0 = call i64 @hahayes(i64 1)
-  %1 = load i64, i64* %m, align 8
-  ret i64 0
-}

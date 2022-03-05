@@ -437,6 +437,16 @@ static AstNode* P_Statement(P_Parser* parser) {
         L_Token name = parser->prev;
         
         if (P_Match(parser, TokenType_Colon)) {
+            if (P_Match(parser, TokenType_Equal)) {
+                if (P_Match(parser, TokenType_Semicolon))
+                    return P_AllocVarDeclNode(parser, nullptr, name, nullptr);
+                AstNode* value = P_Expression(parser, Prec_Invalid, false);
+                if (value->type != NodeType_Lambda) {
+                    P_Eat(parser, TokenType_Semicolon);
+                }
+                return P_AllocVarDeclNode(parser, nullptr, name, value);
+            }
+            
             P_Type* type = P_EatType(parser);
             AstNode* value = nullptr;
             if (P_Match(parser, TokenType_Equal)) value = P_Expression(parser, Prec_Invalid, false);

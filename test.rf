@@ -1,10 +1,10 @@
-k : int = (1 + 2) * 3;
+k := (1 + 2) * 3;
 
-hahayes : func(int) -> int = func(v : int) -> int {
+hahayes := func(v : int) -> int {
     return 10 + v;
 }
 
-main : func() -> int = func() -> int {
-    m : int = hahayes(1);
+main := func() -> int {
+    m :=;
     return 0;
 }
