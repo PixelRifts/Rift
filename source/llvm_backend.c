@@ -11,7 +11,7 @@ b8 llvmsymbol_val_is_tombstone(llvmsymbol_hash_table_value v) { return v.tombsto
 HashTable_Impl(llvmsymbol, llvmsymbol_key_is_null, llvmsymbol_key_is_eq, hash_llvmsymbol_key, ((llvmsymbol_hash_table_value) { .type = (LLVMTypeRef) {0}, .alloca = (LLVMValueRef) {0}, .loaded = (LLVMValueRef) {0}, .not_null = false, .tombstone = true }), llvmsymbol_val_is_null, llvmsymbol_val_is_tombstone);
 
 static void BL_Report(BL_Emitter* emitter, const char* stage, const char* err, ...) {
-    fprintf(stderr, "%s Error: ", stage);
+    fprintf(stderr, "%.*s:%s ERROR: ", str_expand(emitter->source_filename), stage);
     va_list va;
     va_start(va, err);
     vfprintf(stderr, err, va);
@@ -49,9 +49,10 @@ LLVMInitialize ## X ## Disassembler(); \
 LLVMInitialize ## X ## TargetMC(); \
 } while(0)
 
-void BL_Init(BL_Emitter* emitter, string filename) {
+void BL_Init(BL_Emitter* emitter, string source_filename, string filename) {
     memset(emitter, 0, sizeof(BL_Emitter));
     emitter->filename = filename;
+    emitter->source_filename = source_filename;
     
     emitter->module = LLVMModuleCreateWithName("Testing");
     emitter->builder = LLVMCreateBuilder();

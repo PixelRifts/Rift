@@ -24,6 +24,7 @@ HashTable_Prototype(llvmsymbol, struct { string name; u32 depth; }, BL_StackValu
 
 typedef struct BL_Emitter {
     string filename;
+    string source_filename;
     LLVMModuleRef module;
     LLVMBuilderRef builder;
     LLVMBasicBlockRef current_block;
@@ -32,7 +33,7 @@ typedef struct BL_Emitter {
     llvmsymbol_hash_table variables;
 } BL_Emitter;
 
-void BL_Init(BL_Emitter* emitter, string filename);
+void BL_Init(BL_Emitter* emitter, string source_filename, string filename);
 LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node);
 void BL_Free(BL_Emitter* emitter);
 

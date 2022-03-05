@@ -1,10 +1,10 @@
 k := (1 + 2) * 3;
 
 hahayes := func(v : int) -> int {
-    return 10 + v;
+    return 10 + ;
 }
 
 main := func() -> int {
-    m :=;
+    m := 10;
     return 0;
 }

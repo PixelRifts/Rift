@@ -58,12 +58,13 @@ typedef struct C_Checker {
     b8 found_return;
     b8 no_scope;
     
+    string filename;
     C_ScopeContext* current_scope_context;
 } C_Checker;
 
 P_Type C_AstTypeToCheckerType(AstNode* type);
 
-void C_Init(C_Checker* checker);
+void C_Init(C_Checker* checker, string filename);
 void C_CheckAst(C_Checker* checker, AstNode* node);
 void C_Free(C_Checker* checker);
 

@@ -18,7 +18,7 @@ Array_Impl(node_array, AstNode*);
 static void P_Report(P_Parser* parser, L_Token token, const char* stage, const char* err, ...) {
     if (parser->errored) return;
     if (parser->error_count > 20) exit(-1);
-    fprintf(stderr, "%s Error:%d:%d: ", stage, token.line, token.column);
+    fprintf(stderr, "%.*s:%d:%d: ERROR: %s > ", str_expand(parser->filename), token.line, token.column, stage);
     va_list va;
     va_start(va, err);
     vfprintf(stderr, err, va);
@@ -490,8 +490,9 @@ static AstNode* P_Statement(P_Parser* parser) {
     return P_AllocErrorNode(parser);
 }
 
-void P_Init(P_Parser* parser, L_Lexer* lexer) {
+void P_Init(P_Parser* parser, string filename, L_Lexer* lexer) {
     parser->lexer = lexer;
+    parser->filename = filename;
     pool_init(&parser->node_pool, sizeof(AstNode));
     pool_init(&parser->type_pool, sizeof(P_Type));
     arena_init(&parser->arena);

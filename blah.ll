@@ -7,11 +7,9 @@ target triple = "x86_64-pc-windows-msvc"
 
 declare i64 @printf(i8*, ...)
 
-define i64 @hahayes(i64 %0) {
+define i64 @main() {
 entry:
-  %1 = alloca i64, align 8
-  store i64 %0, i64* %1, align 8
-  %2 = load i64, i64* %1, align 8
-  %3 = add i64 10, %2
-  ret i64 %3
+  %m = alloca i64, align 8
+  %0 = load i64, i64* %m, align 8
+  ret i64 0
 }

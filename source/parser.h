@@ -157,11 +157,13 @@ typedef struct P_Parser {
     L_Token curr;
     L_Token next;
     
+    
+    string filename;
     b8 errored;
     u8 error_count;
 } P_Parser;
 
-void P_Init(P_Parser* parser, L_Lexer* lexer);
+void P_Init(P_Parser* parser, string filename, L_Lexer* lexer);
 AstNode* P_Parse(P_Parser* parser);
 void P_Free(P_Parser* parser);
 

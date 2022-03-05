@@ -30,16 +30,17 @@ int main(int argc, char **argv) {
     } else {
         char* source = readFile(argv[1]);
         string source_str = { .str = (u8*) source, .size = strlen(source) };
+        string source_filename = { .str = (u8*) argv[1], .size = strlen(argv[1]) };
         
         L_Lexer lexer = {0};
         L_Init(&lexer, source_str);
         P_Parser parser = {0};
-        P_Init(&parser, &lexer);
-        
+        P_Init(&parser, source_filename, &lexer);
         C_Checker checker = {0};
-        C_Init(&checker);
+        C_Init(&checker, source_filename);
+        
         BL_Emitter emitter = {0};
-        BL_Init(&emitter, str_lit("blah.ll"));
+        BL_Init(&emitter, source_filename, str_lit("blah.ll"));
         
         AstNode* node = P_Parse(&parser);
         while (node->type != NodeType_Error) {

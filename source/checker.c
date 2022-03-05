@@ -25,7 +25,7 @@ HashTable_Impl(symbol, symbol_key_is_null, symbol_key_is_eq, hash_symbol_key, (s
 static void C_Report(C_Checker* checker, L_Token token, const char* stage, const char* err, ...) {
     if (checker->errored) return;
     if (checker->error_count > 20) exit(-1);
-    fprintf(stderr, "%s Error:%d:%d: ", stage, token.line, token.column);
+    fprintf(stderr, "%.*s:%d:%d: ERROR: %s > ", str_expand(checker->filename), token.line, token.column, stage);
     va_list va;
     va_start(va, err);
     vfprintf(stderr, err, va);
@@ -322,7 +322,6 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
                         C_ReportCheckError(checker, node->id, "Symbol %.*s already exists\n", str_expand(var_name));
                     }
                     symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Variable, .name = var_name, .depth = checker->scope_depth, .variable_type = type });
-                    
                 }
             } else {
                 if (type == nullptr) 
@@ -335,8 +334,9 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
     return &C_InvalidType;
 }
 
-void C_Init(C_Checker* checker) {
+void C_Init(C_Checker* checker, string filename) {
     memset(checker, 0, sizeof(*checker));
+    checker->filename = filename;
     symbol_hash_table_init(&checker->symbol_table);
 }
 
