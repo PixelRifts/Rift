@@ -167,7 +167,7 @@ static void L_SkipWhitespace(L_Lexer* lexer) {
         i8 c = L_Peek(lexer);
         switch (c) {
             case ' ': case '\r': case '\t': L_Advance(lexer); break;
-            case '\n': lexer->line++; lexer->column = 1; L_Advance(lexer); break;
+            case '\n': lexer->line++; lexer->column = 0; L_Advance(lexer); break;
             default: return;
         }
     }
@@ -177,7 +177,7 @@ static L_Token L_String(L_Lexer* lexer) {
     while (L_Peek(lexer) != '"') {
         if (L_Peek(lexer) == '\n') {
             lexer->line++;
-            lexer->column = 1;
+            lexer->column = 0;
         }
         if (L_Bound(lexer)) return L_ErrorToken(lexer, str_lit("Unterminated String literal"));
         L_Advance(lexer);
@@ -392,7 +392,7 @@ void L_Init(L_Lexer* lexer, string source) {
     lexer->start = (const char*) source.str;
     lexer->current = (const char*) source.str;
     lexer->line = 1;
-    lexer->column = 1;
+    lexer->column = 0;
 }
 
 L_Token L_LexToken(L_Lexer* lexer) {
@@ -410,7 +410,6 @@ L_Token L_LexToken(L_Lexer* lexer) {
         case ')':  return L_MakeToken(lexer, TokenType_CloseParenthesis);
         case ']':  return L_MakeToken(lexer, TokenType_CloseBracket);
         case '}':  return L_MakeToken(lexer, TokenType_CloseBrace);
-        case '.':  return L_MakeToken(lexer, TokenType_Dot);
         case ',':  return L_MakeToken(lexer, TokenType_Comma);
         case ';':  return L_MakeToken(lexer, TokenType_Semicolon);
         case ':':  return L_MakeToken(lexer, TokenType_Colon);
@@ -442,7 +441,7 @@ L_Token L_LexToken(L_Lexer* lexer) {
                     L_Advance(lexer);
                     if (L_Peek(lexer) == '\n') {
                         lexer->line++;
-                        lexer->column = 1;
+                        lexer->column = 0;
                     }
                     
                     if (L_Bound(lexer)) return L_ErrorToken(lexer, str_lit("Unterminated Comment Block\n"));
@@ -460,6 +459,13 @@ L_Token L_LexToken(L_Lexer* lexer) {
             } else {
                 return L_DoubleHandle(lexer, '=', TokenType_SlashEqual, TokenType_Slash);
             }
+        }
+        case '.':  {
+            if (L_Peek(lexer) == '.' && L_PeekNext(lexer) == '.') {
+                L_Advance(lexer); L_Advance(lexer);
+                return L_MakeToken(lexer, TokenType_Ellipses);
+            }
+            return L_MakeToken(lexer, TokenType_Dot);
         }
         
         case '"':  return L_String(lexer);

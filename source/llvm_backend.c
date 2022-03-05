@@ -32,7 +32,7 @@ static LLVMTypeRef BL_PTypeToLLVMType(P_Type* type) {
             LLVMTypeRef* param_types = calloc(type->function.arity, sizeof(LLVMTypeRef));
             for (u32 i = 0; i < type->function.arity; i++)
                 param_types[i] = BL_PTypeToLLVMType(type->function.param_types[i]);
-            LLVMTypeRef ret = LLVMFunctionType(return_type, param_types, type->function.arity, false);
+            LLVMTypeRef ret = LLVMFunctionType(return_type, param_types, type->function.arity, type->function.varargs);
             free(param_types);
             return ret;
         } break;
@@ -164,6 +164,9 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             
             BL_Emit(emitter, node->Lambda.body);
             
+            if (node->Lambda.function_type->function.return_type->type == BasicType_Void)
+                LLVMBuildRet(emitter->builder, (LLVMValueRef) {0});
+            
             emitter->is_in_function = false;
             emitter->current_block = prev;
             LLVMPositionBuilderAtEnd(emitter->builder, emitter->current_block);
@@ -270,7 +273,6 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             
             free(hoist);
             return addr;
-            
         }
     }
     return (LLVMValueRef) {0};

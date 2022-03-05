@@ -103,7 +103,7 @@ struct P_Type {
     L_Token token;
     
     union {
-        struct { P_Type* return_type; P_Type** param_types; u32 arity; } function;
+        struct { P_Type* return_type; P_Type** param_types; u32 arity; b8 varargs; } function;
     };
 };
 
@@ -156,7 +156,6 @@ typedef struct P_Parser {
     L_Token prev;
     L_Token curr;
     L_Token next;
-    
     
     string filename;
     b8 errored;

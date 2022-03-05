@@ -155,7 +155,7 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
                 if (val.type == SymbolType_Variable || val.type == SymbolType_Function) {
                     return val.variable_type;
                 }
-            } else C_ReportCheckError(checker, node->id, "Undefined Variable %.*s\n", str_expand(node->Ident));
+            } else C_ReportCheckError(checker, node->id, "Undefined Variable '%.*s'\n", str_expand(node->Ident));
             return &C_InvalidType;
         } break;
         
@@ -171,7 +171,7 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             P_Type* xpr = C_GetType(checker, node->Unary.expr);
             P_Type* output;
             if (!C_CheckUnary(xpr, node->id.type, &output)) {
-                C_ReportCheckError(checker, node->id, "Cannot apply unary operator %.*s to type %.*s\n", str_expand(L_GetTypeName(node->id.type)), str_expand(C_GetBasicTypeName(xpr)));
+                C_ReportCheckError(checker, node->id, "Cannot apply unary operator '%.*s' to type '%.*s'\n", str_expand(L_GetTypeName(node->id.type)), str_expand(C_GetBasicTypeName(xpr)));
             }
             return output;
         } break;
@@ -181,7 +181,7 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             P_Type* rhs = C_GetType(checker, node->Binary.right);
             P_Type* output;
             if (!C_CheckBinary(lhs, rhs, node->id.type, &output)) {
-                C_ReportCheckError(checker, node->id, "Cannot apply binary operator %.*s to types %.*s and %.*s\n", str_expand(L_GetTypeName(node->id.type)), str_expand(C_GetBasicTypeName(lhs)), str_expand(C_GetBasicTypeName(rhs)));
+                C_ReportCheckError(checker, node->id, "Cannot apply binary operator '%.*s' to types '%.*s' and '%.*s'\n", str_expand(L_GetTypeName(node->id.type)), str_expand(C_GetBasicTypeName(lhs)), str_expand(C_GetBasicTypeName(rhs)));
             }
             return output;
         } break;
@@ -198,7 +198,7 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
                 P_Type* type = node->Lambda.function_type->function.param_types[i];
                 symbol_hash_table_key key = (symbol_hash_table_key) { .name = var_name, .depth = 0 };
                 if (symbol_hash_table_get(&checker->symbol_table, key, nullptr)) {
-                    C_ReportCheckError(checker, node->id, "Parameters have the same name %.*s\n", str_expand(var_name));
+                    C_ReportCheckError(checker, node->id, "Parameters have the same name '%.*s'\n", str_expand(var_name));
                 }
                 symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Variable, .name = var_name, .depth = checker->scope_depth, .variable_type = type });
             }
@@ -207,6 +207,9 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             C_GetType(checker, node->Lambda.body);
             checker->no_scope = false;
             
+            if (!checker->found_return && node->Lambda.function_type->function.return_type->type != BasicType_Void)
+                C_ReportCheckError(checker, node->id, "Function '%.*s' does not return a value\n", str_expand(node->id.lexeme));
+            checker->found_return = false;
             C_PopScope(checker, scope_context);
             return node->Lambda.function_type;
         } break;
@@ -214,19 +217,21 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
         case NodeType_Call: {
             P_Type* callee_type = C_GetType(checker, node->Call.callee);
             if (callee_type->type != BasicType_Function) {
-                C_ReportCheckError(checker, node->id, "Cannot call expression of type %.*s\n", str_expand(C_GetBasicTypeName(callee_type)));
+                C_ReportCheckError(checker, node->id, "Cannot call expression of type '%.*s'\n", str_expand(C_GetBasicTypeName(callee_type)));
                 return &C_InvalidType;
             }
             
-            if (callee_type->function.arity != node->Call.arity) {
-                C_ReportCheckError(checker, node->id, "Wrong number of arguments passed to function %.*s. Expected %u got %u\n", str_expand(node->id.lexeme), callee_type->function.arity, node->Call.arity);
+            b8 arity_check_failed = callee_type->function.varargs
+                ? callee_type->function.arity >= node->Call.arity : callee_type->function.arity != node->Call.arity;
+            if (arity_check_failed) {
+                C_ReportCheckError(checker, node->id, "Wrong number of arguments passed to function '%.*s'. Expected %u got %u\n", str_expand(node->id.lexeme), callee_type->function.arity, node->Call.arity);
                 return &C_InvalidType;
             }
             
-            for (u32 i = 0; i < node->Call.arity; i++) {
+            for (u32 i = 0; i < callee_type->function.arity; i++) {
                 P_Type* curr_type = C_GetType(checker, node->Call.params[i]);
                 if (!C_CheckTypeEquals(curr_type, callee_type->function.param_types[i])) {
-                    C_ReportCheckError(checker, node->id, "Argument %u mismatched. Expected %.*s, got %.*s\n", i, str_expand(C_GetBasicTypeName(callee_type->function.param_types[i])), str_expand(C_GetBasicTypeName(curr_type)));
+                    C_ReportCheckError(checker, node->id, "Argument %u mismatched. Expected '%.*s', got '%.*s'\n", i, str_expand(C_GetBasicTypeName(callee_type->function.param_types[i])), str_expand(C_GetBasicTypeName(curr_type)));
                     return &C_InvalidType;
                 }
             }
@@ -239,11 +244,11 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             if (node->Return) {
                 P_Type* returned = C_GetType(checker, node->Return);
                 if (!C_CheckTypeEquals(returned, checker->function_return_type)) {
-                    C_ReportCheckError(checker, node->id, "Return Type %.*s does not match with return type of function %.*s\n", str_expand(C_GetBasicTypeName(returned)), str_expand(C_GetBasicTypeName(checker->function_return_type)));
+                    C_ReportCheckError(checker, node->id, "Return Type '%.*s' does not match with return type of function '%.*s'\n", str_expand(C_GetBasicTypeName(returned)), str_expand(C_GetBasicTypeName(checker->function_return_type)));
                 }
             } else {
                 if (!C_CheckTypeEquals(&C_VoidType, checker->function_return_type)) {
-                    C_ReportCheckError(checker, node->id, "Return Type %.*s does not match with return type of function %.*s\n", str_expand(C_GetBasicTypeName(&C_VoidType)), str_expand(C_GetBasicTypeName(checker->function_return_type)));
+                    C_ReportCheckError(checker, node->id, "Return Type '%.*s' does not match with return type of function '%.*s'\n", str_expand(C_GetBasicTypeName(&C_VoidType)), str_expand(C_GetBasicTypeName(checker->function_return_type)));
                 }
             }
             
@@ -278,13 +283,13 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             symbol_hash_table_value val;
             if (C_GetSymbol(checker, key, &val)) {
                 if (val.type != SymbolType_Variable)
-                    C_ReportCheckError(checker, node->id, "%.*s is not assignable\n", str_expand(node->id.lexeme));
+                    C_ReportCheckError(checker, node->id, "'%.*s' is not assignable\n", str_expand(node->id.lexeme));
                 symboltype = val.variable_type;
             }
             
             P_Type* valuetype = C_GetType(checker, node->Assign.value);
             if (!C_CheckTypeEquals(symboltype, valuetype)) {
-                C_ReportCheckError(checker, node->id, "Assignment type mismatch. got types %.*s and %.*s\n", str_expand(C_GetBasicTypeName(symboltype)), str_expand(C_GetBasicTypeName(valuetype)));
+                C_ReportCheckError(checker, node->id, "Assignment type mismatch. got types '%.*s' and '%.*s'\n", str_expand(C_GetBasicTypeName(symboltype)), str_expand(C_GetBasicTypeName(valuetype)));
             }
             
             return &C_InvalidType;
@@ -304,14 +309,14 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
                 }
                 
                 if (!C_CheckTypeEquals(type, valuetype)) {
-                    C_ReportCheckError(checker, node->id, "Assignment type mismatch. got types %.*s and %.*s\n", str_expand(C_GetBasicTypeName(type)), str_expand(C_GetBasicTypeName(valuetype)));
+                    C_ReportCheckError(checker, node->id, "Assignment type mismatch. got types '%.*s' and '%.*s'\n", str_expand(C_GetBasicTypeName(type)), str_expand(C_GetBasicTypeName(valuetype)));
                 }
                 
                 if (node->VarDecl.value->type == NodeType_Lambda) {
                     
                     symbol_hash_table_key key = (symbol_hash_table_key) { .name = var_name, .depth = 0 };
                     if (symbol_hash_table_get(&checker->symbol_table, key, nullptr)) {
-                        C_ReportCheckError(checker, node->id, "Symbol %.*s already exists\n", str_expand(var_name));
+                        C_ReportCheckError(checker, node->id, "Symbol '%.*s' already exists\n", str_expand(var_name));
                     }
                     symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Function, .name = var_name, .depth = checker->scope_depth, .variable_type = type });
                     
@@ -319,13 +324,13 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
                     
                     symbol_hash_table_key key = (symbol_hash_table_key) { .name = var_name, .depth = 0 };
                     if (symbol_hash_table_get(&checker->symbol_table, key, nullptr)) {
-                        C_ReportCheckError(checker, node->id, "Symbol %.*s already exists\n", str_expand(var_name));
+                        C_ReportCheckError(checker, node->id, "Symbol '%.*s' already exists\n", str_expand(var_name));
                     }
                     symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Variable, .name = var_name, .depth = checker->scope_depth, .variable_type = type });
                 }
             } else {
                 if (type == nullptr) 
-                    C_ReportCheckError(checker, node->id, "Variable %.*s has neither type nor value. At least one of these should be specified\n", str_expand(var_name));
+                    C_ReportCheckError(checker, node->id, "Variable '%.*s' has neither type nor value. At least one of these should be specified\n", str_expand(var_name));
             }
             
             return &C_InvalidType;

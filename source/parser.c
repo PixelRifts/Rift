@@ -184,11 +184,12 @@ static P_Type* P_AllocVoidType(P_Parser* parser, L_Token tok) {
     return type;
 }
 
-static P_Type* P_AllocFunctionType(P_Parser* parser, P_Type* return_type, P_Type** param_types, u32 arity, L_Token func_token) {
+static P_Type* P_AllocFunctionType(P_Parser* parser, P_Type* return_type, P_Type** param_types, u32 arity, b8 varargs, L_Token func_token) {
     P_Type* type = P_AllocType(parser, BasicType_Function);
     type->token = func_token;
     type->function.return_type = return_type;
     type->function.param_types = param_types;
+    type->function.varargs = varargs;
     type->function.arity = arity;
     return type;
 }
@@ -248,8 +249,15 @@ static P_Type* P_EatType(P_Parser* parser) {
             type_array temp_param_types = {0};
             
             u32 arity = 0;
+            b8 varargs = false;
             
             while (!P_Match(parser, TokenType_CloseParenthesis)) {
+                if (P_Match(parser, TokenType_Ellipses)) {
+                    P_Eat(parser, TokenType_CloseParenthesis);
+                    varargs = true;
+                    break;
+                }
+                
                 type_array_add(&temp_param_types, P_EatType(parser));
                 
                 arity++;
@@ -270,7 +278,7 @@ static P_Type* P_EatType(P_Parser* parser) {
             if (!return_type) return_type = P_AllocVoidType(parser, func_token);
             
             type_array_free(&temp_param_types);
-            return P_AllocFunctionType(parser, return_type, param_types, arity, func_token);
+            return P_AllocFunctionType(parser, return_type, param_types, arity, varargs, func_token);
         }
         
         default: P_ReportParseError(parser, "Could not consume type. Got %.*s token\n", str_expand(L_GetTypeName(parser->curr.type)));
@@ -330,12 +338,20 @@ static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
             string_array temp_param_names = {0};
             
             u32 arity = 0;
+            b8 varargs = false;
             
             while (!P_Match(parser, TokenType_CloseParenthesis)) {
                 P_Eat(parser, TokenType_Identifier);
                 string_array_add(&temp_param_names, parser->prev.lexeme);
                 
                 P_Eat(parser, TokenType_Colon);
+                
+                if (P_Match(parser, TokenType_Ellipses)) {
+                    P_Eat(parser, TokenType_CloseParenthesis);
+                    varargs = true;
+                    break;
+                }
+                
                 type_array_add(&temp_param_types, P_EatType(parser));
                 
                 arity++;
@@ -359,7 +375,7 @@ static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
             
             string_array_free(&temp_param_names);
             type_array_free(&temp_param_types);
-            P_Type* func_type = P_AllocFunctionType(parser, return_type, param_types, arity, func_token);
+            P_Type* func_type = P_AllocFunctionType(parser, return_type, param_types, arity, varargs, func_token);
             
             AstNode* body = P_Statement(parser);
             return P_AllocLambdaNode(parser, func_type, param_names, func_token, body);
@@ -394,6 +410,11 @@ static AstNode* P_ExprInfix(P_Parser* parser, L_Token op, Prec prec, AstNode* lh
                 AstNode* param = P_Expression(parser, Prec_Invalid, false);
                 node_array_add(&temp_args, param);
                 arity++;
+                
+                if (!P_Match(parser, TokenType_Comma)) {
+                    P_Eat(parser, TokenType_CloseParenthesis);
+                    break;
+                }
             }
             
             AstNode** args = arena_alloc(&parser->arena, sizeof(AstNode*) * arity);
@@ -431,7 +452,6 @@ static AstNode* P_Statement(P_Parser* parser) {
         AstNode* expr = nullptr;
         if (!P_Match(parser, TokenType_Semicolon))
             expr = P_Expression(parser, Prec_Invalid, false);
-        parser->errored = false;
         return P_AllocReturnNode(parser, expr, tok);
     } else if (P_Match(parser, TokenType_Identifier)) {
         L_Token name = parser->prev;
@@ -464,7 +484,6 @@ static AstNode* P_Statement(P_Parser* parser) {
         P_Eat(parser, TokenType_Equal);
         AstNode* value = P_Expression(parser, Prec_Invalid, false);
         P_Eat(parser, TokenType_Semicolon);
-        parser->errored = false;
         return P_AllocAssignNode(parser, name, value);
     } else if (P_Match(parser, TokenType_OpenBrace)) {
         L_Token tok = parser->prev;
@@ -484,7 +503,6 @@ static AstNode* P_Statement(P_Parser* parser) {
         
         node_array_free(&temp_statements);
         P_Scope scope = { .type = ScopeType_None };
-        parser->errored = false;
         return P_AllocBlockNode(parser, scope, statements, count, tok);
     }
     return P_AllocErrorNode(parser);
