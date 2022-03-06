@@ -4,11 +4,11 @@ add_ten := func(v : int) -> int {
     return 10 + v;
 }
 
-variadic := func(j : int, b : ...) -> int {
-    return j;
+variadic := func(j : cstring, b : ...) -> int {
+    return 10;
 }
 
 main := func() -> int {
-    t := variadic(10, 10, 20);
+    l := printf("yes", 6);
     return 0;
 }

@@ -178,6 +178,12 @@ static P_Type* P_AllocIntType(P_Parser* parser, L_Token tok) {
     return type;
 }
 
+static P_Type* P_AllocCstringType(P_Parser* parser, L_Token tok) {
+    P_Type* type = P_AllocType(parser, BasicType_Cstring);
+    type->token = tok;
+    return type;
+}
+
 static P_Type* P_AllocVoidType(P_Parser* parser, L_Token tok) {
     P_Type* type = P_AllocType(parser, BasicType_Void);
     type->token = tok;
@@ -239,6 +245,7 @@ static b8 P_IsType(P_Parser* parser) {
 static P_Type* P_EatType(P_Parser* parser) {
     switch (parser->curr.type) {
         case TokenType_Int: P_Advance(parser); return P_AllocIntType(parser, parser->prev);
+        case TokenType_Cstring: P_Advance(parser); return P_AllocCstringType(parser, parser->prev);
         case TokenType_Void: P_Advance(parser); return P_AllocVoidType(parser, parser->prev);
         
         case TokenType_Func: {
@@ -420,7 +427,7 @@ static AstNode* P_ExprInfix(P_Parser* parser, L_Token op, Prec prec, AstNode* lh
             AstNode** args = arena_alloc(&parser->arena, sizeof(AstNode*) * arity);
             memcpy(args, temp_args.elems, sizeof(AstNode*) * arity);
             
-            return P_AllocCallNode(parser, lhs, args, arity, op);
+            return P_AllocCallNode(parser, lhs, args, arity, lhs->id);
         }
     }
     return P_AllocErrorNode(parser);
@@ -463,6 +470,8 @@ static AstNode* P_Statement(P_Parser* parser) {
                 AstNode* value = P_Expression(parser, Prec_Invalid, false);
                 if (value->type != NodeType_Lambda) {
                     P_Eat(parser, TokenType_Semicolon);
+                } else {
+                    value->id = name;
                 }
                 return P_AllocVarDeclNode(parser, nullptr, name, value);
             }
@@ -475,6 +484,8 @@ static AstNode* P_Statement(P_Parser* parser) {
             if (value) {
                 if (value->type != NodeType_Lambda) {
                     P_Eat(parser, TokenType_Semicolon);
+                } else {
+                    value->id = name;
                 }
             } else P_Eat(parser, TokenType_Semicolon);
             

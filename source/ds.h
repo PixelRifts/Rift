@@ -123,11 +123,11 @@ table->cap = 0;\
 table->len = 0;\
 table->elems = nullptr;\
 }\
-static Name##_hash_table_entry* Name##_hash_table_find_entry(Name##_hash_table* table, Name##_hash_table_key key) {\
-u32 index = HashKey(key) % table->cap;\
+static Name##_hash_table_entry* Name##_hash_table_find_entry(Name##_hash_table_entry* entries, u32 cap,  Name##_hash_table_key key) {\
+u32 index = HashKey(key) % cap;\
 Name##_hash_table_entry* tombstone = nullptr;\
 while (true) {\
-Name##_hash_table_entry* entry = &table->elems[index];\
+Name##_hash_table_entry* entry = &entries[index];\
 if (KeyIsNull(entry->key)) {\
 if (ValIsNull(entry->value))\
 return tombstone != nullptr ? tombstone : entry;\
@@ -136,7 +136,7 @@ if (tombstone == nullptr) tombstone = entry;\
 }\
 } else if (KeyIsEqual(entry->key, key))\
 return entry;\
-index = (index + 1) % table->cap;\
+index = (index + 1) % cap;\
 }\
 }\
 static void Name##_hash_table_adjust_cap(Name##_hash_table* table, u32 cap) {\
@@ -145,7 +145,7 @@ table->len = 0;\
 for (u32 i = 0; i < table->cap; i++) {\
 Name##_hash_table_entry* curr = &table->elems[i];\
 if (KeyIsNull(curr->key)) continue;\
-Name##_hash_table_entry* dest = Name##_hash_table_find_entry(table, curr->key);\
+Name##_hash_table_entry* dest = Name##_hash_table_find_entry(entries, cap, curr->key);\
 dest->key = curr->key;\
 dest->value = curr->value;\
 table->len++;\
@@ -159,7 +159,7 @@ if (table->len + 1 > table->cap * HashTable_MaxLoad) {\
 u32 cap = DoubleCapacity(table->cap);\
 Name##_hash_table_adjust_cap(table, cap);\
 }\
-Name##_hash_table_entry* entry = Name##_hash_table_find_entry(table, key);\
+Name##_hash_table_entry* entry = Name##_hash_table_find_entry(table->elems, table->cap, key);\
 b8 is_new_key = KeyIsNull(entry->key);\
 if (is_new_key && ValIsNull(entry->value)) table->len++;\
 entry->key = key;\
@@ -175,14 +175,14 @@ Name##_hash_table_set(to, e->key, e->value);\
 }\
 b8 Name##_hash_table_get(Name##_hash_table* table, Name##_hash_table_key key, Name##_hash_table_value* val) {\
 if (table->len == 0) return false;\
-Name##_hash_table_entry* entry = Name##_hash_table_find_entry(table, key);\
+Name##_hash_table_entry* entry = Name##_hash_table_find_entry(table->elems, table->cap, key);\
 if (KeyIsNull(entry->key)) return false;\
 if (val != nullptr) *val = entry->value;\
 return true;\
 }\
 b8 Name##_hash_table_del(Name##_hash_table* table, Name##_hash_table_key key) {\
 if (table->len == 0) return false;\
-Name##_hash_table_entry* entry = Name##_hash_table_find_entry(table, key);\
+Name##_hash_table_entry* entry = Name##_hash_table_find_entry(table->elems, table->cap, key);\
 if (KeyIsNull(entry->key)) return false;\
 entry->key = (Name##_hash_table_key) {0};\
 entry->value = Name##_hash_table_tombstone;\

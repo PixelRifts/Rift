@@ -46,6 +46,8 @@ struct C_ScopeContext {
 };
 
 typedef struct C_Checker {
+    M_Arena arena;
+    
     b8 errored;
     u8 error_count;
     

@@ -221,9 +221,9 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
                 return &C_InvalidType;
             }
             
-            b8 arity_check_failed = callee_type->function.varargs
-                ? callee_type->function.arity >= node->Call.arity : callee_type->function.arity != node->Call.arity;
-            if (arity_check_failed) {
+            b8 arity_check = callee_type->function.varargs
+                ? callee_type->function.arity <= node->Call.arity : callee_type->function.arity == node->Call.arity;
+            if (!arity_check) {
                 C_ReportCheckError(checker, node->id, "Wrong number of arguments passed to function '%.*s'. Expected %u got %u\n", str_expand(node->id.lexeme), callee_type->function.arity, node->Call.arity);
                 return &C_InvalidType;
             }
@@ -343,6 +343,19 @@ void C_Init(C_Checker* checker, string filename) {
     memset(checker, 0, sizeof(*checker));
     checker->filename = filename;
     symbol_hash_table_init(&checker->symbol_table);
+    arena_init(&checker->arena);
+    
+    // WTF
+    P_Type* printf_function_type = arena_alloc(&checker->arena, sizeof(P_Type));
+    printf_function_type->type = BasicType_Function;
+    printf_function_type->token = (L_Token) {0};
+    printf_function_type->function.return_type = &C_IntegerType;
+    printf_function_type->function.arity = 1;
+    printf_function_type->function.param_types = arena_alloc(&checker->arena, sizeof(P_Type*));
+    printf_function_type->function.param_types[0] = &C_CstringType;
+    printf_function_type->function.varargs = true;
+    symbol_hash_table_key key = (symbol_hash_table_key) { .name = str_lit("printf"), .depth = 0 };
+    symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Function, .name = str_lit("printf"), .depth = 0, .variable_type = printf_function_type });
 }
 
 void C_CheckAst(C_Checker* checker, AstNode* node) {
@@ -351,4 +364,5 @@ void C_CheckAst(C_Checker* checker, AstNode* node) {
 
 void C_Free(C_Checker* checker) {
     symbol_hash_table_free(&checker->symbol_table);
+    arena_free(&checker->arena);
 }
