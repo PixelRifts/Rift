@@ -154,7 +154,7 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         }
         
         case NodeType_IntLit: return LLVMConstInt(LLVMInt64Type(), node->IntLit, 0);
-        case NodeType_BoolLit: return LLVMConstInt(LLVMInt8Type(), node->BoolLit, 0);
+        case NodeType_BoolLit: return LLVMConstInt(LLVMInt1Type(), node->BoolLit, 0);
         
         case NodeType_GlobalString: {
             char* hoist = malloc(node->GlobalString.value.size + 1);
@@ -183,9 +183,11 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         
         case NodeType_Lambda: {
             LLVMBasicBlockRef prev = emitter->current_block;
+            b8 prev_is_in_function = emitter->is_in_function;
             
             LLVMTypeRef function_type = BL_PTypeToLLVMType(node->Lambda.function_type);
             LLVMValueRef func = LLVMAddFunction(emitter->module, "", function_type);
+            
             emitter->current_block = LLVMAppendBasicBlock(func, "entry");
             LLVMPositionBuilderAtEnd(emitter->builder, emitter->current_block);
             emitter->is_in_function = true;
@@ -208,7 +210,7 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             if (node->Lambda.function_type->function.return_type->type == BasicType_Void)
                 LLVMBuildRet(emitter->builder, (LLVMValueRef) {0});
             
-            emitter->is_in_function = false;
+            emitter->is_in_function = prev_is_in_function;
             emitter->current_block = prev;
             LLVMPositionBuilderAtEnd(emitter->builder, emitter->current_block);
             return func;
@@ -216,13 +218,6 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         
         case NodeType_Call: {
             // Change key.name when implementing function pointers
-            /*if (str_eq(node->Call.callee->id.lexeme, str_lit("printf"))) {
-                LLVMValueRef* params = malloc(node->Call.arity * sizeof(LLVMValueRef));
-                for (u32 i = 0; i < node->Call.arity; i++) {
-                    params[i] = BL_Emit(emitter, node->Call.params[i]);
-                }
-                return LLVMBuildCall2(emitter->builder, printffunctype, printffunc, params, node->Call.arity, "");
-            }*/
             
             llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->Call.callee->id.lexeme, .depth = 0 };
             llvmsymbol_hash_table_value val;
@@ -250,6 +245,38 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             for (u32 i = 0; i < node->Block.count; i++) {
                 BL_Emit(emitter, node->Block.statements[i]);
             }
+            return (LLVMValueRef) {0};
+        }
+        
+        case NodeType_If: {
+            LLVMValueRef condition = BL_Emit(emitter, node->If.condition);
+            
+            //LLVMBasicBlockRef prev = emitter->current_block;
+            
+            LLVMValueRef current_function = LLVMGetBasicBlockParent(emitter->current_block);
+            LLVMBasicBlockRef ifb = LLVMAppendBasicBlock(current_function, "th");
+            LLVMBasicBlockRef elseb = nullptr;
+            if (node->If.elsee) elseb = LLVMAppendBasicBlock(current_function, "el");
+            LLVMBasicBlockRef mergeb = LLVMAppendBasicBlock(current_function, "me");
+            if (!elseb) elseb = mergeb;
+            
+            LLVMBuildCondBr(emitter->builder, condition, ifb, elseb);
+            
+            LLVMPositionBuilderAtEnd(emitter->builder, ifb);
+            emitter->current_block = ifb;
+            BL_Emit(emitter, node->If.then);
+            LLVMBuildBr(emitter->builder, mergeb);
+            
+            if (node->If.elsee) {
+                LLVMPositionBuilderAtEnd(emitter->builder, elseb);
+                emitter->current_block = elseb;
+                BL_Emit(emitter, node->If.elsee);
+                LLVMBuildBr(emitter->builder, mergeb);
+            }
+            
+            LLVMPositionBuilderAtEnd(emitter->builder, mergeb);
+            emitter->current_block = mergeb;
+            
             return (LLVMValueRef) {0};
         }
         

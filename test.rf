@@ -1,8 +1,12 @@
-test := func(k : bool) {
+gettrue := func() -> bool {
+    return true;
 }
 
 main := func() -> int {
-    test(false && true);
-    printf("yes\n");
+    if gettrue() == false {
+        printf("yes\n");
+    } else {
+        printf("no\n");
+    }
     return 0;
 }

@@ -151,6 +151,15 @@ static AstNode* P_AllocBlockNode(P_Parser* parser, P_Scope scope, AstNode** stat
     return node;
 }
 
+static AstNode* P_AllocIfNode(P_Parser* parser, L_Token token, AstNode* condition, AstNode* then, AstNode* elsee) {
+    AstNode* node = P_AllocNode(parser, NodeType_If);
+    node->If.condition = condition;
+    node->If.then = then;
+    node->If.elsee = elsee;
+    node->id = token;
+    return node;
+}
+
 static AstNode* P_AllocAssignNode(P_Parser* parser, L_Token name, AstNode* value) {
     AstNode* node = P_AllocNode(parser, NodeType_Assign);
     node->id = name;
@@ -491,13 +500,15 @@ static AstNode* P_Expression(P_Parser* parser, Prec prec_in, b8 is_rhs) {
     
     if (infix_expr_precs[parser->curr.type] != Prec_Invalid) {
         P_Advance(parser);
+        L_Token op = parser->prev;
         while (true) {
-            L_Token op = parser->prev;
             if (infix_expr_precs[op.type] == Prec_Invalid) break;
             
             if (infix_expr_precs[op.type] >= prec_in) {
                 lhs = P_ExprInfix(parser, op, infix_expr_precs[op.type] + 1, lhs);
                 if (lhs->type == NodeType_Error) return P_AllocErrorNode(parser);
+                op = parser->curr;
+                if (infix_expr_precs[op.type] != Prec_Invalid) P_Advance(parser);
             } else break;
         }
     }
@@ -554,6 +565,14 @@ static AstNode* P_Statement(P_Parser* parser) {
             AstNode* expr = P_Expression(parser, Prec_Invalid, false);
             return P_AllocExprStatementNode(parser, expr);
         }
+    } else if (P_Match(parser, TokenType_If)) {
+        L_Token tok = parser->prev;
+        AstNode* condition = P_Expression(parser, Prec_Invalid, false);
+        AstNode* then = P_Statement(parser);
+        AstNode* elsee = nullptr;
+        if (P_Match(parser, TokenType_Else))
+            elsee = P_Statement(parser);
+        return P_AllocIfNode(parser, tok, condition, then, elsee);
     } else if (P_Match(parser, TokenType_OpenBrace)) {
         L_Token tok = parser->prev;
         node_array temp_statements = {0};

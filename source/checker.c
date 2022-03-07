@@ -136,7 +136,7 @@ static void C_PopScope(C_Checker* checker, C_ScopeContext* scope) {
     checker->function_return_type = scope->function_return_type;
     checker->is_in_func_body = scope->is_in_func_body;
     
-    free(checker->current_scope_context);
+    free(scope);
     
     checker->scope_depth--;
 }
@@ -269,16 +269,43 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
         
         case NodeType_Block: {
             C_CheckInFunction(checker, node);
-            C_ScopeContext* scope_ctx;
+            C_ScopeContext* scope_ctx = nullptr;
             if (!checker->no_scope) scope_ctx = C_PushScope(checker, nullptr, false);
             for (u32 i = 0; i < node->Block.count; i++) {
                 AstNode* statement = node->Block.statements[i];
                 C_GetType(checker, statement);
             }
-            if (!checker->no_scope) C_PopScope(checker, scope_ctx);
+            if (scope_ctx) C_PopScope(checker, scope_ctx);
             
             return &C_InvalidType;
         } break;
+        
+        case NodeType_If: {
+            C_CheckInFunction(checker, node);
+            
+            C_ScopeContext* scope_ctx = C_PushScope(checker, nullptr, false);
+            
+            P_Type* type = C_GetType(checker, node->If.condition);
+            if (type->type != BasicType_Boolean) {
+                C_ReportCheckError(checker, node->id, "Condition for if statement is not a boolean\n");
+            }
+            
+            checker->no_scope = true;
+            C_GetType(checker, node->If.then);
+            checker->no_scope = false;
+            
+            C_PopScope(checker, scope_ctx);
+            
+            if (node->If.elsee) {
+                scope_ctx = C_PushScope(checker, nullptr, false);
+                checker->no_scope = true;
+                C_GetType(checker, node->If.elsee);
+                checker->no_scope = false;
+                C_PopScope(checker, scope_ctx);
+            }
+            
+            return &C_InvalidType;
+        }
         
         case NodeType_Assign: {
             C_CheckInFunction(checker, node);

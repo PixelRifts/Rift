@@ -46,6 +46,11 @@ P_Scope scope;\
 AstNode** statements;\
 u32 count;\
 })\
+AST_NODE(If, str_lit("IfStatement"), struct {\
+AstNode* condition;\
+AstNode* then;\
+AstNode* elsee;\
+})\
 AST_NODE(Assign, str_lit("Variable Assignment"), struct {\
 AstNode* value;\
 })\
@@ -75,6 +80,7 @@ enum {
     NodeType_Return,
     NodeType_ExprStatement,
     NodeType_Block,
+    NodeType_If,
     NodeType_Assign,
     NodeType_VarDecl,
     NodeType_STMT_END,
