@@ -54,6 +54,7 @@ static b8 C_CheckTypeEquals(P_Type* a, P_Type* b) {
         // No extra Data associated with these types
         case BasicType_Integer:
         case BasicType_Void:
+        case BasicType_Boolean:
         case BasicType_Cstring: return true;
         
         case BasicType_Function: {
@@ -161,6 +162,10 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
         
         case NodeType_IntLit: {
             return &C_IntegerType;
+        } break;
+        
+        case NodeType_BoolLit: {
+            return &C_BooleanType;
         } break;
         
         case NodeType_GlobalString: {

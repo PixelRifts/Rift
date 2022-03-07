@@ -67,6 +67,12 @@ static AstNode* P_AllocIntLitNode(P_Parser* parser, i64 val) {
     return node;
 }
 
+static AstNode* P_AllocBoolLitNode(P_Parser* parser, b8 val) {
+    AstNode* node = P_AllocNode(parser, NodeType_BoolLit);
+    node->BoolLit = val;
+    return node;
+}
+
 static AstNode* P_AllocGlobalStringNode(P_Parser* parser, L_Token token, string val) {
     AstNode* node = P_AllocNode(parser, NodeType_GlobalString);
     node->id = token;
@@ -178,6 +184,12 @@ static P_Type* P_AllocIntType(P_Parser* parser, L_Token tok) {
     return type;
 }
 
+static P_Type* P_AllocBoolType(P_Parser* parser, L_Token tok) {
+    P_Type* type = P_AllocType(parser, BasicType_Boolean);
+    type->token = tok;
+    return type;
+}
+
 static P_Type* P_AllocCstringType(P_Parser* parser, L_Token tok) {
     P_Type* type = P_AllocType(parser, BasicType_Cstring);
     type->token = tok;
@@ -232,10 +244,14 @@ static b8 P_IsType(P_Parser* parser) {
     P_ParserSnap snap = P_TakeSnapshot(parser);
     
     switch (parser->curr.type) {
-        case TokenType_Int: ret = true; break;
-        case TokenType_Void: ret = true; break;
-        case TokenType_Func: ret = true; break;
-        default: ret = false; break;
+        case TokenType_Int:
+        case TokenType_Bool:
+        case TokenType_Void:
+        case TokenType_Func:
+        ret = true; break;
+        
+        default:
+        ret = false; break;
     }
     
     P_ApplySnapshot(parser, snap);
@@ -245,6 +261,7 @@ static b8 P_IsType(P_Parser* parser) {
 static P_Type* P_EatType(P_Parser* parser) {
     switch (parser->curr.type) {
         case TokenType_Int: P_Advance(parser); return P_AllocIntType(parser, parser->prev);
+        case TokenType_Bool: P_Advance(parser); return P_AllocBoolType(parser, parser->prev);
         case TokenType_Cstring: P_Advance(parser); return P_AllocCstringType(parser, parser->prev);
         case TokenType_Void: P_Advance(parser); return P_AllocVoidType(parser, parser->prev);
         
@@ -303,12 +320,18 @@ static AstNode* P_ExprIntegerLiteral(P_Parser* parser) {
     return P_AllocIntLitNode(parser, value);
 }
 
+static AstNode* P_ExprBoolLiteral(P_Parser* parser) {
+    b8 value = parser->prev.type == TokenType_True;
+    return P_AllocBoolLitNode(parser, value);
+}
+
 static AstNode* P_ExprIdent(P_Parser* parser) {
     return P_AllocIdentNode(parser, parser->prev);
 }
 
 static AstNode* P_ExprStringLit(P_Parser* parser) {
     string value = { .str = parser->prev.lexeme.str + 1, .size = parser->prev.lexeme.size - 2 };
+    value = str_replace_all(&parser->arena, value, str_lit("\\n"), str_lit("\x0A\x00"));
     return P_AllocGlobalStringNode(parser, parser->prev, value);
 }
 
@@ -318,11 +341,32 @@ static AstNode* P_ExprUnaryNum(P_Parser* parser) {
     return P_AllocUnaryNode(parser, expr, op);
 }
 
+static b8 P_IsExprTok(P_Parser* parser) {
+    switch (parser->curr.type) {
+        case TokenType_IntLit:
+        case TokenType_True:
+        case TokenType_False:
+        case TokenType_CstringLit:
+        case TokenType_Identifier:
+        case TokenType_OpenParenthesis:
+        case TokenType_Plus:
+        case TokenType_Minus:
+        case TokenType_Tilde:
+        case TokenType_Func:
+        return true;
+    }
+    return false;
+}
+
 static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
     switch (parser->curr.type) {
         case TokenType_IntLit: P_Advance(parser); return P_ExprIntegerLiteral(parser);
         case TokenType_CstringLit: P_Advance(parser); return P_ExprStringLit(parser);
         case TokenType_Identifier: P_Advance(parser); return P_ExprIdent(parser);
+        case TokenType_True:
+        case TokenType_False: {
+            P_Advance(parser); return P_ExprBoolLiteral(parser);
+        }
         case TokenType_OpenParenthesis: {
             P_Advance(parser);
             L_Token tok = parser->prev;
@@ -404,7 +448,15 @@ static AstNode* P_ExprInfix(P_Parser* parser, L_Token op, Prec prec, AstNode* lh
         case TokenType_Plus:
         case TokenType_Minus:
         case TokenType_Star:
-        case TokenType_Slash: {
+        case TokenType_Slash:
+        case TokenType_AmpersandAmpersand:
+        case TokenType_PipePipe:
+        case TokenType_EqualEqual:
+        case TokenType_BangEqual:
+        case TokenType_Less:
+        case TokenType_LessEqual:
+        case TokenType_Greater:
+        case TokenType_GreaterEqual: {
             AstNode* rhs = P_Expression(parser, prec, true);
             return P_AllocBinaryNode(parser, lhs, rhs, op);
         }
@@ -460,10 +512,12 @@ static AstNode* P_Statement(P_Parser* parser) {
         if (!P_Match(parser, TokenType_Semicolon))
             expr = P_Expression(parser, Prec_Invalid, false);
         return P_AllocReturnNode(parser, expr, tok);
-    } else if (P_Match(parser, TokenType_Identifier)) {
-        L_Token name = parser->prev;
+    } else if (parser->curr.type == TokenType_Identifier) {
+        L_Token name = parser->curr;
         
-        if (P_Match(parser, TokenType_Colon)) {
+        if (parser->next.type == TokenType_Colon) {
+            P_Advance(parser); // Identifier
+            P_Advance(parser); // :
             if (P_Match(parser, TokenType_Equal)) {
                 if (P_Match(parser, TokenType_Semicolon))
                     return P_AllocVarDeclNode(parser, nullptr, name, nullptr);
@@ -490,12 +544,16 @@ static AstNode* P_Statement(P_Parser* parser) {
             } else P_Eat(parser, TokenType_Semicolon);
             
             return P_AllocVarDeclNode(parser, type, name, value);
+        } else if (parser->next.type == TokenType_Equal) {
+            P_Advance(parser); // Identifier
+            P_Advance(parser); // =
+            AstNode* value = P_Expression(parser, Prec_Invalid, false);
+            P_Eat(parser, TokenType_Semicolon);
+            return P_AllocAssignNode(parser, name, value);
+        } else {
+            AstNode* expr = P_Expression(parser, Prec_Invalid, false);
+            return P_AllocExprStatementNode(parser, expr);
         }
-        
-        P_Eat(parser, TokenType_Equal);
-        AstNode* value = P_Expression(parser, Prec_Invalid, false);
-        P_Eat(parser, TokenType_Semicolon);
-        return P_AllocAssignNode(parser, name, value);
     } else if (P_Match(parser, TokenType_OpenBrace)) {
         L_Token tok = parser->prev;
         node_array temp_statements = {0};
@@ -515,6 +573,9 @@ static AstNode* P_Statement(P_Parser* parser) {
         node_array_free(&temp_statements);
         P_Scope scope = { .type = ScopeType_None };
         return P_AllocBlockNode(parser, scope, statements, count, tok);
+    } else if (P_IsExprTok(parser)) {
+        AstNode* expr = P_Expression(parser, Prec_Invalid, false);
+        return P_AllocExprStatementNode(parser, expr);
     }
     return P_AllocErrorNode(parser);
 }

@@ -7,9 +7,8 @@ const P_Type C_NullType    = { 0 };
 const P_Type C_InvalidType = { BasicType_Invalid };
 const P_Type C_VoidType    = { BasicType_Void };
 const P_Type C_IntegerType = { BasicType_Integer };
+const P_Type C_BooleanType = { BasicType_Boolean };
 const P_Type C_CstringType = { BasicType_Cstring };
-
-#define C_IntTypeConst { BasicType_Integer }
 
 //~ Unary Operators
 
@@ -62,12 +61,37 @@ C_BinaryOpTypes operator_factor[] = {
     { &C_IntegerType, &C_IntegerType, &C_IntegerType }
 };
 
+const u32 operator_eq_length = 2;
+C_BinaryOpTypes operator_eq[] = {
+    { &C_IntegerType, &C_IntegerType, &C_BooleanType },
+    { &C_BooleanType, &C_BooleanType, &C_BooleanType },
+};
+
+const u32 operator_cmp_length = 1;
+C_BinaryOpTypes operator_cmp[] = {
+    { &C_IntegerType, &C_IntegerType, &C_BooleanType },
+};
+
+const u32 operator_logic_length = 2;
+C_BinaryOpTypes operator_logic[] = {
+    { &C_BooleanType, &C_BooleanType, &C_BooleanType },
+};
+
 #define associate(token, name) [token] = { operator_##name, operator_##name##_length }
 C_BinaryOpBinding binary_operator_bindings[] = {
     associate(TokenType_Plus, term),
     associate(TokenType_Minus, term),
     associate(TokenType_Star, factor),
     associate(TokenType_Slash, factor),
+    associate(TokenType_EqualEqual, eq),
+    associate(TokenType_BangEqual, eq),
+    associate(TokenType_AmpersandAmpersand, logic),
+    associate(TokenType_PipePipe, logic),
+    
+    associate(TokenType_Less, cmp),
+    associate(TokenType_LessEqual, cmp),
+    associate(TokenType_Greater, cmp),
+    associate(TokenType_GreaterEqual, cmp),
     
     [TokenType_TokenTypeCount] = { nullptr, 0 },
 };

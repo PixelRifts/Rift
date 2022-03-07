@@ -1,14 +1,8 @@
-k := (1 + 2) * 3;
-
-add_ten := func(v : int) -> int {
-    return 10 + v;
-}
-
-variadic := func(j : cstring, b : ...) -> int {
-    return 10;
+test := func(k : bool) {
 }
 
 main := func() -> int {
-    l := printf("yes", 6);
+    test(false && true);
+    printf("yes\n");
     return 0;
 }

@@ -29,6 +29,7 @@ static LLVMTypeRef BL_PTypeToLLVMType(P_Type* type) {
     switch (type->type) {
         case BasicType_Void: return LLVMVoidType();
         case BasicType_Integer: return LLVMInt64Type();
+        case BasicType_Boolean: return LLVMInt1Type();
         case BasicType_Cstring: return LLVMPointerType(LLVMInt8Type(), 0);
         case BasicType_Function: {
             LLVMTypeRef return_type = BL_PTypeToLLVMType(type->function.return_type);
@@ -56,7 +57,6 @@ void BL_Init(BL_Emitter* emitter, string source_filename, string filename) {
     memset(emitter, 0, sizeof(BL_Emitter));
     emitter->filename = filename;
     emitter->source_filename = source_filename;
-    
     emitter->module = LLVMModuleCreateWithName("Testing");
     emitter->builder = LLVMCreateBuilder();
     
@@ -93,6 +93,40 @@ static LLVMValueRef BL_BuildBinary(BL_Emitter* emitter, L_Token token, LLVMValue
         case TokenType_Minus: return LLVMBuildSub(emitter->builder, left, right, "");
         case TokenType_Star:  return LLVMBuildMul(emitter->builder, left, right, "");
         case TokenType_Slash: return LLVMBuildUDiv(emitter->builder, left, right, "");
+        
+        case TokenType_AmpersandAmpersand: return LLVMBuildBitCast(emitter->builder, LLVMBuildAnd(emitter->builder, left, right, ""), LLVMInt1Type(), "");
+        case TokenType_PipePipe: return LLVMBuildBitCast(emitter->builder, LLVMBuildOr(emitter->builder, left, right, ""), LLVMInt1Type(), "");
+        
+        case TokenType_EqualEqual: {
+            if (LLVMGetTypeKind(LLVMTypeOf(left)) == LLVMIntegerTypeKind)
+                return LLVMBuildICmp(emitter->builder, LLVMIntEQ, left, right, "");
+        }
+        
+        case TokenType_BangEqual: {
+            if (LLVMGetTypeKind(LLVMTypeOf(left)) == LLVMIntegerTypeKind)
+                return LLVMBuildICmp(emitter->builder, LLVMIntNE, left, right, "");
+        }
+        
+        case TokenType_Less: {
+            if (LLVMGetTypeKind(LLVMTypeOf(left)) == LLVMIntegerTypeKind)
+                return LLVMBuildICmp(emitter->builder, LLVMIntSLT, left, right, "");
+        }
+        
+        case TokenType_LessEqual: {
+            if (LLVMGetTypeKind(LLVMTypeOf(left)) == LLVMIntegerTypeKind)
+                return LLVMBuildICmp(emitter->builder, LLVMIntSLE, left, right, "");
+        }
+        
+        case TokenType_Greater: {
+            if (LLVMGetTypeKind(LLVMTypeOf(left)) == LLVMIntegerTypeKind)
+                return LLVMBuildICmp(emitter->builder, LLVMIntSGT, left, right, "");
+        }
+        
+        case TokenType_GreaterEqual: {
+            if (LLVMGetTypeKind(LLVMTypeOf(left)) == LLVMIntegerTypeKind)
+                return LLVMBuildICmp(emitter->builder, LLVMIntSGE, left, right, "");
+        }
+        
         default: unreachable;
     }
     return (LLVMValueRef) {0};
@@ -120,6 +154,7 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         }
         
         case NodeType_IntLit: return LLVMConstInt(LLVMInt64Type(), node->IntLit, 0);
+        case NodeType_BoolLit: return LLVMConstInt(LLVMInt8Type(), node->BoolLit, 0);
         
         case NodeType_GlobalString: {
             char* hoist = malloc(node->GlobalString.value.size + 1);

@@ -14,6 +14,7 @@ AST_NODE(Error, str_lit(""), i8)\
 AST_NODE(EXPR_START, str_lit(""), i8)\
 AST_NODE(Ident, str_lit("Identifier Expression"), string)\
 AST_NODE(IntLit, str_lit("Integer Literal"), i64)\
+AST_NODE(BoolLit, str_lit("Boolean Literal"), b8)\
 AST_NODE(GlobalString, str_lit("Global String Literal"), struct {\
 string value;\
 })\
@@ -61,6 +62,7 @@ enum {
     NodeType_EXPR_START,
     NodeType_Ident,
     NodeType_IntLit,
+    NodeType_BoolLit,
     NodeType_GlobalString,
     NodeType_Unary,
     NodeType_Binary,
@@ -82,6 +84,7 @@ enum {
 #define BASIC_TYPES \
 TYPE(Invalid, str_lit("Invalid")) \
 TYPE(Integer, str_lit("Integer")) \
+TYPE(Boolean, str_lit("Boolean")) \
 TYPE(Void, str_lit("Void")) \
 TYPE(Function, str_lit("Function")) \
 TYPE(Cstring, str_lit("Cstring")) \
@@ -91,6 +94,7 @@ typedef u32 P_BasicType;
 enum {
     BasicType_Invalid,
     BasicType_Integer,
+    BasicType_Boolean,
     BasicType_Void,
     BasicType_Function,
     BasicType_Cstring,
