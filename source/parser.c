@@ -160,18 +160,26 @@ static AstNode* P_AllocIfNode(P_Parser* parser, L_Token token, AstNode* conditio
     return node;
 }
 
+static AstNode* P_AllocWhileNode(P_Parser* parser, L_Token token, AstNode* condition, AstNode* body) {
+    AstNode* node = P_AllocNode(parser, NodeType_While);
+    node->While.condition = condition;
+    node->While.body = body;
+    node->id = token;
+    return node;
+}
+
 static AstNode* P_AllocAssignNode(P_Parser* parser, L_Token name, AstNode* value) {
     AstNode* node = P_AllocNode(parser, NodeType_Assign);
-    node->id = name;
     node->Assign.value = value;
+    node->id = name;
     return node;
 }
 
 static AstNode* P_AllocVarDeclNode(P_Parser* parser, P_Type* type, L_Token name, AstNode* value) {
     AstNode* node = P_AllocNode(parser, NodeType_VarDecl);
     node->VarDecl.type = type;
-    node->id = name;
     node->VarDecl.value = value;
+    node->id = name;
     return node;
 }
 
@@ -573,6 +581,11 @@ static AstNode* P_Statement(P_Parser* parser) {
         if (P_Match(parser, TokenType_Else))
             elsee = P_Statement(parser);
         return P_AllocIfNode(parser, tok, condition, then, elsee);
+    } else if (P_Match(parser, TokenType_While)) {
+        L_Token tok = parser->prev;
+        AstNode* condition = P_Expression(parser, Prec_Invalid, false);
+        AstNode* body = P_Statement(parser);
+        return P_AllocWhileNode(parser, tok, condition, body);
     } else if (P_Match(parser, TokenType_OpenBrace)) {
         L_Token tok = parser->prev;
         node_array temp_statements = {0};

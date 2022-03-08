@@ -46,10 +46,14 @@ P_Scope scope;\
 AstNode** statements;\
 u32 count;\
 })\
-AST_NODE(If, str_lit("IfStatement"), struct {\
+AST_NODE(If, str_lit("If Statement"), struct {\
 AstNode* condition;\
 AstNode* then;\
 AstNode* elsee;\
+})\
+AST_NODE(While, str_lit("While Loop"), struct {\
+AstNode* condition;\
+AstNode* body;\
 })\
 AST_NODE(Assign, str_lit("Variable Assignment"), struct {\
 AstNode* value;\
@@ -81,6 +85,7 @@ enum {
     NodeType_ExprStatement,
     NodeType_Block,
     NodeType_If,
+    NodeType_While,
     NodeType_Assign,
     NodeType_VarDecl,
     NodeType_STMT_END,

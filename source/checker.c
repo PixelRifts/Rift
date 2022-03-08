@@ -305,7 +305,23 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             }
             
             return &C_InvalidType;
-        }
+        } break;
+        
+        case NodeType_While: {
+            C_CheckInFunction(checker, node);
+            C_ScopeContext* scope_ctx = C_PushScope(checker, nullptr, false);
+            P_Type* type = C_GetType(checker, node->While.condition);
+            if (type->type != BasicType_Boolean) {
+                C_ReportCheckError(checker, node->id, "Condition for While loop is not a boolean\n");
+            }
+            
+            checker->no_scope = true;
+            C_GetType(checker, node->While.body);
+            checker->no_scope = false;
+            
+            C_PopScope(checker, scope_ctx);
+            return &C_InvalidType;
+        } break;
         
         case NodeType_Assign: {
             C_CheckInFunction(checker, node);

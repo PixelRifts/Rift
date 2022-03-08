@@ -76,11 +76,11 @@ void BL_Init(BL_Emitter* emitter, string source_filename, string filename) {
     llvmsymbol_hash_table_init(&emitter->variables);
     
     LLVMTypeRef printf_function_args_type[] = { LLVMPointerType(LLVMInt8Type(), 0) };
-    LLVMTypeRef rintffunctype = LLVMFunctionType(LLVMInt64Type(), printf_function_args_type, 1, true);
-    LLVMValueRef rintffunc = LLVMAddFunction(emitter->module, "printf", rintffunctype);
+    printffunctype = LLVMFunctionType(LLVMInt64Type(), printf_function_args_type, 1, true);
+    printffunc = LLVMAddFunction(emitter->module, "printf", printffunctype);
     
     llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = str_lit("printf"), .depth = 0 };
-    llvmsymbol_hash_table_value val = { .type = rintffunctype, .alloca = rintffunc, .loaded = nullptr, .not_null = true };
+    llvmsymbol_hash_table_value val = { .symtype = SymbolType_Function, .symflags = ValueFlag_Global, .type = printffunctype, .alloca = printffunc, .not_null = true };
     llvmsymbol_hash_table_set(&emitter->variables, key, val);
     
     LLVMInstallFatalErrorHandler(BL_Report_LLVMHandler);
@@ -148,6 +148,10 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->Ident, .depth = 0 };
             llvmsymbol_hash_table_value val;
             if (llvmsymbol_hash_table_get(&emitter->variables, key, &val)) {
+                if (val.changed) {
+                    LLVMValueRef v = LLVMBuildLoad(emitter->builder, val.alloca, "");
+                    return v;
+                }
                 return val.loaded;
             }
             return (LLVMValueRef) {0};
@@ -198,10 +202,9 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
                 
                 LLVMValueRef alloca = LLVMBuildAlloca(emitter->builder, type, "");
                 LLVMBuildStore(emitter->builder, LLVMGetParam(func, i), alloca);
-                LLVMValueRef loaded = LLVMBuildLoad(emitter->builder, alloca, "");
                 
                 llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = var_name, .depth = 0 };
-                llvmsymbol_hash_table_value val = { .type = type, .alloca = alloca, .loaded = loaded, .not_null = true };
+                llvmsymbol_hash_table_value val = { .symtype = SymbolType_Variable, .type = type, .alloca = alloca, .changed = true, .not_null = true };
                 llvmsymbol_hash_table_set(&emitter->variables, key, val);
             }
             
@@ -213,6 +216,16 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             emitter->is_in_function = prev_is_in_function;
             emitter->current_block = prev;
             LLVMPositionBuilderAtEnd(emitter->builder, emitter->current_block);
+            
+            for (u32 k = 0; k < emitter->variables.cap; k++) {
+                llvmsymbol_hash_table_entry e = emitter->variables.elems[k];
+                if (!llvmsymbol_key_is_null(e.key)) {
+                    if ((e.value.symflags & ValueFlag_Global) == 0) {
+                        llvmsymbol_hash_table_del(&emitter->variables, e.key);
+                    }
+                }
+            }
+            
             return func;
         }
         
@@ -251,8 +264,6 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         case NodeType_If: {
             LLVMValueRef condition = BL_Emit(emitter, node->If.condition);
             
-            //LLVMBasicBlockRef prev = emitter->current_block;
-            
             LLVMValueRef current_function = LLVMGetBasicBlockParent(emitter->current_block);
             LLVMBasicBlockRef ifb = LLVMAppendBasicBlock(current_function, "th");
             LLVMBasicBlockRef elseb = nullptr;
@@ -280,6 +291,32 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             return (LLVMValueRef) {0};
         }
         
+        case NodeType_While: {
+            LLVMValueRef current_function = LLVMGetBasicBlockParent(emitter->current_block);
+            LLVMBasicBlockRef condb = LLVMAppendBasicBlock(current_function, "cn");
+            
+            LLVMBuildBr(emitter->builder, condb);
+            
+            LLVMPositionBuilderAtEnd(emitter->builder, condb);
+            emitter->current_block = condb;
+            LLVMValueRef condition = BL_Emit(emitter, node->While.condition);
+            
+            LLVMBasicBlockRef bodyb = LLVMAppendBasicBlock(current_function, "wh");
+            LLVMBasicBlockRef afterb = LLVMAppendBasicBlock(current_function, "af");
+            
+            LLVMBuildCondBr(emitter->builder, condition, bodyb, afterb);
+            
+            LLVMPositionBuilderAtEnd(emitter->builder, bodyb);
+            emitter->current_block = bodyb;
+            BL_Emit(emitter, node->While.body);
+            LLVMBuildBr(emitter->builder, condb);
+            
+            LLVMPositionBuilderAtEnd(emitter->builder, afterb);
+            emitter->current_block = afterb;
+            
+            return (LLVMValueRef) {0};
+        }
+        
         case NodeType_Assign: {
             char* hoist = malloc(node->id.lexeme.size + 1);
             memcpy(hoist, node->id.lexeme.str, node->id.lexeme.size);
@@ -289,7 +326,7 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             if (llvmsymbol_hash_table_get(&emitter->variables, key, &val)) {
                 LLVMValueRef value = BL_Emit(emitter, node->Assign.value);
                 LLVMBuildStore(emitter->builder, value, val.alloca);
-                val.loaded = LLVMBuildLoad2(emitter->builder, val.type, val.alloca, "");
+                val.changed = true;
                 llvmsymbol_hash_table_set(&emitter->variables, key, val);
                 
                 free(hoist);
@@ -306,7 +343,8 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             hoist[node->id.lexeme.size] = '\0';
             
             LLVMValueRef addr = {0};
-            LLVMValueRef ref = {0};
+            C_SymbolType symtype = SymbolType_Invalid;
+            BL_ValueFlag symflags = 0;
             
             LLVMTypeRef var_type = BL_PTypeToLLVMType(node->VarDecl.type);
             if (node->VarDecl.type->type == BasicType_Function && node->VarDecl.value->type != NodeType_Lambda)
@@ -318,32 +356,41 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
                 if (node->VarDecl.value) {
                     if (node->VarDecl.value->type == NodeType_Lambda) {
                         addr = BL_Emit(emitter, node->VarDecl.value);
+                        symtype = SymbolType_Function;
                         LLVMSetValueName2(addr, (const char*)node->id.lexeme.str, node->id.lexeme.size);
                     } else {
-                        BL_Emit(emitter, node->VarDecl.value);
+                        LLVMValueRef val = BL_Emit(emitter, node->VarDecl.value);
+                        LLVMBuildStore(emitter->builder, val, addr);
+                        symtype = SymbolType_Variable;
                     }
                 } else {
                     // TODO(voxel): @default_init
                 }
-                ref = LLVMBuildLoad2(emitter->builder, var_type, addr, "");
                 
             } else {
                 if (node->VarDecl.value) {
                     if (node->VarDecl.value->type == NodeType_Lambda) {
                         addr = BL_Emit(emitter, node->VarDecl.value);
+                        symtype = SymbolType_Function;
+                        symflags |= ValueFlag_Global;
                         LLVMSetValueName2(addr, (const char*)node->id.lexeme.str, node->id.lexeme.size);
                     } else {
                         addr = LLVMAddGlobal(emitter->module, var_type, hoist);
                         LLVMSetInitializer(addr, BL_Emit(emitter, node->VarDecl.value));
+                        symtype = SymbolType_Variable;
+                        symflags |= ValueFlag_Global;
                     }
                 } else {
                     addr = LLVMAddGlobal(emitter->module, var_type, hoist);
+                    symtype = SymbolType_Variable;
+                    symflags |= ValueFlag_Global;
+                    
                     // TODO(voxel): @default_init
                 }
             }
             
             llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->id.lexeme, .depth = 0 };
-            llvmsymbol_hash_table_value val = (llvmsymbol_hash_table_value) { .alloca = addr, .loaded = ref, .type = var_type, .not_null = true, .tombstone = false };
+            llvmsymbol_hash_table_value val = (llvmsymbol_hash_table_value) { .symtype = symtype, .symflags = symflags, .alloca = addr, .changed = true, .type = var_type, .not_null = true, .tombstone = false };
             llvmsymbol_hash_table_set(&emitter->variables, key, val);
             
             free(hoist);

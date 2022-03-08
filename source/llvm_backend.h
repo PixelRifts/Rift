@@ -12,15 +12,24 @@
 #include "llvm-c/ExecutionEngine.h"
 #include "llvm-c/Error.h"
 
-typedef struct BL_StackValue {
+typedef u32 BL_ValueFlag;
+enum {
+    ValueFlag_Global = 0x1,
+};
+
+typedef struct BL_Value {
+    C_SymbolType symtype;
+    BL_ValueFlag symflags;
+    
     LLVMTypeRef type;
     LLVMValueRef alloca;
     LLVMValueRef loaded;
+    b8 changed;
     b8 not_null;
     b8 tombstone;
-} BL_StackValue;
+} BL_Value;
 
-HashTable_Prototype(llvmsymbol, struct { string name; u32 depth; }, BL_StackValue);
+HashTable_Prototype(llvmsymbol, struct { string name; u32 depth; }, BL_Value);
 
 typedef struct BL_Emitter {
     string filename;
