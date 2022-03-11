@@ -18,7 +18,7 @@ b8 symbol_key_is_eq(symbol_hash_table_key a, symbol_hash_table_key b) { return s
 u32 hash_symbol_key(symbol_hash_table_key k) { return str_hash(k.name) + k.depth; }
 b8 symbol_val_is_null(symbol_hash_table_value v) { return v.type == SymbolType_Invalid; }
 b8 symbol_val_is_tombstone(symbol_hash_table_value v) { return v.type == SymbolType_Count; }
-HashTable_Impl(symbol, symbol_key_is_null, symbol_key_is_eq, hash_symbol_key, (symbol_hash_table_value) { .type = SymbolType_Count }, symbol_val_is_null, symbol_val_is_tombstone);
+HashTable_Impl(symbol, symbol_key_is_null, symbol_key_is_eq, hash_symbol_key, { .type = SymbolType_Count }, symbol_val_is_null, symbol_val_is_tombstone);
 
 //~ Diagnostics
 
@@ -147,7 +147,7 @@ static void C_PopScope(C_Checker* checker, C_ScopeContext* scope) {
 
 static void C_CheckInFunction(C_Checker* checker, AstNode* node) {
     if (memcmp(checker->function_return_type, &C_NullType, sizeof(P_Type)) == 0) {
-        C_ReportCheckError(checker, node->id, "Cannot have statements outside of functions\n");
+        C_ReportCheckError(checker, node->id, "Cannot have statements outside of functions\n", 0);
     }
 }
 
@@ -291,7 +291,7 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             
             P_Type* type = C_GetType(checker, node->If.condition);
             if (type->type != BasicType_Boolean) {
-                C_ReportCheckError(checker, node->id, "Condition for if statement is not a boolean\n");
+                C_ReportCheckError(checker, node->id, "Condition for if statement is not a boolean\n", 0);
             }
             
             checker->no_scope = true;
@@ -316,7 +316,7 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             C_ScopeContext* scope_ctx = C_PushScope(checker, node->While.scope, nullptr, false);
             P_Type* type = C_GetType(checker, node->While.condition);
             if (type->type != BasicType_Boolean) {
-                C_ReportCheckError(checker, node->id, "Condition for While loop is not a boolean\n");
+                C_ReportCheckError(checker, node->id, "Condition for While loop is not a boolean\n", 0);
             }
             
             checker->no_scope = true;

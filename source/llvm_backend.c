@@ -10,14 +10,14 @@ b8 llvmsymbol_key_is_eq(llvmsymbol_hash_table_key a, llvmsymbol_hash_table_key b
 u32 hash_llvmsymbol_key(llvmsymbol_hash_table_key k) { return str_hash(k.name) + k.depth; }
 b8 llvmsymbol_val_is_null(llvmsymbol_hash_table_value v) { return v.not_null == false; }
 b8 llvmsymbol_val_is_tombstone(llvmsymbol_hash_table_value v) { return v.tombstone == true; }
-HashTable_Impl(llvmsymbol, llvmsymbol_key_is_null, llvmsymbol_key_is_eq, hash_llvmsymbol_key, ((llvmsymbol_hash_table_value) { .type = (LLVMTypeRef) {0}, .alloca = (LLVMValueRef) {0}, .loaded = (LLVMValueRef) {0}, .not_null = false, .tombstone = true }), llvmsymbol_val_is_null, llvmsymbol_val_is_tombstone);
+HashTable_Impl(llvmsymbol, llvmsymbol_key_is_null, llvmsymbol_key_is_eq, hash_llvmsymbol_key, { .tombstone = true }, llvmsymbol_val_is_null, llvmsymbol_val_is_tombstone);
 
 b8 llvmmeta_key_is_null(llvmmeta_hash_table_key k) { return k == nullptr; }
 b8 llvmmeta_key_is_eq(llvmmeta_hash_table_key a, llvmmeta_hash_table_key b) { return a == b; }
 u32 hash_llvmmeta_key(llvmmeta_hash_table_key k) { return *(u32*)&k; }
 b8 llvmmeta_val_is_null(llvmmeta_hash_table_value v) { return v.not_null == false; }
 b8 llvmmeta_val_is_tombstone(llvmmeta_hash_table_value v) { return v.tombstone == true; }
-HashTable_Impl(llvmmeta, llvmmeta_key_is_null, llvmmeta_key_is_eq, hash_llvmmeta_key, ((BL_Metadata) { .tombstone = true }), llvmmeta_val_is_null, llvmmeta_val_is_tombstone);
+HashTable_Impl(llvmmeta, llvmmeta_key_is_null, llvmmeta_key_is_eq, hash_llvmmeta_key, { .tombstone = true }, llvmmeta_val_is_null, llvmmeta_val_is_tombstone);
 
 //~ Diagnostics
 
@@ -101,7 +101,7 @@ void BL_Init(BL_Emitter* emitter, string source_filename, string filename) {
     INITIALIZE_TARGET(X86);
     
     LLVMTargetRef target;
-    const char* error = nullptr;
+    char* error = nullptr;
     if (LLVMGetTargetFromTriple(LLVMGetDefaultTargetTriple(), &target, &error) != 0) {
         printf("Target From Triple: %s\n", error);
         fflush(stdout);

@@ -2,11 +2,11 @@
 #include <string.h>
 #include <assert.h>
 #include <stdio.h>
+#include <stdint.h>
 
 #ifdef CPCOM_WIN
 #include <windows.h>
 #elif defined(CPCOM_LINUX)
-#include <stdint.h>
 #include <sys/mman.h>
 #endif
 

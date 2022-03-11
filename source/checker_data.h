@@ -22,7 +22,7 @@ typedef struct C_UnaryOpBinding {
     u32 count;
 } C_UnaryOpBinding;
 
-const u32 uoperator_number_length = 1;
+#define uoperator_number_length 1
 C_UnaryOpTypes uoperator_number[] = {
     { &C_IntegerType, &C_IntegerType },
 };
@@ -51,28 +51,28 @@ typedef struct C_BinaryOpBinding {
     u32 pairs_count;
 } C_BinaryOpBinding;
 
-const u32 operator_term_length = 1;
+#define operator_term_length 1
 C_BinaryOpTypes operator_term[] = {
     { &C_IntegerType, &C_IntegerType, &C_IntegerType }
 };
 
-const u32 operator_factor_length = 1;
+#define operator_factor_length 1
 C_BinaryOpTypes operator_factor[] = {
     { &C_IntegerType, &C_IntegerType, &C_IntegerType }
 };
 
-const u32 operator_eq_length = 2;
+#define operator_eq_length 2
 C_BinaryOpTypes operator_eq[] = {
     { &C_IntegerType, &C_IntegerType, &C_BooleanType },
     { &C_BooleanType, &C_BooleanType, &C_BooleanType },
 };
 
-const u32 operator_cmp_length = 1;
+#define operator_cmp_length 1
 C_BinaryOpTypes operator_cmp[] = {
     { &C_IntegerType, &C_IntegerType, &C_BooleanType },
 };
 
-const u32 operator_logic_length = 2;
+#define operator_logic_length 2
 C_BinaryOpTypes operator_logic[] = {
     { &C_BooleanType, &C_BooleanType, &C_BooleanType },
 };

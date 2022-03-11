@@ -144,7 +144,7 @@ u64 str_find_last(string_const str, string_const needle, u32 offset) {
     return prev;
 }
 
-static u32 str_hash(string_const str) {
+u32 str_hash(string_const str) {
     u32 hash = 2166136261u;
     for (int i = 0; i < str.size; i++) {
         hash ^= str.str[i];
