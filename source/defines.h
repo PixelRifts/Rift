@@ -37,9 +37,23 @@ typedef char b8;
 #define nullptr (void*)0
 #endif
 
+#if defined(__clang__)
+#  define CPCOM_COMPILER_CLANG
+#elif defined(_MSC_VER)
+#  define CPCOM_COMPILER_CL
+#elif defined(__GNUC__)
+#  define CPCOM_COMPILER_GCC
+#endif
+
+#if defined(CPCOM_COMPILER_CLANG)
+#  define FILE_NAME __FILE_NAME__
+#else
+#  define FILE_NAME __FILE__
+#endif
+
 #define trace do { printf("Trace\n"); fflush(stdout); } while (0)
 #define flush fflush(stdout)
-#define unreachable printf("How did we get here? In %s on line %d\n", __FILE_NAME__, __LINE__)
+#define unreachable printf("How did we get here? In %s on line %d\n", FILE_NAME, __LINE__)
 
 #define FATAL(s)            \
 do {                    \
