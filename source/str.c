@@ -62,7 +62,7 @@ string_const str_replace_all(M_Arena* arena, string_const to_fix, string_const n
     u64 replaceable = str_substr_count(to_fix, needle);
     if (replaceable == 0) return to_fix;
     
-    u64 new_size = (to_fix.size - replaceable) + (replaceable * replacement.size) - 1;
+    u64 new_size = (to_fix.size - replaceable * needle.size) + (replaceable * replacement.size);
     string_const ret = str_alloc(arena, new_size);
     
     b8 replaced;

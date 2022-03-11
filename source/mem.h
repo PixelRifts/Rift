@@ -17,6 +17,7 @@ typedef struct M_Arena {
     u64 max;
     u64 alloc_position;
     u64 commit_position;
+    b8 static_size;
 } M_Arena;
 
 #define M_ARENA_MAX Gigabytes(1)
@@ -34,8 +35,9 @@ void arena_free(M_Arena* arena);
 // A scratch block is just a view into an arena
 
 typedef struct M_Scratch {
+    // This is just a view into the bigger main arena. THIS THING SHOULD NOT GROW
+    M_Arena arena;
     u32 index;
-    u8* pointer;
 } M_Scratch;
 
 #define M_SCRATCH_SIZE Kilobytes(4)
@@ -46,7 +48,6 @@ void M_ScratchInit();
 void M_ScratchFree();
 
 M_Scratch scratch_get();
-void* scratch_alloc(M_Scratch* scratch, u64 size);
 void scratch_return(M_Scratch* scratch);
 
 //~ Pool Allocator

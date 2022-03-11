@@ -2,11 +2,11 @@
 #include <stdlib.h>
 #include "str.h"
 #include "mem.h"
+#include "utils.h"
 #include "lexer.h"
 #include "parser.h"
 #include "checker.h"
 #include "llvm_backend.h"
-#include "defines.h"
 
 #include "llvm-c/Core.h"
 
@@ -34,6 +34,11 @@ int main(int argc, char **argv) {
         char* source = readFile(argv[1]);
         string source_str = { .str = (u8*) source, .size = strlen(source) };
         string source_filename = { .str = (u8*) argv[1], .size = strlen(argv[1]) };
+        
+        M_Scratch scratch = scratch_get();
+        string full_path = full_filepath(&scratch.arena, str_lit("this\\is/a/./very/../weird/path"));
+        printf("Filepath: %.*s\n", str_expand(full_path));
+        scratch_return(&scratch);
         
         L_Lexer lexer = {0};
         L_Init(&lexer, source_str);

@@ -71,19 +71,25 @@ u64 align_forward_u64(u64 ptr, u64 align) {
 
 void* arena_alloc(M_Arena* arena, u64 size) {
     void* memory = 0;
+    
     if (arena->alloc_position + size > arena->commit_position) {
-        u64 commit_size = size;
-        
-        commit_size += M_ARENA_COMMIT_SIZE - 1;
-        commit_size -= commit_size % M_ARENA_COMMIT_SIZE;
-        
-        if (arena->commit_position >= arena->max) {
-            assert(0 && "Arena is out of memory");
+        if (!arena->static_size) {
+            u64 commit_size = size;
+            
+            commit_size += M_ARENA_COMMIT_SIZE - 1;
+            commit_size -= commit_size % M_ARENA_COMMIT_SIZE;
+            
+            if (arena->commit_position >= arena->max) {
+                assert(0 && "Arena is out of memory");
+            } else {
+                mem_commit(arena->memory + arena->commit_position, commit_size);
+                arena->commit_position += commit_size;
+            }
         } else {
-            mem_commit(arena->memory + arena->commit_position, commit_size);
-            arena->commit_position += commit_size;
+            assert(0 && "Static-Size Arena is out of memory");
         }
     }
+    
     memory = arena->memory + arena->alloc_position;
     arena->alloc_position += size;
     return memory;
@@ -106,6 +112,7 @@ void arena_init(M_Arena* arena) {
     arena->memory = mem_reserve(arena->max);
     arena->alloc_position = 0;
     arena->commit_position = 0;
+    arena->static_size = false;
 }
 
 void arena_clear(M_Arena* arena) {
@@ -141,30 +148,33 @@ M_Scratch scratch_get() {
     if (!scratch_context.free_list) {
         M_Scratch scratch = {0};
         scratch.index = scratch_context.max_created;
-        scratch.pointer = arena_alloc(&scratch_context.arena, M_SCRATCH_SIZE);
+        void* ptr = arena_alloc(&scratch_context.arena, M_SCRATCH_SIZE);
+        scratch.arena.memory = ptr;
+        scratch.arena.max = M_SCRATCH_SIZE;
+        scratch.arena.alloc_position = 0;
+        scratch.arena.commit_position = M_SCRATCH_SIZE;
+        scratch.arena.static_size = true;
+        
         scratch_context.max_created++;
         return scratch;
     } else {
         M_Scratch scratch = {0};
         scratch.index = scratch_context.free_list->index;
-        scratch.pointer = (u8*) scratch_context.free_list;
+        
+        scratch.arena.memory = (u8*) scratch_context.free_list;
+        scratch.arena.max = M_SCRATCH_SIZE;
+        scratch.arena.alloc_position = 0;
+        scratch.arena.commit_position = M_SCRATCH_SIZE;
+        scratch.arena.static_size = true;
+        
         scratch_context.free_list = scratch_context.free_list->next;
         return scratch;
     }
 }
 
-void* scratch_alloc(M_Scratch* scratch, u64 size) {
-    void* allocation = scratch->pointer;
-    if (((u64)(scratch_context.arena.memory) + (scratch->index * M_SCRATCH_SIZE) + M_SCRATCH_SIZE) < (u64) (scratch->pointer + size)) {
-        assert(0 && "Scratch is out of memory");
-    }
-    scratch->pointer += size;
-    return allocation;
-}
-
 void scratch_return(M_Scratch* scratch) {
     scratch_free_list_node* prev_head = scratch_context.free_list;
-    scratch_context.free_list = (scratch_free_list_node*) scratch->pointer;
+    scratch_context.free_list = (scratch_free_list_node*) scratch->arena.memory;
     scratch_context.free_list->next = prev_head;
     scratch_context.free_list->index = scratch->index;
 }
