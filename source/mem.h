@@ -29,6 +29,7 @@ void arena_init(M_Arena* arena);
 void arena_clear(M_Arena* arena);
 void arena_free(M_Arena* arena);
 
+// TODO(voxel): Scratch Buffer
 // TODO(voxel): Bump / Stack Allocator
 
 //~ Pool Allocator

@@ -27,9 +27,9 @@ AstNode* right;\
 })\
 AST_NODE(Group, str_lit("Group Expression"), AstNode*)\
 AST_NODE(Lambda, str_lit("Lambda Expression"), struct {\
-P_Scope scope;\
-P_Type* function_type;\
-string* param_names;\
+P_Scope* scope;\
+P_Type*  function_type;\
+string*  param_names;\
 AstNode* body;\
 })\
 AST_NODE(Call, str_lit("Call Expression"), struct {\
@@ -42,16 +42,19 @@ AST_NODE(STMT_START, str_lit(""), i8)\
 AST_NODE(Return, str_lit("Return Statement"), AstNode*)\
 AST_NODE(ExprStatement, str_lit("Return Statement"), AstNode*)\
 AST_NODE(Block, str_lit("Block Statement"), struct {\
-P_Scope scope;\
+P_Scope* scope;\
 AstNode** statements;\
 u32 count;\
 })\
 AST_NODE(If, str_lit("If Statement"), struct {\
 AstNode* condition;\
+P_Scope* then_scope;\
 AstNode* then;\
+P_Scope* else_scope;\
 AstNode* elsee;\
 })\
 AST_NODE(While, str_lit("While Loop"), struct {\
+P_Scope* scope;\
 AstNode* condition;\
 AstNode* body;\
 })\
@@ -126,13 +129,19 @@ typedef u32 P_ScopeType;
 enum {
     ScopeType_Invalid,
     ScopeType_None,
+    ScopeType_If,
+    ScopeType_Else,
+    ScopeType_While,
+    ScopeType_Func,
     ScopeType_Count
 };
 
-typedef struct P_Scope {
+typedef struct P_Scope P_Scope;
+struct P_Scope {
     P_ScopeType type;
-    // There will be more stuff here probably
-} P_Scope;
+    P_Scope* parent;
+    // There will be more stuff here probably.... maybe
+};
 
 #define AST_NODE(Id, Name, Type) Type Id;
 typedef struct AstNode AstNode;

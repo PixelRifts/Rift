@@ -60,6 +60,13 @@ static AstNode* P_AllocErrorNode(P_Parser* parser) {
     return error_node_instance;
 }
 
+// Makes a scope have a longer lifetime in a static allocator
+static P_Scope* P_RaiseScope(P_Parser* parser, P_Scope scope) {
+    P_Scope* scope_ptr = arena_alloc(&parser->arena, sizeof(P_Scope));
+    *scope_ptr = scope;
+    return scope_ptr;
+}
+
 //- Expression Node Allocation 
 static AstNode* P_AllocIntLitNode(P_Parser* parser, i64 val) {
     AstNode* node = P_AllocNode(parser, NodeType_IntLit);
@@ -109,12 +116,13 @@ static AstNode* P_AllocGroupNode(P_Parser* parser, AstNode* expr, L_Token token)
     return node;
 }
 
-static AstNode* P_AllocLambdaNode(P_Parser* parser, P_Type* function_type, string* param_names, L_Token func, AstNode* body) {
+static AstNode* P_AllocLambdaNode(P_Parser* parser, P_Scope scope, P_Type* function_type, string* param_names, L_Token func, AstNode* body) {
     AstNode* node = P_AllocNode(parser, NodeType_Lambda);
     node->Lambda.function_type = function_type;
     node->Lambda.param_names = param_names;
-    node->id = func;
     node->Lambda.body = body;
+    node->Lambda.scope = P_RaiseScope(parser, scope);
+    node->id = func;
     return node;
 }
 
@@ -144,26 +152,29 @@ static AstNode* P_AllocExprStatementNode(P_Parser* parser, AstNode* expr) {
 
 static AstNode* P_AllocBlockNode(P_Parser* parser, P_Scope scope, AstNode** statements, u32 count, L_Token token) {
     AstNode* node = P_AllocNode(parser, NodeType_Block);
-    node->Block.scope = scope;
+    node->Block.scope = P_RaiseScope(parser, scope);
     node->Block.statements = statements;
     node->Block.count = count;
     node->id = token;
     return node;
 }
 
-static AstNode* P_AllocIfNode(P_Parser* parser, L_Token token, AstNode* condition, AstNode* then, AstNode* elsee) {
+static AstNode* P_AllocIfNode(P_Parser* parser, L_Token token, AstNode* condition, P_Scope then_scope, AstNode* then, P_Scope else_scope, AstNode* elsee) {
     AstNode* node = P_AllocNode(parser, NodeType_If);
     node->If.condition = condition;
     node->If.then = then;
+    node->If.then_scope = P_RaiseScope(parser, then_scope);
     node->If.elsee = elsee;
+    node->If.else_scope = P_RaiseScope(parser, else_scope);
     node->id = token;
     return node;
 }
 
-static AstNode* P_AllocWhileNode(P_Parser* parser, L_Token token, AstNode* condition, AstNode* body) {
+static AstNode* P_AllocWhileNode(P_Parser* parser, L_Token token, P_Scope scope, AstNode* condition, AstNode* body) {
     AstNode* node = P_AllocNode(parser, NodeType_While);
     node->While.condition = condition;
     node->While.body = body;
+    node->While.scope = P_RaiseScope(parser, scope);
     node->id = token;
     return node;
 }
@@ -446,7 +457,8 @@ static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
             P_Type* func_type = P_AllocFunctionType(parser, return_type, param_types, arity, varargs, func_token);
             
             AstNode* body = P_Statement(parser);
-            return P_AllocLambdaNode(parser, func_type, param_names, func_token, body);
+            P_Scope scope = { .type = ScopeType_Func };
+            return P_AllocLambdaNode(parser, scope, func_type, param_names, func_token, body);
         }
         
         default: {
@@ -580,12 +592,15 @@ static AstNode* P_Statement(P_Parser* parser) {
         AstNode* elsee = nullptr;
         if (P_Match(parser, TokenType_Else))
             elsee = P_Statement(parser);
-        return P_AllocIfNode(parser, tok, condition, then, elsee);
+        P_Scope then_scope = { .type = ScopeType_If };
+        P_Scope else_scope = { .type = ScopeType_Else };
+        return P_AllocIfNode(parser, tok, condition, then_scope, then, else_scope, elsee);
     } else if (P_Match(parser, TokenType_While)) {
         L_Token tok = parser->prev;
         AstNode* condition = P_Expression(parser, Prec_Invalid, false);
         AstNode* body = P_Statement(parser);
-        return P_AllocWhileNode(parser, tok, condition, body);
+        P_Scope scope = { .type = ScopeType_While };
+        return P_AllocWhileNode(parser, tok, scope, condition, body);
     } else if (P_Match(parser, TokenType_OpenBrace)) {
         L_Token tok = parser->prev;
         node_array temp_statements = {0};

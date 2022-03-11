@@ -40,6 +40,7 @@ HashTable_Prototype(symbol, struct { string name; u32 depth; }, C_Symbol);
 typedef struct C_ScopeContext C_ScopeContext;
 struct C_ScopeContext {
     C_ScopeContext* upper;
+    P_Scope* upper_scope; // Used for connecting scopes
     
     P_Type* function_return_type;
     b8 is_in_func_body;
@@ -61,6 +62,7 @@ typedef struct C_Checker {
     b8 no_scope;
     
     string filename;
+    P_Scope* current_scope; // Used for connecting scopes
     C_ScopeContext* current_scope_context;
 } C_Checker;
 

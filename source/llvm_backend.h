@@ -29,16 +29,36 @@ typedef struct BL_Value {
     b8 tombstone;
 } BL_Value;
 
+typedef struct BL_Metadata {
+    LLVMMetadataRef metadata;
+    
+    b8 not_null;
+    b8 tombstone;
+} BL_Metadata;
+
 HashTable_Prototype(llvmsymbol, struct { string name; u32 depth; }, BL_Value);
+HashTable_Prototype(llvmmeta, void*, BL_Metadata);
+
+typedef struct BL_BlockContext BL_BlockContext;
+struct BL_BlockContext {
+    BL_BlockContext* prev;
+    LLVMBasicBlockRef basic_block;
+};
 
 typedef struct BL_Emitter {
     string filename;
     string source_filename;
     LLVMModuleRef module;
     LLVMBuilderRef builder;
+    LLVMDIBuilderRef debug_builder;
     LLVMBasicBlockRef current_block;
     b8 is_in_function;
     
+    LLVMValueRef func_return;
+    LLVMBasicBlockRef return_block;
+    b8 emitted_end_in_this_block;
+    
+    BL_BlockContext* current_block_context;
     llvmsymbol_hash_table variables;
 } BL_Emitter;
 

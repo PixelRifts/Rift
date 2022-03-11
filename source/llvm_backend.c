@@ -3,12 +3,23 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
+//~ Hash Tables
+
 b8 llvmsymbol_key_is_null(llvmsymbol_hash_table_key k) { return k.name.size == 0 && k.depth == 0; }
 b8 llvmsymbol_key_is_eq(llvmsymbol_hash_table_key a, llvmsymbol_hash_table_key b) { return str_eq(a.name, b.name) && a.depth == b.depth; }
 u32 hash_llvmsymbol_key(llvmsymbol_hash_table_key k) { return str_hash(k.name) + k.depth; }
 b8 llvmsymbol_val_is_null(llvmsymbol_hash_table_value v) { return v.not_null == false; }
 b8 llvmsymbol_val_is_tombstone(llvmsymbol_hash_table_value v) { return v.tombstone == true; }
 HashTable_Impl(llvmsymbol, llvmsymbol_key_is_null, llvmsymbol_key_is_eq, hash_llvmsymbol_key, ((llvmsymbol_hash_table_value) { .type = (LLVMTypeRef) {0}, .alloca = (LLVMValueRef) {0}, .loaded = (LLVMValueRef) {0}, .not_null = false, .tombstone = true }), llvmsymbol_val_is_null, llvmsymbol_val_is_tombstone);
+
+b8 llvmmeta_key_is_null(llvmmeta_hash_table_key k) { return k == nullptr; }
+b8 llvmmeta_key_is_eq(llvmmeta_hash_table_key a, llvmmeta_hash_table_key b) { return a == b; }
+u32 hash_llvmmeta_key(llvmmeta_hash_table_key k) { return *(u32*)&k; }
+b8 llvmmeta_val_is_null(llvmmeta_hash_table_value v) { return v.not_null == false; }
+b8 llvmmeta_val_is_tombstone(llvmmeta_hash_table_value v) { return v.tombstone == true; }
+HashTable_Impl(llvmmeta, llvmmeta_key_is_null, llvmmeta_key_is_eq, hash_llvmmeta_key, ((BL_Metadata) { .tombstone = true }), llvmmeta_val_is_null, llvmmeta_val_is_tombstone);
+
+//~ Diagnostics
 
 static void BL_Report(BL_Emitter* emitter, const char* stage, const char* err, ...) {
     fprintf(stderr, "%.*s:%s ERROR: ", str_expand(emitter->source_filename), stage);
@@ -24,6 +35,8 @@ static void BL_Report_LLVMHandler(const char* reason) { fprintf(stderr, "LLVM Er
 
 LLVMTypeRef printffunctype;
 LLVMValueRef printffunc;
+
+static b8 DEBUG_MODE = true;
 
 static LLVMTypeRef BL_PTypeToLLVMType(P_Type* type) {
     switch (type->type) {
@@ -52,6 +65,31 @@ LLVMInitialize ## X ## Target(); \
 LLVMInitialize ## X ## Disassembler(); \
 LLVMInitialize ## X ## TargetMC(); \
 } while(0)
+
+static BL_BlockContext* BL_StartBasicBlock(BL_Emitter* emitter, LLVMBasicBlockRef block) {
+    BL_BlockContext* context = malloc(sizeof(BL_BlockContext));
+    context->prev = emitter->current_block_context;
+    context->basic_block = emitter->current_block;
+    
+    emitter->current_block_context = context;
+    emitter->current_block = block;
+    LLVMPositionBuilderAtEnd(emitter->builder, block);
+    return context;
+}
+
+static void BL_EndBasicBlock(BL_Emitter* emitter, BL_BlockContext* ctx) {
+    emitter->current_block_context = ctx->prev;
+    emitter->current_block = ctx->basic_block;
+    emitter->emitted_end_in_this_block = false;
+    LLVMPositionBuilderAtEnd(emitter->builder, emitter->current_block);
+    
+    free(ctx);
+}
+
+static BL_BlockContext* BL_SwitchBasicBlock(BL_Emitter* emitter, BL_BlockContext* ctx, LLVMBasicBlockRef block) {
+    BL_EndBasicBlock(emitter, ctx);
+    return BL_StartBasicBlock(emitter, block);
+}
 
 void BL_Init(BL_Emitter* emitter, string source_filename, string filename) {
     memset(emitter, 0, sizeof(BL_Emitter));
@@ -85,6 +123,10 @@ void BL_Init(BL_Emitter* emitter, string source_filename, string filename) {
     
     LLVMInstallFatalErrorHandler(BL_Report_LLVMHandler);
     LLVMEnablePrettyStackTrace();
+    
+    emitter->debug_builder = LLVMCreateDIBuilder(emitter->module);
+    
+    // @here add file metadata
 }
 
 static LLVMValueRef BL_BuildBinary(BL_Emitter* emitter, L_Token token, LLVMValueRef left, LLVMValueRef right) {
@@ -143,6 +185,8 @@ static LLVMValueRef BL_BuildUnary(BL_Emitter* emitter, L_Token op, LLVMValueRef 
 }
 
 LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
+    if (emitter->emitted_end_in_this_block) return (LLVMValueRef) {0};
+    
     switch (node->type) {
         case NodeType_Ident: {
             llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->Ident, .depth = 0 };
@@ -186,15 +230,26 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         }
         
         case NodeType_Lambda: {
+            // prev vars
             LLVMBasicBlockRef prev = emitter->current_block;
+            LLVMBasicBlockRef prev_ret = emitter->return_block;
             b8 prev_is_in_function = emitter->is_in_function;
+            LLVMValueRef prev_ret_val = emitter->func_return;
             
+            // add function
             LLVMTypeRef function_type = BL_PTypeToLLVMType(node->Lambda.function_type);
             LLVMValueRef func = LLVMAddFunction(emitter->module, "", function_type);
             
+            // add blocks
             emitter->current_block = LLVMAppendBasicBlock(func, "entry");
-            LLVMPositionBuilderAtEnd(emitter->builder, emitter->current_block);
+            emitter->return_block = LLVMAppendBasicBlock(func, "re");
             emitter->is_in_function = true;
+            
+            // ==-- Entry --== //
+            BL_BlockContext* block_ctx = BL_StartBasicBlock(emitter, emitter->current_block);
+            
+            LLVMTypeRef return_type = BL_PTypeToLLVMType(node->Lambda.function_type->function.return_type);
+            emitter->func_return = LLVMBuildAlloca(emitter->builder, return_type, "");
             
             for (u32 i = 0; i < node->Lambda.function_type->function.arity; i++) {
                 string var_name = node->Lambda.param_names[i];
@@ -209,14 +264,35 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             }
             
             BL_Emit(emitter, node->Lambda.body);
+            if (!emitter->emitted_end_in_this_block) {
+                LLVMBuildBr(emitter->builder, emitter->return_block);
+                emitter->emitted_end_in_this_block = false;
+            }
+            
+            BL_EndBasicBlock(emitter, block_ctx);
+            // ==-- Entry End --== //
+            
+            // ==-- Return --== //
+            LLVMMoveBasicBlockAfter(emitter->return_block, emitter->current_block);
+            block_ctx = BL_StartBasicBlock(emitter, emitter->return_block);
             
             if (node->Lambda.function_type->function.return_type->type == BasicType_Void)
-                LLVMBuildRet(emitter->builder, (LLVMValueRef) {0});
+                LLVMBuildStore(emitter->builder, (LLVMValueRef) {0}, emitter->func_return);
+            LLVMValueRef ret_loaded = LLVMBuildLoad(emitter->builder, emitter->func_return, "");
+            LLVMBuildRet(emitter->builder, ret_loaded);
             
+            BL_EndBasicBlock(emitter, block_ctx);
+            // ==-- Return End --== //
+            
+            // restore vars
             emitter->is_in_function = prev_is_in_function;
             emitter->current_block = prev;
+            emitter->return_block = prev_ret;
+            emitter->func_return = prev_ret_val;
+            
             LLVMPositionBuilderAtEnd(emitter->builder, emitter->current_block);
             
+            // remove non global variables
             for (u32 k = 0; k < emitter->variables.cap; k++) {
                 llvmsymbol_hash_table_entry e = emitter->variables.elems[k];
                 if (!llvmsymbol_key_is_null(e.key)) {
@@ -244,10 +320,15 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         }
         
         case NodeType_Return: {
+            LLVMValueRef stored = {0};
             if (!node->Return) {
-                return LLVMBuildRet(emitter->builder, (LLVMValueRef) {0});
+                stored = LLVMBuildStore(emitter->builder, (LLVMValueRef) {0}, emitter->func_return);
+            } else {
+                stored = LLVMBuildStore(emitter->builder, BL_Emit(emitter, node->Return), emitter->func_return);
             }
-            return LLVMBuildRet(emitter->builder, BL_Emit(emitter, node->Return));
+            LLVMBuildBr(emitter->builder, emitter->return_block);
+            emitter->emitted_end_in_this_block = true;
+            return stored;
         }
         
         case NodeType_ExprStatement: {
@@ -255,6 +336,10 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         }
         
         case NodeType_Block: {
+            if (DEBUG_MODE) {
+                //LLVMDIBuilderCreateLexicalBlock(emitter->debug_builder, /* @here */, );
+            }
+            
             for (u32 i = 0; i < node->Block.count; i++) {
                 BL_Emit(emitter, node->Block.statements[i]);
             }
@@ -273,16 +358,20 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             
             LLVMBuildCondBr(emitter->builder, condition, ifb, elseb);
             
-            LLVMPositionBuilderAtEnd(emitter->builder, ifb);
-            emitter->current_block = ifb;
+            BL_BlockContext* block_ctx = BL_StartBasicBlock(emitter, ifb);
             BL_Emit(emitter, node->If.then);
-            LLVMBuildBr(emitter->builder, mergeb);
+            if (!emitter->emitted_end_in_this_block) {
+                LLVMBuildBr(emitter->builder, mergeb);
+            }
+            BL_EndBasicBlock(emitter, block_ctx);
             
             if (node->If.elsee) {
-                LLVMPositionBuilderAtEnd(emitter->builder, elseb);
-                emitter->current_block = elseb;
+                block_ctx = BL_StartBasicBlock(emitter, ifb);
                 BL_Emit(emitter, node->If.elsee);
-                LLVMBuildBr(emitter->builder, mergeb);
+                if (!emitter->emitted_end_in_this_block) {
+                    LLVMBuildBr(emitter->builder, mergeb);
+                }
+                BL_EndBasicBlock(emitter, block_ctx);
             }
             
             LLVMPositionBuilderAtEnd(emitter->builder, mergeb);
@@ -297,19 +386,21 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             
             LLVMBuildBr(emitter->builder, condb);
             
-            LLVMPositionBuilderAtEnd(emitter->builder, condb);
-            emitter->current_block = condb;
+            BL_BlockContext* block_ctx = BL_StartBasicBlock(emitter, condb);
             LLVMValueRef condition = BL_Emit(emitter, node->While.condition);
             
             LLVMBasicBlockRef bodyb = LLVMAppendBasicBlock(current_function, "wh");
             LLVMBasicBlockRef afterb = LLVMAppendBasicBlock(current_function, "af");
             
             LLVMBuildCondBr(emitter->builder, condition, bodyb, afterb);
+            BL_EndBasicBlock(emitter, block_ctx);
             
-            LLVMPositionBuilderAtEnd(emitter->builder, bodyb);
-            emitter->current_block = bodyb;
+            block_ctx = BL_StartBasicBlock(emitter, bodyb);
             BL_Emit(emitter, node->While.body);
-            LLVMBuildBr(emitter->builder, condb);
+            if (!emitter->emitted_end_in_this_block) {
+                LLVMBuildBr(emitter->builder, condb);
+            }
+            BL_EndBasicBlock(emitter, block_ctx);
             
             LLVMPositionBuilderAtEnd(emitter->builder, afterb);
             emitter->current_block = afterb;

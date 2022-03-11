@@ -103,15 +103,18 @@ static b8 C_GetSymbol(C_Checker* checker, symbol_hash_table_key key_prototype, s
     return false;
 }
 
-static C_ScopeContext* C_PushScope(C_Checker* checker, P_Type* new_fn_ret, b8 is_lambda_body) {
+static C_ScopeContext* C_PushScope(C_Checker* checker, P_Scope* new_scope, P_Type* new_fn_ret, b8 is_lambda_body) {
     checker->scope_depth++;
     C_ScopeContext* scope = malloc(sizeof(C_ScopeContext));
     memset(scope, 0, sizeof(C_ScopeContext));
     scope->upper = checker->current_scope_context;
+    scope->upper_scope = checker->current_scope;
     scope->function_return_type = checker->function_return_type;
     scope->is_in_func_body = checker->is_in_func_body;
     
+    new_scope->parent = scope->upper_scope;
     checker->current_scope_context = scope;
+    checker->current_scope = new_scope;
     checker->is_in_func_body = false;
     
     if (is_lambda_body) {
@@ -135,6 +138,7 @@ static void C_PopScope(C_Checker* checker, C_ScopeContext* scope) {
     checker->current_scope_context = scope->upper;
     checker->function_return_type = scope->function_return_type;
     checker->is_in_func_body = scope->is_in_func_body;
+    checker->current_scope = scope->upper_scope;
     
     free(scope);
     
@@ -196,7 +200,7 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
         } break;
         
         case NodeType_Lambda: {
-            C_ScopeContext* scope_context = C_PushScope(checker, node->Lambda.function_type->function.return_type, true);
+            C_ScopeContext* scope_context = C_PushScope(checker, node->Lambda.scope, node->Lambda.function_type->function.return_type, true);
             
             for (u32 i = 0; i < node->Lambda.function_type->function.arity; i++) {
                 string var_name = node->Lambda.param_names[i];
@@ -270,7 +274,7 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
         case NodeType_Block: {
             C_CheckInFunction(checker, node);
             C_ScopeContext* scope_ctx = nullptr;
-            if (!checker->no_scope) scope_ctx = C_PushScope(checker, nullptr, false);
+            if (!checker->no_scope) scope_ctx = C_PushScope(checker, node->Block.scope, nullptr, false);
             for (u32 i = 0; i < node->Block.count; i++) {
                 AstNode* statement = node->Block.statements[i];
                 C_GetType(checker, statement);
@@ -283,7 +287,7 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
         case NodeType_If: {
             C_CheckInFunction(checker, node);
             
-            C_ScopeContext* scope_ctx = C_PushScope(checker, nullptr, false);
+            C_ScopeContext* scope_ctx = C_PushScope(checker, node->If.then_scope, nullptr, false);
             
             P_Type* type = C_GetType(checker, node->If.condition);
             if (type->type != BasicType_Boolean) {
@@ -297,7 +301,7 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             C_PopScope(checker, scope_ctx);
             
             if (node->If.elsee) {
-                scope_ctx = C_PushScope(checker, nullptr, false);
+                scope_ctx = C_PushScope(checker, node->If.else_scope, nullptr, false);
                 checker->no_scope = true;
                 C_GetType(checker, node->If.elsee);
                 checker->no_scope = false;
@@ -309,7 +313,7 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
         
         case NodeType_While: {
             C_CheckInFunction(checker, node);
-            C_ScopeContext* scope_ctx = C_PushScope(checker, nullptr, false);
+            C_ScopeContext* scope_ctx = C_PushScope(checker, node->While.scope, nullptr, false);
             P_Type* type = C_GetType(checker, node->While.condition);
             if (type->type != BasicType_Boolean) {
                 C_ReportCheckError(checker, node->id, "Condition for While loop is not a boolean\n");
