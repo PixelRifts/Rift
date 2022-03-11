@@ -28,41 +28,28 @@ re:                                               ; preds = %entry
 define i64 @main() {
 entry:
   %0 = alloca i64, align 8
-  %l = alloca i64, align 8
-  store i64 19, i64* %l, align 8
-  %k = alloca i1, align 1
-  store i1 false, i1* %k, align 1
   %i = alloca i64, align 8
   store i64 0, i64* %i, align 8
   br label %cn
 
-re:                                               ; preds = %af, %th
+re:                                               ; preds = %af
   %1 = load i64, i64* %0, align 8
   ret i64 %1
 
-cn:                                               ; preds = %me, %entry
+cn:                                               ; preds = %wh, %entry
   %2 = load i64, i64* %i, align 8
   %3 = icmp slt i64 %2, 10
   br i1 %3, label %wh, label %af
 
 wh:                                               ; preds = %cn
   %4 = load i64, i64* %i, align 8
-  %5 = add i64 %4, 1
-  store i64 %5, i64* %i, align 8
+  %5 = call i64 (i8*, ...) @printf(i8* getelementptr inbounds ([6 x i8], [6 x i8]* @0, i32 0, i32 0), i64 %4)
   %6 = load i64, i64* %i, align 8
-  %7 = icmp eq i64 %6, 5
-  br i1 %7, label %th, label %me
+  %7 = add i64 %6, 1
+  store i64 %7, i64* %i, align 8
+  br label %cn
 
 af:                                               ; preds = %cn
   store i64 0, i64* %0, align 8
   br label %re
-
-th:                                               ; preds = %wh
-  store i64 0, i64* %0, align 8
-  br label %re
-
-me:                                               ; preds = %wh
-  %8 = load i64, i64* %i, align 8
-  %9 = call i64 (i8*, ...) @printf(i8* getelementptr inbounds ([6 x i8], [6 x i8]* @0, i32 0, i32 0), i64 %8)
-  br label %cn
 }

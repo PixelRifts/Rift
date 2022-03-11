@@ -90,9 +90,15 @@ void* arena_alloc(M_Arena* arena, u64 size) {
 }
 
 void arena_dealloc(M_Arena* arena, u64 size) {
-    if(size > arena->alloc_position)
+    if (size > arena->alloc_position)
         size = arena->alloc_position;
     arena->alloc_position -= size;
+}
+
+void* arena_raise(M_Arena* arena, void* ptr, u64 size) {
+    void* raised = arena_alloc(arena, size);
+    memcpy(raised, ptr, size);
+    return raised;
 }
 
 void arena_init(M_Arena* arena) {
@@ -110,6 +116,58 @@ void arena_free(M_Arena* arena) {
     mem_release(arena->memory, arena->max);
 }
 
+//~ Scratch
+typedef struct scratch_free_list_node scratch_free_list_node;
+struct scratch_free_list_node {
+    scratch_free_list_node* next;
+    u32 index;
+};
+
+static struct {
+    M_Arena arena;
+    u32 max_created;
+    scratch_free_list_node* free_list;
+} scratch_context;
+
+void M_ScratchInit() {
+    arena_init(&scratch_context.arena);
+}
+
+void M_ScratchFree() {
+    arena_free(&scratch_context.arena);
+}
+
+M_Scratch scratch_get() {
+    if (!scratch_context.free_list) {
+        M_Scratch scratch = {0};
+        scratch.index = scratch_context.max_created;
+        scratch.pointer = arena_alloc(&scratch_context.arena, M_SCRATCH_SIZE);
+        scratch_context.max_created++;
+        return scratch;
+    } else {
+        M_Scratch scratch = {0};
+        scratch.index = scratch_context.free_list->index;
+        scratch.pointer = (u8*) scratch_context.free_list;
+        scratch_context.free_list = scratch_context.free_list->next;
+        return scratch;
+    }
+}
+
+void* scratch_alloc(M_Scratch* scratch, u64 size) {
+    void* allocation = scratch->pointer;
+    if (((u64)(scratch_context.arena.memory) + (scratch->index * M_SCRATCH_SIZE) + M_SCRATCH_SIZE) < (u64) (scratch->pointer + size)) {
+        assert(0 && "Scratch is out of memory");
+    }
+    scratch->pointer += size;
+    return allocation;
+}
+
+void scratch_return(M_Scratch* scratch) {
+    scratch_free_list_node* prev_head = scratch_context.free_list;
+    scratch_context.free_list = (scratch_free_list_node*) scratch->pointer;
+    scratch_context.free_list->next = prev_head;
+    scratch_context.free_list->index = scratch->index;
+}
 
 //~ Pool
 

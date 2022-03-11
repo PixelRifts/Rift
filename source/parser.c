@@ -320,9 +320,7 @@ static P_Type* P_EatType(P_Parser* parser) {
                 }
             }
             
-            // TODO(voxel): please stop being lazy and implement arena_raise already
-            P_Type** param_types = arena_alloc(&parser->arena, sizeof(AstNode*) * arity);
-            memcpy(param_types, temp_param_types.elems, sizeof(P_Type*) * arity);
+            P_Type** param_types = arena_raise(&parser->arena, temp_param_types.elems, sizeof(AstNode*) * arity);
             
             P_Type* return_type = nullptr;
             if (P_Match(parser, TokenType_ThinArrow))
@@ -441,11 +439,8 @@ static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
                 }
             }
             
-            // TODO(voxel): please stop being lazy and implement arena_raise already
-            string* param_names = arena_alloc(&parser->arena, sizeof(string) * arity);
-            memcpy(param_names, temp_param_names.elems, sizeof(string) * arity);
-            P_Type** param_types = arena_alloc(&parser->arena, sizeof(AstNode*) * arity);
-            memcpy(param_types, temp_param_types.elems, sizeof(P_Type*) * arity);
+            string* param_names = arena_raise(&parser->arena, temp_param_names.elems, sizeof(string) * arity);
+            P_Type** param_types = arena_raise(&parser->arena, temp_param_types.elems, sizeof(AstNode*) * arity);
             
             P_Type* return_type = nullptr;
             if (P_Match(parser, TokenType_ThinArrow))
@@ -505,8 +500,7 @@ static AstNode* P_ExprInfix(P_Parser* parser, L_Token op, Prec prec, AstNode* lh
                 }
             }
             
-            AstNode** args = arena_alloc(&parser->arena, sizeof(AstNode*) * arity);
-            memcpy(args, temp_args.elems, sizeof(AstNode*) * arity);
+            AstNode** args = arena_raise(&parser->arena, temp_args.elems, sizeof(AstNode*) * arity);
             
             return P_AllocCallNode(parser, lhs, args, arity, lhs->id);
         }
@@ -613,9 +607,7 @@ static AstNode* P_Statement(P_Parser* parser) {
             count++;
         }
         
-        // NOTE(voxel): please stop being lazy and implement arena_raise already
-        AstNode** statements = arena_alloc(&parser->arena, sizeof(AstNode*) * count);
-        memcpy(statements, temp_statements.elems, sizeof(AstNode*) * count);
+        AstNode** statements = arena_raise(&parser->arena, temp_statements.elems, sizeof(AstNode*) * count);
         
         node_array_free(&temp_statements);
         P_Scope scope = { .type = ScopeType_None };

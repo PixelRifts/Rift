@@ -20,17 +20,34 @@ typedef struct M_Arena {
 } M_Arena;
 
 #define M_ARENA_MAX Gigabytes(1)
-#define M_ARENA_COMMIT_SIZE Kilobytes(4)
+#define M_ARENA_COMMIT_SIZE Kilobytes(8)
 
 void* arena_alloc(M_Arena* arena, u64 size);
 void arena_dealloc(M_Arena* arena, u64 size);
+void* arena_raise(M_Arena* arena, void* ptr, u64 size);
 
 void arena_init(M_Arena* arena);
 void arena_clear(M_Arena* arena);
 void arena_free(M_Arena* arena);
 
-// TODO(voxel): Scratch Buffer
-// TODO(voxel): Bump / Stack Allocator
+//~ Scratch Helpers
+// A scratch block is just a view into an arena
+
+typedef struct M_Scratch {
+    u32 index;
+    u8* pointer;
+} M_Scratch;
+
+#define M_SCRATCH_SIZE Kilobytes(4)
+
+// Should be called at the start of your app
+void M_ScratchInit();
+// Should be called at the end of your app
+void M_ScratchFree();
+
+M_Scratch scratch_get();
+void* scratch_alloc(M_Scratch* scratch, u64 size);
+void scratch_return(M_Scratch* scratch);
 
 //~ Pool Allocator
 
@@ -57,5 +74,7 @@ void pool_dealloc_range(M_Pool* pool, void* ptr, u64 count);
 void pool_init(M_Pool* pool, u64 chunk_size);
 void pool_clear(M_Pool* pool);
 void pool_free(M_Pool* pool);
+
+// TODO(voxel): Bump / Stack Allocator
 
 #endif //MEM_H

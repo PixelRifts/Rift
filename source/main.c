@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "str.h"
+#include "mem.h"
 #include "lexer.h"
 #include "parser.h"
 #include "checker.h"
@@ -25,6 +26,8 @@ static char* readFile(const char* path) {
 }
 
 int main(int argc, char **argv) {
+    M_ScratchInit();
+    
     if (argc < 2) {
         printf("Did not recieve filename as first argument\n");
     } else {
@@ -64,6 +67,8 @@ int main(int argc, char **argv) {
         
         free(source);
     }
+    
+    M_ScratchFree();
 }
 
 /* Hello World */
