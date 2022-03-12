@@ -7,6 +7,7 @@
 #include "str.h"
 #include "defines.h"
 
+string fix_filepath(M_Arena* arena, string filepath);
 string full_filepath(M_Arena* arena, string filename);
 
 #endif //UTILS_H

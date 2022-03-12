@@ -1,4 +1,5 @@
 #include "utils.h"
+#include <stdio.h>
 #include <string.h>
 
 string fix_filepath(M_Arena* arena, string filepath) {
@@ -6,6 +7,7 @@ string fix_filepath(M_Arena* arena, string filepath) {
     
     string fixed = filepath;
     fixed = str_replace_all(&scratch.arena, fixed, str_lit("\\"), str_lit("/"));
+    fixed = str_replace_all(arena, fixed, str_lit("/./"), str_lit("/"));
     while (true) {
         u64 dotdot = str_find_first(fixed, str_lit(".."), 0);
         if (dotdot == fixed.size) break;
@@ -18,7 +20,6 @@ string fix_filepath(M_Arena* arena, string filepath) {
         memcpy(fixed.str, old.str, last_slash);
         memcpy(fixed.str + last_slash, old.str + dotdot + 3, old.size - range - last_slash + 1);
     }
-    fixed = str_replace_all(arena, fixed, str_lit("./"), (string) {0});
     
     scratch_return(&scratch);
     

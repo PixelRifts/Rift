@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
         string source_filename = { .str = (u8*) argv[1], .size = strlen(argv[1]) };
         
         M_Scratch scratch = scratch_get();
-        string full_path = full_filepath(&scratch.arena, str_lit("this\\is/a/./very/../weird/path"));
+        string full_path = full_filepath(&scratch.arena, str_lit("a/very/./../../weird/path"));
         printf("Filepath: %.*s\n", str_expand(full_path));
         scratch_return(&scratch);
         
