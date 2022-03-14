@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include "utils.h"
 
 //~ Hash Tables
 
@@ -37,6 +38,7 @@ LLVMTypeRef printffunctype;
 LLVMValueRef printffunc;
 
 static b8 DEBUG_MODE = true;
+static const char* compilation_unit_key = "compunit_key";
 
 static LLVMTypeRef BL_PTypeToLLVMType(P_Type* type) {
     switch (type->type) {
@@ -55,6 +57,87 @@ static LLVMTypeRef BL_PTypeToLLVMType(P_Type* type) {
         } break;
     }
     return (LLVMTypeRef) {0};
+}
+
+
+static LLVMMetadataRef BL_GetMeta(BL_Emitter* emitter, void* key) {
+    llvmmeta_hash_table_value v;
+    if (llvmmeta_hash_table_get(&emitter->debug_metadata, key, &v)) {
+        return v.metadata;
+    }
+    return (LLVMMetadataRef) {0};
+}
+
+static void BL_SetMeta(BL_Emitter* emitter, void* key, LLVMMetadataRef value) {
+    llvmmeta_hash_table_value v = { .metadata = value, .not_null = true };
+    llvmmeta_hash_table_set(&emitter->debug_metadata, key, v);
+}
+
+static LLVMMetadataRef BL_Loc(BL_Emitter* emitter, u32 line, u32 col) {
+    LLVMMetadataRef scope = {0};
+    if (emitter->is_in_function) scope = BL_GetMeta(emitter, emitter->curr_func);
+    else scope = BL_GetMeta(emitter, emitter->current_scope);
+    return LLVMDIBuilderCreateDebugLocation(nullptr, line, col, scope, nullptr);
+}
+
+static LLVMMetadataRef BL_PTypeToMetadataType(BL_Emitter* emitter, P_Type* type) {
+    LLVMMetadataRef r = BL_GetMeta(emitter, type);
+    if (r) return r;
+    
+    string name;
+    
+    switch (type->type) {
+        case BasicType_Void: {
+            name = str_lit("void");
+            LLVMMetadataRef ret =
+                LLVMDIBuilderCreateBasicType(emitter->debug_builder,
+                                             (const char*) name.str, name.size, 0, LLVMDWARFTypeEncoding_Boolean, LLVMDIFlagZero);
+            BL_SetMeta(emitter, type, ret);
+            return ret;
+        }
+        case BasicType_Integer: {
+            name = str_lit("int");
+            LLVMMetadataRef ret =
+                LLVMDIBuilderCreateBasicType(emitter->debug_builder,
+                                             (const char*) name.str, name.size, 64, LLVMDWARFTypeEncoding_Signed, LLVMDIFlagZero);
+            BL_SetMeta(emitter, type, ret);
+            return ret;
+        }
+        case BasicType_Boolean: {
+            name = str_lit("bool");
+            LLVMMetadataRef ret =
+                LLVMDIBuilderCreateBasicType(emitter->debug_builder,
+                                             (const char*) name.str, name.size, 1, LLVMDWARFTypeEncoding_Boolean, LLVMDIFlagZero);
+            BL_SetMeta(emitter, type, ret);
+            return ret;
+        }
+        case BasicType_Cstring: {
+            name = str_lit("const char*");
+            LLVMMetadataRef ret =
+                LLVMDIBuilderCreateBasicType(emitter->debug_builder,
+                                             (const char*) name.str, name.size, 1, LLVMDWARFTypeEncoding_Address, LLVMDIFlagZero);
+            BL_SetMeta(emitter, type, ret);
+            return ret;
+        }
+        
+        case BasicType_Function: {
+            LLVMMetadataRef* param_types = calloc(type->function.arity, sizeof(LLVMMetadataRef));
+            for (u32 i = 0; i < type->function.arity; i++)
+                param_types[i] = BL_PTypeToMetadataType(emitter, type->function.param_types[i]);
+            
+            LLVMMetadataRef ret =
+                LLVMDIBuilderCreateSubroutineType(emitter->debug_builder,
+                                                  BL_GetMeta(emitter, emitter->source_filename.str),
+                                                  param_types, type->function.arity,
+                                                  LLVMDIFlagStaticMember);
+            BL_SetMeta(emitter, type, ret);
+            
+            free(param_types);
+            return ret;
+        } break;
+    }
+    return (LLVMMetadataRef) {0};
+    
 }
 
 #define INITIALIZE_TARGET(X) do { \
@@ -91,6 +174,38 @@ static BL_BlockContext* BL_SwitchBasicBlock(BL_Emitter* emitter, BL_BlockContext
     return BL_StartBasicBlock(emitter, block);
 }
 
+static C_ScopeContext* BL_PushScope(BL_Emitter* emitter, P_Scope* new_scope, L_Token id) {
+    emitter->scope_depth++;
+    C_ScopeContext* scope = malloc(sizeof(C_ScopeContext));
+    memset(scope, 0, sizeof(C_ScopeContext));
+    scope->upper_scope = emitter->current_scope;
+    
+    emitter->current_scope = new_scope;
+    
+    if (DEBUG_MODE) {
+        LLVMMetadataRef md = {0};
+        if (emitter->scope_depth == 1)
+            md = BL_GetMeta(emitter, emitter->curr_func); // parent = function
+        else
+            md = BL_GetMeta(emitter, scope->upper_scope); // parent = upper scope
+        LLVMMetadataRef r =
+            LLVMDIBuilderCreateLexicalBlock(emitter->debug_builder, md,
+                                            BL_GetMeta(emitter, emitter->source_filename.str),
+                                            id.line, id.column);
+        BL_SetMeta(emitter, emitter->current_scope, r);
+    }
+    
+    
+    return scope;
+}
+
+static void BL_PopScope(BL_Emitter* emitter, C_ScopeContext* scope) {
+    emitter->current_scope = scope->upper_scope;
+    free(scope);
+    
+    emitter->scope_depth--;
+}
+
 void BL_Init(BL_Emitter* emitter, string source_filename, string filename) {
     memset(emitter, 0, sizeof(BL_Emitter));
     emitter->filename = filename;
@@ -112,6 +227,7 @@ void BL_Init(BL_Emitter* emitter, string source_filename, string filename) {
     LLVMSetModuleDataLayout(emitter->module, target_data);
     
     llvmsymbol_hash_table_init(&emitter->variables);
+    llvmmeta_hash_table_init(&emitter->debug_metadata);
     
     LLVMTypeRef printf_function_args_type[] = { LLVMPointerType(LLVMInt8Type(), 0) };
     printffunctype = LLVMFunctionType(LLVMInt64Type(), printf_function_args_type, 1, true);
@@ -124,9 +240,33 @@ void BL_Init(BL_Emitter* emitter, string source_filename, string filename) {
     LLVMInstallFatalErrorHandler(BL_Report_LLVMHandler);
     LLVMEnablePrettyStackTrace();
     
-    emitter->debug_builder = LLVMCreateDIBuilder(emitter->module);
+    if (DEBUG_MODE) {
+        emitter->debug_builder = LLVMCreateDIBuilder(emitter->module);
+        
+        M_Scratch scratch = scratch_get();
+        string full_path = full_filepath(&scratch.arena, emitter->source_filename);
+        string fn = filename_from_filepath(full_path);
+        string fd = directory_from_filepath(full_path);
+        
+        
+        string act_str = str_lit("Debug Info Version");
+        LLVMValueRef str = LLVMConstInt(LLVMInt32Type(), 3, false);
+        LLVMValueRef md = LLVMMDNode(&str, 1);
+        LLVMMetadataRef act_md = LLVMValueAsMetadata(md);
+        LLVMAddModuleFlag(emitter->module, LLVMModuleFlagBehaviorError, (const char*) act_str.str, act_str.size, act_md);
+        
+        
+        LLVMMetadataRef file_meta = LLVMDIBuilderCreateFile(emitter->debug_builder,
+                                                            (const char*) fn.str, fn.size, (const char*) fd.str, fd.size);
+        
+        string producer = str_lit("rift");
+        LLVMMetadataRef compilation_unit_meta = LLVMDIBuilderCreateCompileUnit(emitter->debug_builder, LLVMDWARFSourceLanguageC, file_meta, (const char*) producer.str, producer.size, false, "", 0, 0, "", 0, LLVMDWARFEmissionFull, 0, false, false, "", 0, "", 0);
+        
+        BL_SetMeta(emitter, emitter->source_filename.str, file_meta);
+        BL_SetMeta(emitter, compilation_unit_key, compilation_unit_meta);
+        scratch_return(&scratch);
+    }
     
-    // @here add file metadata
 }
 
 static LLVMValueRef BL_BuildBinary(BL_Emitter* emitter, L_Token token, LLVMValueRef left, LLVMValueRef right) {
@@ -230,11 +370,27 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         }
         
         case NodeType_Lambda: {
+            if (DEBUG_MODE) {
+                // Change to upper function metadata if applicable
+                LLVMMetadataRef file_meta = BL_GetMeta(emitter, emitter->source_filename.str);
+                string fnname = node->id.lexeme;
+                LLVMMetadataRef func_meta =
+                    LLVMDIBuilderCreateFunction(emitter->debug_builder, file_meta,
+                                                (const char*) fnname.str, fnname.size,
+                                                (const char*) fnname.str, fnname.size, // same for now
+                                                file_meta, node->id.line,
+                                                BL_PTypeToMetadataType(emitter, node->Lambda.function_type),
+                                                true, true, node->id.line, LLVMDIFlagStaticMember,
+                                                false); /* @opt */
+                BL_SetMeta(emitter, node, func_meta);
+            }
+            
             // prev vars
             LLVMBasicBlockRef prev = emitter->current_block;
             LLVMBasicBlockRef prev_ret = emitter->return_block;
             b8 prev_is_in_function = emitter->is_in_function;
             LLVMValueRef prev_ret_val = emitter->func_return;
+            AstNode* prev_func = emitter->curr_func;
             
             // add function
             LLVMTypeRef function_type = BL_PTypeToLLVMType(node->Lambda.function_type);
@@ -244,7 +400,9 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             emitter->current_block = LLVMAppendBasicBlock(func, "entry");
             emitter->return_block = LLVMAppendBasicBlock(func, "re");
             emitter->is_in_function = true;
+            emitter->curr_func = node;
             
+            C_ScopeContext* scope_ctx = BL_PushScope(emitter, node->Lambda.scope, node->id);
             // ==-- Entry --== //
             BL_BlockContext* block_ctx = BL_StartBasicBlock(emitter, emitter->current_block);
             
@@ -283,12 +441,14 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             
             BL_EndBasicBlock(emitter, block_ctx);
             // ==-- Return End --== //
+            BL_PopScope(emitter, scope_ctx);
             
             // restore vars
             emitter->is_in_function = prev_is_in_function;
             emitter->current_block = prev;
             emitter->return_block = prev_ret;
             emitter->func_return = prev_ret_val;
+            emitter->curr_func = prev_func;
             
             LLVMPositionBuilderAtEnd(emitter->builder, emitter->current_block);
             
@@ -336,13 +496,13 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         }
         
         case NodeType_Block: {
-            if (DEBUG_MODE) {
-                //LLVMDIBuilderCreateLexicalBlock(emitter->debug_builder, /* @here */, );
-            }
-            
+            C_ScopeContext* scope_ctx = nullptr;
+            if (!emitter->no_scope) scope_ctx = BL_PushScope(emitter, node->Block.scope, node->id);
             for (u32 i = 0; i < node->Block.count; i++) {
                 BL_Emit(emitter, node->Block.statements[i]);
             }
+            if (scope_ctx) BL_PopScope(emitter, scope_ctx);
+            
             return (LLVMValueRef) {0};
         }
         
@@ -358,21 +518,33 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             
             LLVMBuildCondBr(emitter->builder, condition, ifb, elseb);
             
+            // ==-- If --== //
             BL_BlockContext* block_ctx = BL_StartBasicBlock(emitter, ifb);
+            C_ScopeContext* scope_ctx = BL_PushScope(emitter, node->If.then_scope, node->id);
+            emitter->no_scope = true;
             BL_Emit(emitter, node->If.then);
+            emitter->no_scope = false;
             if (!emitter->emitted_end_in_this_block) {
                 LLVMBuildBr(emitter->builder, mergeb);
             }
             BL_EndBasicBlock(emitter, block_ctx);
+            BL_PopScope(emitter, scope_ctx);
+            // ==-- End If --== //
             
+            // ==-- Else --== //
             if (node->If.elsee) {
+                scope_ctx = BL_PushScope(emitter, node->If.else_scope, node->id);
                 block_ctx = BL_StartBasicBlock(emitter, ifb);
+                emitter->no_scope = true;
                 BL_Emit(emitter, node->If.elsee);
+                emitter->no_scope = false;
                 if (!emitter->emitted_end_in_this_block) {
                     LLVMBuildBr(emitter->builder, mergeb);
                 }
                 BL_EndBasicBlock(emitter, block_ctx);
+                BL_PopScope(emitter, scope_ctx);
             }
+            // ==-- End Else --== //
             
             LLVMPositionBuilderAtEnd(emitter->builder, mergeb);
             emitter->current_block = mergeb;
@@ -386,6 +558,7 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             
             LLVMBuildBr(emitter->builder, condb);
             
+            C_ScopeContext* scope_ctx = BL_PushScope(emitter, node->While.scope, node->id);
             BL_BlockContext* block_ctx = BL_StartBasicBlock(emitter, condb);
             LLVMValueRef condition = BL_Emit(emitter, node->While.condition);
             
@@ -396,11 +569,14 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             BL_EndBasicBlock(emitter, block_ctx);
             
             block_ctx = BL_StartBasicBlock(emitter, bodyb);
+            emitter->no_scope = true;
             BL_Emit(emitter, node->While.body);
+            emitter->no_scope = false;
             if (!emitter->emitted_end_in_this_block) {
                 LLVMBuildBr(emitter->builder, condb);
             }
             BL_EndBasicBlock(emitter, block_ctx);
+            BL_PopScope(emitter, scope_ctx);
             
             LLVMPositionBuilderAtEnd(emitter->builder, afterb);
             emitter->current_block = afterb;
@@ -453,6 +629,10 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
                         LLVMValueRef val = BL_Emit(emitter, node->VarDecl.value);
                         LLVMBuildStore(emitter->builder, val, addr);
                         symtype = SymbolType_Variable;
+                        
+                        if (DEBUG_MODE) {
+                            
+                        }
                     }
                 } else {
                     // TODO(voxel): @default_init
@@ -497,6 +677,11 @@ void BL_Free(BL_Emitter* emitter) {
     
 #if 1
     LLVMPrintModuleToFile(emitter->module, (char*)emitter->filename.str, &error);
+    if (error) {
+        fprintf(stderr, "Print Module Error: %s\n", error);
+        fflush(stderr);
+        LLVMDisposeErrorMessage(error);
+    }
 #else
     LLVMExecutionEngineRef engine;
     LLVMLinkInMCJIT();
@@ -516,10 +701,15 @@ void BL_Free(BL_Emitter* emitter) {
     llvmsymbol_hash_table_get(&emitter->variables, key, &val);
     
     LLVMRunFunction(engine, val.alloca, 0, nullptr);
-    
 #endif
-    llvmsymbol_hash_table_free(&emitter->variables);
     
-    LLVMDisposeModule(emitter->module);
+    llvmsymbol_hash_table_free(&emitter->variables);
+    llvmmeta_hash_table_free(&emitter->debug_metadata);
+    
+    if (DEBUG_MODE) {
+        LLVMDisposeDIBuilder(emitter->debug_builder);
+    }
+    
     LLVMDisposeBuilder(emitter->builder);
+    LLVMDisposeModule(emitter->module);
 }

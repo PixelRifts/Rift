@@ -35,14 +35,6 @@ int main(int argc, char **argv) {
         string source_str = { .str = (u8*) source, .size = strlen(source) };
         string source_filename = { .str = (u8*) argv[1], .size = strlen(argv[1]) };
         
-        M_Scratch scratch = scratch_get();
-        string full_path = full_filepath(&scratch.arena, str_lit("a/very/./.././weird/path.heheboi"));
-        string file_name = filename_from_filepath(full_path);
-        printf("Filepath: %.*s\n", str_expand(full_path));
-        printf("Filename: %.*s\n", str_expand(file_name));
-        printf("strlen(file_name): %llu, file_name.size: %llu\n", strlen((const char*) file_name.str), file_name.size);
-        scratch_return(&scratch);
-        
         L_Lexer lexer = {0};
         L_Init(&lexer, source_str);
         P_Parser parser = {0};

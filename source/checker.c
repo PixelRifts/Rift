@@ -113,6 +113,7 @@ static C_ScopeContext* C_PushScope(C_Checker* checker, P_Scope* new_scope, P_Typ
     scope->is_in_func_body = checker->is_in_func_body;
     
     new_scope->parent = scope->upper_scope;
+    new_scope->depth = checker->scope_depth;
     checker->current_scope_context = scope;
     checker->current_scope = new_scope;
     checker->is_in_func_body = false;

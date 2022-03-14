@@ -140,6 +140,7 @@ typedef struct P_Scope P_Scope;
 struct P_Scope {
     P_ScopeType type;
     P_Scope* parent;
+    u32 depth;
     // There will be more stuff here probably.... maybe
 };
 

@@ -48,3 +48,8 @@ string filename_from_filepath(string filepath) {
     u64 sizeof_filename = filepath.size - last_slash;
     return (string) { .str = filepath.str + last_slash, .size = sizeof_filename };
 }
+
+string directory_from_filepath(string filepath) {
+    u64 last_slash = str_find_last(filepath, str_lit("/"), 0);
+    return (string) { .str = filepath.str, .size = last_slash - 1 };
+}
