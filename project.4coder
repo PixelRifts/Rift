@@ -71,7 +71,7 @@ command_list =
 		.cursor_at_end = true,
 		.cmd =
 		{
-			{ "clang blah.ll", .os = "win" },
+			{ "clang -g blah.ll", .os = "win" },
 		},
 	},
 };

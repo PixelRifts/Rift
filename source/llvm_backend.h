@@ -56,12 +56,19 @@ typedef struct BL_Value {
 typedef struct BL_Metadata {
     LLVMMetadataRef metadata;
     
-    b8 not_null;
     b8 tombstone;
 } BL_Metadata;
 
+typedef struct BL_DebugFunc {
+    LLVMTypeRef type;
+    LLVMValueRef func;
+    
+    b8 tombstone;
+} BL_DebugFunc;
+
 HashTable_Prototype(llvmsymbol, struct { string name; u32 depth; }, BL_Value);
 HashTable_Prototype(llvmmeta, void*, BL_Metadata);
+HashTable_Prototype(llvmdbgfn, string, BL_DebugFunc);
 
 typedef struct BL_BlockContext BL_BlockContext;
 struct BL_BlockContext {
@@ -88,6 +95,7 @@ typedef struct BL_Emitter {
     u32 scope_depth;
     b8 no_scope;
     llvmsymbol_hash_table variables;
+    llvmdbgfn_hash_table debug_functions;
     llvmmeta_hash_table debug_metadata;
 } BL_Emitter;
 

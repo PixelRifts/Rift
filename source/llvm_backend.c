@@ -15,10 +15,16 @@ HashTable_Impl(llvmsymbol, llvmsymbol_key_is_null, llvmsymbol_key_is_eq, hash_ll
 
 b8 llvmmeta_key_is_null(llvmmeta_hash_table_key k) { return k == nullptr; }
 b8 llvmmeta_key_is_eq(llvmmeta_hash_table_key a, llvmmeta_hash_table_key b) { return a == b; }
-u32 hash_llvmmeta_key(llvmmeta_hash_table_key k) { return *(u32*)&k; }
-b8 llvmmeta_val_is_null(llvmmeta_hash_table_value v) { return v.not_null == false; }
+u32 hash_llvmmeta_key(llvmmeta_hash_table_key k) { return *(u32*)&k; } /* @unsure */
+b8 llvmmeta_val_is_null(llvmmeta_hash_table_value v) { return v.metadata == nullptr; }
 b8 llvmmeta_val_is_tombstone(llvmmeta_hash_table_value v) { return v.tombstone == true; }
 HashTable_Impl(llvmmeta, llvmmeta_key_is_null, llvmmeta_key_is_eq, hash_llvmmeta_key, { .tombstone = true }, llvmmeta_val_is_null, llvmmeta_val_is_tombstone);
+
+b8 llvmdbgfn_key_is_null(llvmdbgfn_hash_table_key k) { return k.size == 0; }
+b8 llvmdbgfn_key_is_eq(llvmdbgfn_hash_table_key a, llvmdbgfn_hash_table_key b) { return str_eq(a, b); }
+b8 llvmdbgfn_val_is_null(llvmdbgfn_hash_table_value v) { return v.type == nullptr && v.func == nullptr; }
+b8 llvmdbgfn_val_is_tombstone(llvmdbgfn_hash_table_value v) { return v.tombstone == true; }
+HashTable_Impl(llvmdbgfn, llvmdbgfn_key_is_null, llvmdbgfn_key_is_eq, str_hash, { .tombstone = true }, llvmdbgfn_val_is_null, llvmdbgfn_val_is_tombstone);
 
 //~ Diagnostics
 
@@ -59,6 +65,16 @@ static LLVMTypeRef BL_PTypeToLLVMType(P_Type* type) {
     return (LLVMTypeRef) {0};
 }
 
+typedef struct TypeData { u32 size; u32 encoding; } TypeData;
+static TypeData BL_GetTypeData(P_BasicType type) {
+    switch (type) {
+        case BasicType_Void: return (TypeData) { 0, LLVMDWARFTypeEncoding_Boolean };
+        case BasicType_Integer: return (TypeData) { 64, LLVMDWARFTypeEncoding_Signed }; // change to register size
+        case BasicType_Boolean: return (TypeData) { 1, LLVMDWARFTypeEncoding_Boolean };
+        case BasicType_Cstring: return (TypeData) { 64, LLVMDWARFTypeEncoding_Address };
+    }
+    return (TypeData) { 0, 0 };
+}
 
 static LLVMMetadataRef BL_GetMeta(BL_Emitter* emitter, void* key) {
     llvmmeta_hash_table_value v;
@@ -69,15 +85,28 @@ static LLVMMetadataRef BL_GetMeta(BL_Emitter* emitter, void* key) {
 }
 
 static void BL_SetMeta(BL_Emitter* emitter, void* key, LLVMMetadataRef value) {
-    llvmmeta_hash_table_value v = { .metadata = value, .not_null = true };
+    llvmmeta_hash_table_value v = { .metadata = value };
     llvmmeta_hash_table_set(&emitter->debug_metadata, key, v);
 }
 
-static LLVMMetadataRef BL_Loc(BL_Emitter* emitter, u32 line, u32 col) {
+static LLVMMetadataRef BL_ScopeMetadata(BL_Emitter* emitter) {
     LLVMMetadataRef scope = {0};
     if (emitter->is_in_function) scope = BL_GetMeta(emitter, emitter->curr_func);
+    else if (emitter->scope_depth == 0) scope = BL_GetMeta(emitter, emitter->source_filename.str);
     else scope = BL_GetMeta(emitter, emitter->current_scope);
-    return LLVMDIBuilderCreateDebugLocation(nullptr, line, col, scope, nullptr);
+    return scope;
+}
+
+static LLVMMetadataRef BL_Loc(BL_Emitter* emitter, u32 line, u32 col) {
+    LLVMMetadataRef scope = BL_ScopeMetadata(emitter);
+    return LLVMDIBuilderCreateDebugLocation(LLVMGetGlobalContext(), line, col, scope, nullptr);
+}
+
+static BL_DebugFunc BL_GetDebugFunc(BL_Emitter* emitter, string key) {
+    BL_DebugFunc v = {0};
+    if (!llvmdbgfn_hash_table_get(&emitter->debug_functions, key, &v))
+        return (BL_DebugFunc) {0};
+    return v;
 }
 
 static LLVMMetadataRef BL_PTypeToMetadataType(BL_Emitter* emitter, P_Type* type) {
@@ -85,38 +114,19 @@ static LLVMMetadataRef BL_PTypeToMetadataType(BL_Emitter* emitter, P_Type* type)
     if (r) return r;
     
     string name;
-    
     switch (type->type) {
-        case BasicType_Void: {
-            name = str_lit("void");
-            LLVMMetadataRef ret =
-                LLVMDIBuilderCreateBasicType(emitter->debug_builder,
-                                             (const char*) name.str, name.size, 0, LLVMDWARFTypeEncoding_Boolean, LLVMDIFlagZero);
-            BL_SetMeta(emitter, type, ret);
-            return ret;
-        }
-        case BasicType_Integer: {
-            name = str_lit("int");
-            LLVMMetadataRef ret =
-                LLVMDIBuilderCreateBasicType(emitter->debug_builder,
-                                             (const char*) name.str, name.size, 64, LLVMDWARFTypeEncoding_Signed, LLVMDIFlagZero);
-            BL_SetMeta(emitter, type, ret);
-            return ret;
-        }
-        case BasicType_Boolean: {
-            name = str_lit("bool");
-            LLVMMetadataRef ret =
-                LLVMDIBuilderCreateBasicType(emitter->debug_builder,
-                                             (const char*) name.str, name.size, 1, LLVMDWARFTypeEncoding_Boolean, LLVMDIFlagZero);
-            BL_SetMeta(emitter, type, ret);
-            return ret;
-        }
+        case BasicType_Void:
+        case BasicType_Integer:
+        case BasicType_Boolean:
         case BasicType_Cstring: {
-            name = str_lit("const char*");
-            LLVMMetadataRef ret =
-                LLVMDIBuilderCreateBasicType(emitter->debug_builder,
-                                             (const char*) name.str, name.size, 1, LLVMDWARFTypeEncoding_Address, LLVMDIFlagZero);
-            BL_SetMeta(emitter, type, ret);
+            name = type_names[type->type];
+            LLVMMetadataRef r_again = BL_GetMeta(emitter, name.str);
+            if (r_again) return r_again;
+            
+            TypeData td = BL_GetTypeData(type->type);
+            LLVMMetadataRef ret = LLVMDIBuilderCreateBasicType(emitter->debug_builder,
+                                                               (const char*) name.str, name.size, td.size, td.encoding, LLVMDIFlagZero);
+            BL_SetMeta(emitter, name.str, ret);
             return ret;
         }
         
@@ -195,7 +205,6 @@ static C_ScopeContext* BL_PushScope(BL_Emitter* emitter, P_Scope* new_scope, L_T
         BL_SetMeta(emitter, emitter->current_scope, r);
     }
     
-    
     return scope;
 }
 
@@ -228,6 +237,7 @@ void BL_Init(BL_Emitter* emitter, string source_filename, string filename) {
     
     llvmsymbol_hash_table_init(&emitter->variables);
     llvmmeta_hash_table_init(&emitter->debug_metadata);
+    llvmdbgfn_hash_table_init(&emitter->debug_functions);
     
     LLVMTypeRef printf_function_args_type[] = { LLVMPointerType(LLVMInt8Type(), 0) };
     printffunctype = LLVMFunctionType(LLVMInt64Type(), printf_function_args_type, 1, true);
@@ -265,6 +275,16 @@ void BL_Init(BL_Emitter* emitter, string source_filename, string filename) {
         BL_SetMeta(emitter, emitter->source_filename.str, file_meta);
         BL_SetMeta(emitter, compilation_unit_key, compilation_unit_meta);
         scratch_return(&scratch);
+        
+        // Debug functions initialization
+        LLVMTypeRef metatype = LLVMMetadataTypeInContext(LLVMGetGlobalContext());
+        
+        LLVMTypeRef llvmdecl_function_args_type[] = { metatype, metatype, metatype };
+        LLVMTypeRef llvmdecltype = LLVMFunctionType(LLVMVoidType(), llvmdecl_function_args_type, 3, false);
+        LLVMValueRef llvmdecl = LLVMAddFunction(emitter->module, "llvm.dbg.declare", llvmdecltype);
+        
+        llvmdbgfn_hash_table_value dcl = (llvmdbgfn_hash_table_value) { .type = llvmdecltype, .func = llvmdecl };
+        llvmdbgfn_hash_table_set(&emitter->debug_functions, str_lit("declare"), dcl);
     }
     
 }
@@ -326,6 +346,12 @@ static LLVMValueRef BL_BuildUnary(BL_Emitter* emitter, L_Token op, LLVMValueRef 
 
 LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
     if (emitter->emitted_end_in_this_block) return (LLVMValueRef) {0};
+    if (DEBUG_MODE) {
+        if (emitter->scope_depth != 0) {
+            LLVMMetadataRef loc = BL_Loc(emitter, node->id.line, node->id.column);
+            LLVMSetCurrentDebugLocation2(emitter->builder, loc);
+        }
+    }
     
     switch (node->type) {
         case NodeType_Ident: {
@@ -334,6 +360,9 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             if (llvmsymbol_hash_table_get(&emitter->variables, key, &val)) {
                 if (val.changed) {
                     LLVMValueRef v = LLVMBuildLoad(emitter->builder, val.alloca, "");
+                    val.loaded = v;
+                    val.changed = false;
+                    llvmsymbol_hash_table_set(&emitter->variables, key, val);
                     return v;
                 }
                 return val.loaded;
@@ -605,6 +634,7 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         }
         
         case NodeType_VarDecl: {
+            
             char* hoist = malloc(node->id.lexeme.size + 1);
             memcpy(hoist, node->id.lexeme.str, node->id.lexeme.size);
             hoist[node->id.lexeme.size] = '\0';
@@ -620,6 +650,21 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
             if (emitter->is_in_function) {
                 
                 addr = LLVMBuildAlloca(emitter->builder, var_type, hoist);
+                
+                if (DEBUG_MODE) {
+                    LLVMMetadataRef scope = BL_ScopeMetadata(emitter);
+                    LLVMMetadataRef file = BL_GetMeta(emitter, emitter->source_filename.str);
+                    LLVMMetadataRef type = BL_PTypeToMetadataType(emitter, node->VarDecl.type);
+                    
+                    LLVMMetadataRef v =
+                        LLVMDIBuilderCreateAutoVariable(emitter->debug_builder, scope,
+                                                        (const char*)node->id.lexeme.str, node->id.lexeme.size, file, node->id.line,
+                                                        type, false, LLVMDIFlagZero, 8);
+                    BL_DebugFunc declare = BL_GetDebugFunc(emitter, str_lit("declare"));
+                    LLVMValueRef args[] = { LLVMMDNode(&addr, 1), LLVMMetadataAsValue(LLVMGetGlobalContext(), v), LLVMMetadataAsValue(LLVMGetGlobalContext(), LLVMDIBuilderCreateExpression(emitter->debug_builder, nullptr, 0)) };
+                    LLVMBuildCall2(emitter->builder, declare.type, declare.func, args, 3, "");
+                }
+                
                 if (node->VarDecl.value) {
                     if (node->VarDecl.value->type == NodeType_Lambda) {
                         addr = BL_Emit(emitter, node->VarDecl.value);
@@ -627,12 +672,14 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
                         LLVMSetValueName2(addr, (const char*)node->id.lexeme.str, node->id.lexeme.size);
                     } else {
                         LLVMValueRef val = BL_Emit(emitter, node->VarDecl.value);
+                        if (DEBUG_MODE) {
+                            if (emitter->scope_depth != 0) {
+                                LLVMMetadataRef loc = BL_Loc(emitter, node->VarDecl.value->id.line, node->VarDecl.value->id.column);
+                                LLVMSetCurrentDebugLocation2(emitter->builder, loc);
+                            }
+                        }
                         LLVMBuildStore(emitter->builder, val, addr);
                         symtype = SymbolType_Variable;
-                        
-                        if (DEBUG_MODE) {
-                            
-                        }
                     }
                 } else {
                     // TODO(voxel): @default_init
@@ -648,11 +695,39 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
                     } else {
                         addr = LLVMAddGlobal(emitter->module, var_type, hoist);
                         LLVMSetInitializer(addr, BL_Emit(emitter, node->VarDecl.value));
+                        if (DEBUG_MODE) {
+                            LLVMMetadataRef scope = BL_ScopeMetadata(emitter);
+                            LLVMMetadataRef file = BL_GetMeta(emitter, emitter->source_filename.str);
+                            LLVMMetadataRef type = BL_PTypeToMetadataType(emitter, node->VarDecl.type);
+                            LLVMMetadataRef nullexpr = LLVMDIBuilderCreateExpression(emitter->debug_builder, nullptr, 0);
+                            LLVMMetadataRef v =
+                                LLVMDIBuilderCreateGlobalVariableExpression(emitter->debug_builder, scope, (const char*)node->id.lexeme.str, node->id.lexeme.size,
+                                                                            "", 0, file, node->id.line,
+                                                                            type, true,
+                                                                            nullexpr, nullptr, 8);
+                            BL_SetMeta(emitter, node, v);
+                            LLVMGlobalSetMetadata(addr, 0, v);
+                        }
+                        
                         symtype = SymbolType_Variable;
                         symflags |= ValueFlag_Global;
                     }
                 } else {
                     addr = LLVMAddGlobal(emitter->module, var_type, hoist);
+                    if (DEBUG_MODE) {
+                        LLVMMetadataRef scope = BL_ScopeMetadata(emitter);
+                        LLVMMetadataRef file = BL_GetMeta(emitter, emitter->source_filename.str);
+                        LLVMMetadataRef type = BL_PTypeToMetadataType(emitter, node->VarDecl.type);
+                        LLVMMetadataRef nullexpr = LLVMDIBuilderCreateExpression(emitter->debug_builder, nullptr, 0);
+                        LLVMMetadataRef v =
+                            LLVMDIBuilderCreateGlobalVariableExpression(emitter->debug_builder, scope, (const char*)node->id.lexeme.str, node->id.lexeme.size,
+                                                                        "", 0, file, node->id.line,
+                                                                        type, true,
+                                                                        nullexpr, nullptr, 8);
+                        BL_SetMeta(emitter, node, v);
+                        LLVMGlobalSetMetadata(addr, 0, v);
+                    }
+                    
                     symtype = SymbolType_Variable;
                     symflags |= ValueFlag_Global;
                     
@@ -673,6 +748,10 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
 
 void BL_Free(BL_Emitter* emitter) {
     char* error = nullptr;
+    
+    if (DEBUG_MODE) {
+        LLVMDIBuilderFinalize(emitter->debug_builder);
+    }
     LLVMVerifyModule(emitter->module, LLVMPrintMessageAction, nullptr);
     
 #if 1
@@ -705,6 +784,7 @@ void BL_Free(BL_Emitter* emitter) {
     
     llvmsymbol_hash_table_free(&emitter->variables);
     llvmmeta_hash_table_free(&emitter->debug_metadata);
+    llvmdbgfn_hash_table_free(&emitter->debug_functions);
     
     if (DEBUG_MODE) {
         LLVMDisposeDIBuilder(emitter->debug_builder);

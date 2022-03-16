@@ -37,15 +37,16 @@ static void C_Report(C_Checker* checker, L_Token token, const char* stage, const
 
 //~ Type Stuff
 
-#define TYPE(Id, Name) case BasicType_##Id: return Name;
+#define TYPE(Id, Name, Cname) [BasicType_##Id] = Name,
+string type_names[BasicType_Count + 1] = {
+    BASIC_TYPES
+};
+#undef TYPE
+
 static string C_GetBasicTypeName(P_Type* type) {
     if (!type) return str_lit("Invalid");
-    switch (type->type) {
-        BASIC_TYPES
-    }
-    return str_lit("Invalid");
+    return type_names[type->type];
 }
-#undef TYPE
 
 static b8 C_CheckTypeEquals(P_Type* a, P_Type* b) {
     if (!a || !b) return false; 

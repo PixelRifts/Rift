@@ -1,12 +1,8 @@
-add := func(a : int, b : int) -> int {
-    return a + b;
-}
+try := 10;
 
 main := func() -> int {
     i := 0;
-    while i < 10 {
-        printf("%lld\n", i);
-        i = i + 1;
-    }
+    j := 10;
+    k := 20;
     return 0;
 }

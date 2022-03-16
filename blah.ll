@@ -3,60 +3,52 @@ source_filename = "Testing"
 target datalayout = "e-m:w-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"
 target triple = "x86_64-pc-windows-msvc"
 
-@0 = private unnamed_addr constant [6 x i8] c"%lld\0A\00", align 1
+@try = global i64 10, !dbg !0
 
 declare i64 @printf(i8*, ...)
 
-define i64 @add(i64 %0, i64 %1) {
-entry:
-  %2 = alloca i64, align 8
-  %3 = alloca i64, align 8
-  store i64 %0, i64* %3, align 8
-  %4 = alloca i64, align 8
-  store i64 %1, i64* %4, align 8
-  %5 = load i64, i64* %3, align 8
-  %6 = load i64, i64* %4, align 8
-  %7 = add i64 %5, %6
-  store i64 %7, i64* %2, align 8
-  br label %re
-
-re:                                               ; preds = %entry
-  %8 = load i64, i64* %2, align 8
-  ret i64 %8
-}
+; Function Attrs: nofree nosync nounwind readnone speculatable willreturn
+declare void @llvm.dbg.declare(metadata, metadata, metadata) #0
 
 define i64 @main() {
 entry:
   %0 = alloca i64, align 8
-  %i = alloca i64, align 8
-  store i64 0, i64* %i, align 8
-  br label %cn
+  %i = alloca i64, align 8, !dbg !8
+  call void @llvm.dbg.declare(metadata i64* %i, metadata !11, metadata !DIExpression()), !dbg !8
+  store i64 0, i64* %i, align 8, !dbg !12
+  %j = alloca i64, align 8, !dbg !13
+  call void @llvm.dbg.declare(metadata i64* %j, metadata !14, metadata !DIExpression()), !dbg !13
+  store i64 10, i64* %j, align 8, !dbg !12
+  %k = alloca i64, align 8, !dbg !15
+  call void @llvm.dbg.declare(metadata i64* %k, metadata !16, metadata !DIExpression()), !dbg !15
+  store i64 20, i64* %k, align 8, !dbg !12
+  store i64 0, i64* %0, align 8, !dbg !12
+  br label %re, !dbg !12
 
-re:                                               ; preds = %af
-  %1 = load i64, i64* %0, align 8
-  ret i64 %1
-
-cn:                                               ; preds = %wh, %entry
-  %2 = load i64, i64* %i, align 8
-  %3 = icmp slt i64 %2, 10
-  br i1 %3, label %wh, label %af
-
-wh:                                               ; preds = %cn
-  %4 = load i64, i64* %i, align 8
-  %5 = call i64 (i8*, ...) @printf(i8* getelementptr inbounds ([6 x i8], [6 x i8]* @0, i32 0, i32 0), i64 %4)
-  %6 = load i64, i64* %i, align 8
-  %7 = add i64 %6, 1
-  store i64 %7, i64* %i, align 8
-  br label %cn
-
-af:                                               ; preds = %cn
-  store i64 0, i64* %0, align 8
-  br label %re
+re:                                               ; preds = %entry
+  %1 = load i64, i64* %0, align 8, !dbg !12
+  ret i64 %1, !dbg !12
 }
 
-!llvm.module.flags = !{!0}
-!llvm.dbg.cu = !{!1}
+attributes #0 = { nofree nosync nounwind readnone speculatable willreturn }
 
-!0 = !{i32 1, !"Debug Info Version", i32 3}
-!1 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "rift", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug, splitDebugInlining: false)
+!llvm.module.flags = !{!4}
+!llvm.dbg.cu = !{!5}
+
+!0 = !DIGlobalVariableExpression(var: !1, expr: !DIExpression())
+!1 = distinct !DIGlobalVariable(name: "try", scope: !2, file: !2, line: 1, type: !3, isLocal: true, isDefinition: true, align: 8)
 !2 = !DIFile(filename: "test.rf", directory: "P:/C/cp")
+!3 = !DIBasicType(name: "Integer", size: 64, encoding: DW_ATE_signed)
+!4 = !{i32 1, !"Debug Info Version", i32 3}
+!5 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "rift", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug, enums: !6, globals: !7, splitDebugInlining: false)
+!6 = !{}
+!7 = !{!0}
+!8 = !DILocation(line: 4, column: 6, scope: !9)
+!9 = distinct !DISubprogram(name: "main", linkageName: "main", scope: !2, file: !2, line: 3, type: !10, scopeLine: 3, flags: DIFlagStaticMember, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !5, retainedNodes: !6)
+!10 = !DISubroutineType(flags: DIFlagStaticMember, types: !6)
+!11 = !DILocalVariable(name: "i", scope: !9, file: !2, line: 4, type: !3, align: 8)
+!12 = !DILocation(line: 0, scope: !9)
+!13 = !DILocation(line: 5, column: 6, scope: !9)
+!14 = !DILocalVariable(name: "j", scope: !9, file: !2, line: 5, type: !3, align: 8)
+!15 = !DILocation(line: 6, column: 6, scope: !9)
+!16 = !DILocalVariable(name: "k", scope: !9, file: !2, line: 6, type: !3, align: 8)

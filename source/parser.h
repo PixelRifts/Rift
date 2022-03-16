@@ -94,15 +94,16 @@ enum {
     NodeType_STMT_END,
 };
 
-// Uses TYPE(Id, Name)
+// Uses TYPE(Id, Name, Cname)
 #define BASIC_TYPES \
-TYPE(Invalid, str_lit("Invalid")) \
-TYPE(Integer, str_lit("Integer")) \
-TYPE(Boolean, str_lit("Boolean")) \
-TYPE(Void, str_lit("Void")) \
-TYPE(Function, str_lit("Function")) \
-TYPE(Cstring, str_lit("Cstring")) \
-TYPE(Count, str_lit("__Count"))
+TYPE(Invalid, str_lit("Invalid"), str_lit("Invalid")) \
+TYPE(Integer, str_lit("Integer"), str_lit("int")) \
+TYPE(Boolean, str_lit("Boolean"), str_lit("bool")) \
+TYPE(Void, str_lit("Void"), str_lit("void")) \
+TYPE(Function, str_lit("Function"), str_lit("func")) \
+TYPE(Cstring, str_lit("Cstring"), str_lit("const char*")) \
+TYPE(Count, str_lit("__Count"), str_lit("__Count"))
+
 
 typedef u32 P_BasicType;
 enum {
@@ -114,6 +115,8 @@ enum {
     BasicType_Cstring,
     BasicType_Count
 };
+
+extern string type_names[BasicType_Count + 1];
 
 typedef struct P_Type P_Type;
 struct P_Type {
