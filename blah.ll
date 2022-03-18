@@ -13,14 +13,14 @@ declare void @llvm.dbg.declare(metadata, metadata, metadata) #0
 define i64 @main() {
 entry:
   %0 = alloca i64, align 8
-  %i = alloca i64, align 8, !dbg !8
-  call void @llvm.dbg.declare(metadata i64* %i, metadata !11, metadata !DIExpression()), !dbg !8
+  %i = alloca i64, align 8, !dbg !11
+  call void @llvm.dbg.declare(metadata i64* %i, metadata !8, metadata !DIExpression()), !dbg !11
   store i64 0, i64* %i, align 8, !dbg !12
-  %j = alloca i64, align 8, !dbg !13
-  call void @llvm.dbg.declare(metadata i64* %j, metadata !14, metadata !DIExpression()), !dbg !13
+  %j = alloca i64, align 8, !dbg !12
+  call void @llvm.dbg.declare(metadata i64* %j, metadata !13, metadata !DIExpression()), !dbg !14
   store i64 10, i64* %j, align 8, !dbg !12
-  %k = alloca i64, align 8, !dbg !15
-  call void @llvm.dbg.declare(metadata i64* %k, metadata !16, metadata !DIExpression()), !dbg !15
+  %k = alloca i64, align 8, !dbg !12
+  call void @llvm.dbg.declare(metadata i64* %k, metadata !15, metadata !DIExpression()), !dbg !16
   store i64 20, i64* %k, align 8, !dbg !12
   store i64 0, i64* %0, align 8, !dbg !12
   br label %re, !dbg !12
@@ -43,12 +43,12 @@ attributes #0 = { nofree nosync nounwind readnone speculatable willreturn }
 !5 = distinct !DICompileUnit(language: DW_LANG_C, file: !2, producer: "rift", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug, enums: !6, globals: !7, splitDebugInlining: false)
 !6 = !{}
 !7 = !{!0}
-!8 = !DILocation(line: 4, column: 6, scope: !9)
+!8 = !DILocalVariable(name: "i", scope: !9, file: !2, line: 4, type: !3, align: 8)
 !9 = distinct !DISubprogram(name: "main", linkageName: "main", scope: !2, file: !2, line: 3, type: !10, scopeLine: 3, flags: DIFlagStaticMember, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !5, retainedNodes: !6)
 !10 = !DISubroutineType(flags: DIFlagStaticMember, types: !6)
-!11 = !DILocalVariable(name: "i", scope: !9, file: !2, line: 4, type: !3, align: 8)
-!12 = !DILocation(line: 0, scope: !9)
-!13 = !DILocation(line: 5, column: 6, scope: !9)
-!14 = !DILocalVariable(name: "j", scope: !9, file: !2, line: 5, type: !3, align: 8)
-!15 = !DILocation(line: 6, column: 6, scope: !9)
-!16 = !DILocalVariable(name: "k", scope: !9, file: !2, line: 6, type: !3, align: 8)
+!11 = !DILocation(line: 4, scope: !9)
+!12 = !DILocation(line: 1, scope: !9)
+!13 = !DILocalVariable(name: "j", scope: !9, file: !2, line: 5, type: !3, align: 8)
+!14 = !DILocation(line: 5, scope: !9)
+!15 = !DILocalVariable(name: "k", scope: !9, file: !2, line: 6, type: !3, align: 8)
+!16 = !DILocation(line: 6, scope: !9)
