@@ -356,12 +356,6 @@ static LLVMValueRef BL_BuildUnary(BL_Emitter* emitter, L_Token op, LLVMValueRef 
 
 LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
     if (emitter->emitted_end_in_this_block) return (LLVMValueRef) {0};
-    if (DEBUG_MODE) {
-        if (emitter->scope_depth != 0) {
-            LLVMMetadataRef loc = BL_Loc(emitter, node->id.line, node->id.column);
-            LLVMSetCurrentDebugLocation2(emitter->builder, loc);
-        }
-    }
     
     switch (node->type) {
         case NodeType_Ident: {
@@ -394,18 +388,18 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
         } break;
         
         case NodeType_Unary: {
-            LLVMValueRef operand = BL_Emit_NoLoc(emitter, node->Unary.expr);
+            LLVMValueRef operand = BL_Emit(emitter, node->Unary.expr);
             return BL_BuildUnary(emitter, node->id, operand);
         }
         
         case NodeType_Binary: {
-            LLVMValueRef left = BL_Emit_NoLoc(emitter, node->Binary.left);
-            LLVMValueRef right = BL_Emit_NoLoc(emitter, node->Binary.right);
+            LLVMValueRef left = BL_Emit(emitter, node->Binary.left);
+            LLVMValueRef right = BL_Emit(emitter, node->Binary.right);
             return BL_BuildBinary(emitter, node->id, left, right);
         }
         
         case NodeType_Group: {
-            return BL_Emit_NoLoc(emitter, node->Group);
+            return BL_Emit(emitter, node->Group);
         }
         
         case NodeType_Lambda: {
@@ -461,7 +455,7 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
                 llvmsymbol_hash_table_set(&emitter->variables, key, val);
             }
             
-            BL_Emit_NoLoc(emitter, node->Lambda.body);
+            BL_Emit(emitter, node->Lambda.body);
             if (!emitter->emitted_end_in_this_block) {
                 LLVMBuildBr(emitter->builder, emitter->return_block);
                 emitter->emitted_end_in_this_block = false;
@@ -518,38 +512,44 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             
             LLVMValueRef* params = malloc(node->Call.arity * sizeof(LLVMValueRef));
             for (u32 i = 0; i < node->Call.arity; i++) {
-                params[i] = BL_Emit_NoLoc(emitter, node->Call.params[i]);
+                params[i] = BL_Emit(emitter, node->Call.params[i]);
             }
             return LLVMBuildCall2(emitter->builder, val.type, val.alloca, params, node->Call.arity, "");
         }
         
         case NodeType_Return: {
             LLVMValueRef stored = {0};
-            LLVMMetadataRef loc = BL_Loc(emitter, node->id.line, node->id.column);
+            
+            LLVMMetadataRef loc;
+            if (DEBUG_MODE) loc = BL_Loc(emitter, node->id.line, node->id.column);
+            
             if (!node->Return) {
                 stored = LLVMBuildStore(emitter->builder, (LLVMValueRef) {0}, emitter->func_return);
                 // @weird Why do I have to do this for these specific ValueRefs
-                LLVMSetMetadata(stored, 0, LLVMMetadataAsValue(LLVMGetGlobalContext(), loc));
+                if (DEBUG_MODE)
+                    LLVMSetMetadata(stored, 0, LLVMMetadataAsValue(LLVMGetGlobalContext(), loc));
             } else {
-                stored = LLVMBuildStore(emitter->builder, BL_Emit_NoLoc(emitter, node->Return), emitter->func_return);
+                stored = LLVMBuildStore(emitter->builder, BL_Emit(emitter, node->Return), emitter->func_return);
                 // @weird Why do I have to do this for these specific ValueRefs
-                LLVMSetMetadata(stored, 0, LLVMMetadataAsValue(LLVMGetGlobalContext(), loc));
+                if (DEBUG_MODE)
+                    LLVMSetMetadata(stored, 0, LLVMMetadataAsValue(LLVMGetGlobalContext(), loc));
             }
             // @weird Why do I have to do this for these specific ValueRefs
-            LLVMSetMetadata(LLVMBuildBr(emitter->builder, emitter->return_block), 0, LLVMMetadataAsValue(LLVMGetGlobalContext(), loc));
+            LLVMValueRef br = LLVMBuildBr(emitter->builder, emitter->return_block);
+            if (DEBUG_MODE) LLVMSetMetadata(br, 0, LLVMMetadataAsValue(LLVMGetGlobalContext(), loc));
             emitter->emitted_end_in_this_block = true;
             return stored;
         }
         
         case NodeType_ExprStatement: {
-            return BL_Emit_NoLoc(emitter, node->ExprStatement);
+            return BL_Emit(emitter, node->ExprStatement);
         }
         
         case NodeType_Block: {
             C_ScopeContext* scope_ctx = nullptr;
             if (!emitter->no_scope) scope_ctx = BL_PushScope(emitter, node->Block.scope, node->id);
             for (u32 i = 0; i < node->Block.count; i++) {
-                BL_Emit_NoLoc(emitter, node->Block.statements[i]);
+                BL_Emit(emitter, node->Block.statements[i]);
             }
             if (scope_ctx) BL_PopScope(emitter, scope_ctx);
             
@@ -557,7 +557,7 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
         }
         
         case NodeType_If: {
-            LLVMValueRef condition = BL_Emit_NoLoc(emitter, node->If.condition);
+            LLVMValueRef condition = BL_Emit(emitter, node->If.condition);
             
             LLVMValueRef current_function = LLVMGetBasicBlockParent(emitter->current_block);
             LLVMBasicBlockRef ifb = LLVMAppendBasicBlock(current_function, "th");
@@ -572,7 +572,7 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             BL_BlockContext* block_ctx = BL_StartBasicBlock(emitter, ifb);
             C_ScopeContext* scope_ctx = BL_PushScope(emitter, node->If.then_scope, node->id);
             emitter->no_scope = true;
-            BL_Emit_NoLoc(emitter, node->If.then);
+            BL_Emit(emitter, node->If.then);
             emitter->no_scope = false;
             if (!emitter->emitted_end_in_this_block) {
                 LLVMBuildBr(emitter->builder, mergeb);
@@ -584,9 +584,9 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             // ==-- Else --== //
             if (node->If.elsee) {
                 scope_ctx = BL_PushScope(emitter, node->If.else_scope, node->id);
-                block_ctx = BL_StartBasicBlock(emitter, ifb);
+                block_ctx = BL_StartBasicBlock(emitter, elseb);
                 emitter->no_scope = true;
-                BL_Emit_NoLoc(emitter, node->If.elsee);
+                BL_Emit(emitter, node->If.elsee);
                 emitter->no_scope = false;
                 if (!emitter->emitted_end_in_this_block) {
                     LLVMBuildBr(emitter->builder, mergeb);
@@ -615,6 +615,8 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             LLVMBasicBlockRef bodyb = LLVMAppendBasicBlock(current_function, "wh");
             LLVMBasicBlockRef afterb = LLVMAppendBasicBlock(current_function, "af");
             
+            if (DEBUG_MODE)
+                LLVMSetCurrentDebugLocation2(emitter->builder, nullptr);
             LLVMBuildCondBr(emitter->builder, condition, bodyb, afterb);
             BL_EndBasicBlock(emitter, block_ctx);
             
@@ -622,7 +624,10 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             emitter->no_scope = true;
             BL_Emit_NoLoc(emitter, node->While.body);
             emitter->no_scope = false;
+            
             if (!emitter->emitted_end_in_this_block) {
+                if (DEBUG_MODE)
+                    LLVMSetCurrentDebugLocation2(emitter->builder, nullptr);
                 LLVMBuildBr(emitter->builder, condb);
             }
             BL_EndBasicBlock(emitter, block_ctx);
@@ -641,7 +646,11 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->id.lexeme, .depth = 0 };
             llvmsymbol_hash_table_value val;
             if (llvmsymbol_hash_table_get(&emitter->variables, key, &val)) {
-                LLVMValueRef value = BL_Emit_NoLoc(emitter, node->Assign.value);
+                LLVMValueRef value = BL_Emit(emitter, node->Assign.value);
+                if (DEBUG_MODE) {
+                    LLVMMetadataRef loc = BL_Loc(emitter, node->id.line, node->id.column);
+                    LLVMSetCurrentDebugLocation2(emitter->builder, loc);
+                }
                 LLVMBuildStore(emitter->builder, value, val.alloca);
                 val.changed = true;
                 llvmsymbol_hash_table_set(&emitter->variables, key, val);
@@ -688,11 +697,11 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
                 
                 if (node->VarDecl.value) {
                     if (node->VarDecl.value->type == NodeType_Lambda) {
-                        addr = BL_Emit_NoLoc(emitter, node->VarDecl.value);
+                        addr = BL_Emit(emitter, node->VarDecl.value);
                         symtype = SymbolType_Function;
                         LLVMSetValueName2(addr, (const char*)node->id.lexeme.str, node->id.lexeme.size);
                     } else {
-                        LLVMValueRef val = BL_Emit_NoLoc(emitter, node->VarDecl.value);
+                        LLVMValueRef val = BL_Emit(emitter, node->VarDecl.value);
                         if (DEBUG_MODE) {
                             LLVMMetadataRef loc = BL_Loc(emitter, node->id.line, node->id.column);
                             LLVMSetCurrentDebugLocation2(emitter->builder, loc);
@@ -708,13 +717,13 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             } else {
                 if (node->VarDecl.value) {
                     if (node->VarDecl.value->type == NodeType_Lambda) {
-                        addr = BL_Emit_NoLoc(emitter, node->VarDecl.value);
+                        addr = BL_Emit(emitter, node->VarDecl.value);
                         symtype = SymbolType_Function;
                         symflags |= ValueFlag_Global;
                         LLVMSetValueName2(addr, (const char*)node->id.lexeme.str, node->id.lexeme.size);
                     } else {
                         addr = LLVMAddGlobal(emitter->module, var_type, hoist);
-                        LLVMSetInitializer(addr, BL_Emit_NoLoc(emitter, node->VarDecl.value));
+                        LLVMSetInitializer(addr, BL_Emit(emitter, node->VarDecl.value));
                         if (DEBUG_MODE) {
                             LLVMMetadataRef scope = BL_GetMeta(emitter, compilation_unit_key);
                             LLVMMetadataRef file = BL_GetMeta(emitter, emitter->source_filename.str);
@@ -767,8 +776,13 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
 }
 
 LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
+    if (DEBUG_MODE) {
+        if (emitter->scope_depth != 0) {
+            LLVMMetadataRef loc = BL_Loc(emitter, node->id.line, node->id.column);
+            LLVMSetCurrentDebugLocation2(emitter->builder, loc);
+        }
+    }
     LLVMValueRef r = BL_Emit_NoLoc(emitter, node);
-    LLVMSetCurrentDebugLocation2(emitter->builder, nullptr);
     return r;
 }
 

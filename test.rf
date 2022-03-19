@@ -2,8 +2,17 @@ try := 10;
 
 main := func() -> int {
     i := 0;
-    j := 10;
     k := 20;
-    printf("%lld\n", i);
+    if i == 10 {
+        printf("ten\n", i);
+    } else {
+        printf("%lld\n", i);
+    }
+    
+    while k > 0 {
+        k = k - 1;
+    }
+    
+    j := 10;
     return 0;
 }
