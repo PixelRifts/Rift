@@ -259,12 +259,22 @@ void BL_Init(BL_Emitter* emitter, string source_filename, string filename) {
         string fd = directory_from_filepath(full_path);
         
         
-        string act_str = str_lit("Debug Info Version");
-        LLVMValueRef str = LLVMConstInt(LLVMInt32Type(), 3, false);
-        LLVMValueRef md = LLVMMDNode(&str, 1);
-        LLVMMetadataRef act_md = LLVMValueAsMetadata(md);
-        LLVMAddModuleFlag(emitter->module, LLVMModuleFlagBehaviorError, (const char*) act_str.str, act_str.size, act_md);
+        string debug_info_version_str = str_lit("Debug Info Version");
+        LLVMValueRef version_val = LLVMConstInt(LLVMInt32Type(), 3, false);
+        LLVMValueRef version_md_val = LLVMMDNode(&version_val, 1);
+        LLVMMetadataRef version_act_md = LLVMValueAsMetadata(version_md_val);
+        string codeview_flag_str = str_lit("CodeView");
+        LLVMValueRef codeview_val = LLVMConstInt(LLVMInt32Type(), 1, false);
+        LLVMValueRef codeview_md_val = LLVMMDNode(&codeview_val, 1);
+        LLVMMetadataRef codeview_act_md = LLVMValueAsMetadata(codeview_md_val);
+        string wchar_flag_str = str_lit("wchar_size");
+        LLVMValueRef wchar_val = LLVMConstInt(LLVMInt32Type(), 2, false);
+        LLVMValueRef wchar_md_val = LLVMMDNode(&wchar_val, 1);
+        LLVMMetadataRef wchar_act_md = LLVMValueAsMetadata(wchar_md_val);
         
+        LLVMAddModuleFlag(emitter->module, LLVMModuleFlagBehaviorError, (const char*) debug_info_version_str.str, debug_info_version_str.size, version_act_md);
+        LLVMAddModuleFlag(emitter->module, LLVMModuleFlagBehaviorError, (const char*) codeview_flag_str.str, codeview_flag_str.size, codeview_act_md);
+        LLVMAddModuleFlag(emitter->module, LLVMModuleFlagBehaviorError, (const char*) wchar_flag_str.str, wchar_flag_str.size, wchar_act_md);
         
         LLVMMetadataRef file_meta = LLVMDIBuilderCreateFile(emitter->debug_builder,
                                                             (const char*) fn.str, fn.size, (const char*) fd.str, fd.size);
@@ -346,6 +356,12 @@ static LLVMValueRef BL_BuildUnary(BL_Emitter* emitter, L_Token op, LLVMValueRef 
 
 LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
     if (emitter->emitted_end_in_this_block) return (LLVMValueRef) {0};
+    if (DEBUG_MODE) {
+        if (emitter->scope_depth != 0) {
+            LLVMMetadataRef loc = BL_Loc(emitter, node->id.line, node->id.column);
+            LLVMSetCurrentDebugLocation2(emitter->builder, loc);
+        }
+    }
     
     switch (node->type) {
         case NodeType_Ident: {
@@ -393,11 +409,12 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
         }
         
         case NodeType_Lambda: {
+            LLVMMetadataRef func_meta;
             if (DEBUG_MODE) {
                 // Change to upper function metadata if applicable
                 LLVMMetadataRef file_meta = BL_GetMeta(emitter, emitter->source_filename.str);
                 string fnname = node->id.lexeme;
-                LLVMMetadataRef func_meta =
+                func_meta =
                     LLVMDIBuilderCreateFunction(emitter->debug_builder, file_meta,
                                                 (const char*) fnname.str, fnname.size,
                                                 (const char*) fnname.str, fnname.size, // same for now
@@ -485,6 +502,10 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
                 }
             }
             
+            if (DEBUG_MODE) {
+                LLVMSetSubprogram(func, func_meta);
+            }
+            
             return func;
         }
         
@@ -504,12 +525,18 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
         
         case NodeType_Return: {
             LLVMValueRef stored = {0};
+            LLVMMetadataRef loc = BL_Loc(emitter, node->id.line, node->id.column);
             if (!node->Return) {
                 stored = LLVMBuildStore(emitter->builder, (LLVMValueRef) {0}, emitter->func_return);
+                // @weird Why do I have to do this for these specific ValueRefs
+                LLVMSetMetadata(stored, 0, LLVMMetadataAsValue(LLVMGetGlobalContext(), loc));
             } else {
                 stored = LLVMBuildStore(emitter->builder, BL_Emit_NoLoc(emitter, node->Return), emitter->func_return);
+                // @weird Why do I have to do this for these specific ValueRefs
+                LLVMSetMetadata(stored, 0, LLVMMetadataAsValue(LLVMGetGlobalContext(), loc));
             }
-            LLVMBuildBr(emitter->builder, emitter->return_block);
+            // @weird Why do I have to do this for these specific ValueRefs
+            LLVMSetMetadata(LLVMBuildBr(emitter->builder, emitter->return_block), 0, LLVMMetadataAsValue(LLVMGetGlobalContext(), loc));
             emitter->emitted_end_in_this_block = true;
             return stored;
         }
@@ -646,13 +673,6 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
                 addr = LLVMBuildAlloca(emitter->builder, var_type, hoist);
                 
                 if (DEBUG_MODE) {
-                    if (DEBUG_MODE) {
-                        if (emitter->scope_depth != 0) {
-                            LLVMMetadataRef loc = BL_Loc(emitter, node->id.line, node->id.column);
-                            LLVMSetCurrentDebugLocation2(emitter->builder, loc);
-                        }
-                    }
-                    
                     LLVMMetadataRef scope = BL_ScopeMetadata(emitter);
                     LLVMMetadataRef file = BL_GetMeta(emitter, emitter->source_filename.str);
                     LLVMMetadataRef type = BL_PTypeToMetadataType(emitter, node->VarDecl.type);
@@ -664,7 +684,6 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
                     BL_DebugFunc declare = BL_GetDebugFunc(emitter, str_lit("declare"));
                     LLVMValueRef args[] = { LLVMMDNode(&addr, 1), LLVMMetadataAsValue(LLVMGetGlobalContext(), v), LLVMMetadataAsValue(LLVMGetGlobalContext(), LLVMDIBuilderCreateExpression(emitter->debug_builder, nullptr, 0)) };
                     LLVMBuildCall2(emitter->builder, declare.type, declare.func, args, 3, "");
-                    LLVMSetCurrentDebugLocation2(emitter->builder, nullptr);
                 }
                 
                 if (node->VarDecl.value) {
@@ -675,11 +694,10 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
                     } else {
                         LLVMValueRef val = BL_Emit_NoLoc(emitter, node->VarDecl.value);
                         if (DEBUG_MODE) {
-                            if (emitter->scope_depth != 0) {
-                                LLVMMetadataRef loc = BL_Loc(emitter, node->VarDecl.value->id.line, node->VarDecl.value->id.column);
-                                LLVMSetCurrentDebugLocation2(emitter->builder, loc);
-                            }
+                            LLVMMetadataRef loc = BL_Loc(emitter, node->id.line, node->id.column);
+                            LLVMSetCurrentDebugLocation2(emitter->builder, loc);
                         }
+                        
                         LLVMBuildStore(emitter->builder, val, addr);
                         symtype = SymbolType_Variable;
                     }
@@ -698,7 +716,7 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
                         addr = LLVMAddGlobal(emitter->module, var_type, hoist);
                         LLVMSetInitializer(addr, BL_Emit_NoLoc(emitter, node->VarDecl.value));
                         if (DEBUG_MODE) {
-                            LLVMMetadataRef scope = BL_ScopeMetadata(emitter);
+                            LLVMMetadataRef scope = BL_GetMeta(emitter, compilation_unit_key);
                             LLVMMetadataRef file = BL_GetMeta(emitter, emitter->source_filename.str);
                             LLVMMetadataRef type = BL_PTypeToMetadataType(emitter, node->VarDecl.type);
                             LLVMMetadataRef nullexpr = LLVMDIBuilderCreateExpression(emitter->debug_builder, nullptr, 0);
@@ -717,7 +735,7 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
                 } else {
                     addr = LLVMAddGlobal(emitter->module, var_type, hoist);
                     if (DEBUG_MODE) {
-                        LLVMMetadataRef scope = BL_ScopeMetadata(emitter);
+                        LLVMMetadataRef scope = BL_GetMeta(emitter, compilation_unit_key);
                         LLVMMetadataRef file = BL_GetMeta(emitter, emitter->source_filename.str);
                         LLVMMetadataRef type = BL_PTypeToMetadataType(emitter, node->VarDecl.type);
                         LLVMMetadataRef nullexpr = LLVMDIBuilderCreateExpression(emitter->debug_builder, nullptr, 0);
@@ -749,12 +767,6 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
 }
 
 LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
-    if (DEBUG_MODE) {
-        if (emitter->scope_depth != 0) {
-            LLVMMetadataRef loc = BL_Loc(emitter, node->id.line, node->id.column);
-            LLVMSetCurrentDebugLocation2(emitter->builder, loc);
-        }
-    }
     LLVMValueRef r = BL_Emit_NoLoc(emitter, node);
     LLVMSetCurrentDebugLocation2(emitter->builder, nullptr);
     return r;

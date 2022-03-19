@@ -4,5 +4,6 @@ main := func() -> int {
     i := 0;
     j := 10;
     k := 20;
+    printf("%lld\n", i);
     return 0;
 }

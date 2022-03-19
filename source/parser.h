@@ -31,6 +31,7 @@ P_Scope* scope;\
 P_Type*  function_type;\
 string*  param_names;\
 AstNode* body;\
+L_Token  close_brace;\
 })\
 AST_NODE(Call, str_lit("Call Expression"), struct {\
 AstNode* callee;\

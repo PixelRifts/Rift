@@ -116,12 +116,13 @@ static AstNode* P_AllocGroupNode(P_Parser* parser, AstNode* expr, L_Token token)
     return node;
 }
 
-static AstNode* P_AllocLambdaNode(P_Parser* parser, P_Scope scope, P_Type* function_type, string* param_names, L_Token func, AstNode* body) {
+static AstNode* P_AllocLambdaNode(P_Parser* parser, P_Scope scope, P_Type* function_type, string* param_names, L_Token func, L_Token close_brace, AstNode* body) {
     AstNode* node = P_AllocNode(parser, NodeType_Lambda);
     node->Lambda.function_type = function_type;
     node->Lambda.param_names = param_names;
     node->Lambda.body = body;
     node->Lambda.scope = P_RaiseScope(parser, scope);
+    node->Lambda.close_brace = close_brace;
     node->id = func;
     return node;
 }
@@ -438,6 +439,7 @@ static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
                     break;
                 }
             }
+            L_Token close_brace = parser->prev;
             
             string* param_names = arena_raise(&parser->arena, temp_param_names.elems, sizeof(string) * arity);
             P_Type** param_types = arena_raise(&parser->arena, temp_param_types.elems, sizeof(AstNode*) * arity);
@@ -453,7 +455,7 @@ static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
             
             AstNode* body = P_Statement(parser);
             P_Scope scope = { .type = ScopeType_Func };
-            return P_AllocLambdaNode(parser, scope, func_type, param_names, func_token, body);
+            return P_AllocLambdaNode(parser, scope, func_type, param_names, func_token, close_brace, body);
         }
         
         default: {
