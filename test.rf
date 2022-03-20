@@ -3,16 +3,13 @@ try := 10;
 main := func() -> int {
     i := 0;
     k := 20;
+    j := 10;
+    
     if i == 10 {
-        printf("ten\n", i);
+        printf("ten\n", i / k * printf("twenty\n"));
     } else {
         printf("%lld\n", i);
     }
     
-    while k > 0 {
-        k = k - 1;
-    }
-    
-    j := 10;
     return 0;
 }

@@ -523,8 +523,7 @@ static AstNode* P_Expression(P_Parser* parser, Prec prec_in, b8 is_rhs) {
             if (infix_expr_precs[op.type] >= prec_in) {
                 lhs = P_ExprInfix(parser, op, infix_expr_precs[op.type] + 1, lhs);
                 if (lhs->type == NodeType_Error) return P_AllocErrorNode(parser);
-                op = parser->curr;
-                if (infix_expr_precs[op.type] != Prec_Invalid) P_Advance(parser);
+                op = parser->prev;
             } else break;
         }
     }
