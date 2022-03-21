@@ -342,11 +342,13 @@ static LLVMValueRef BL_BuildUnary(BL_Emitter* emitter, L_Token op, LLVMValueRef 
     return (LLVMValueRef) {0};
 }
 
+#define NOLOC LLVMSetCurrentDebugLocation2(emitter->builder, nullptr)
 LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
     if (emitter->emitted_end_in_this_block) return (LLVMValueRef) {0};
     
     switch (node->type) {
         case NodeType_Ident: {
+            NOLOC;
             llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->Ident, .depth = 0 };
             llvmsymbol_hash_table_value val;
             if (llvmsymbol_hash_table_get(&emitter->variables, key, &val)) {
@@ -362,10 +364,11 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             return (LLVMValueRef) {0};
         }
         
-        case NodeType_IntLit: return LLVMConstInt(LLVMInt64Type(), node->IntLit, 0);
-        case NodeType_BoolLit: return LLVMConstInt(LLVMInt1Type(), node->BoolLit, 0);
+        case NodeType_IntLit: NOLOC; return LLVMConstInt(LLVMInt64Type(), node->IntLit, 0);
+        case NodeType_BoolLit: NOLOC; return LLVMConstInt(LLVMInt1Type(), node->BoolLit, 0);
         
         case NodeType_GlobalString: {
+            NOLOC;
             char* hoist = malloc(node->GlobalString.value.size + 1);
             memcpy(hoist, node->GlobalString.value.str, node->GlobalString.value.size);
             hoist[node->GlobalString.value.size] = '\0';
@@ -376,17 +379,20 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
         } break;
         
         case NodeType_Unary: {
+            NOLOC;
             LLVMValueRef operand = BL_Emit(emitter, node->Unary.expr);
             return BL_BuildUnary(emitter, node->id, operand);
         }
         
         case NodeType_Binary: {
+            NOLOC;
             LLVMValueRef left = BL_Emit(emitter, node->Binary.left);
             LLVMValueRef right = BL_Emit(emitter, node->Binary.right);
             return BL_BuildBinary(emitter, node->id, left, right);
         }
         
         case NodeType_Group: {
+            NOLOC;
             return BL_Emit(emitter, node->Group);
         }
         
@@ -753,6 +759,7 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
     }
     return (LLVMValueRef) {0};
 }
+#undef NOLOC
 
 LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
     LLVMMetadataRef old;

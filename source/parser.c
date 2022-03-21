@@ -543,6 +543,7 @@ static AstNode* P_Statement(P_Parser* parser) {
         AstNode* expr = nullptr;
         if (!P_Match(parser, TokenType_Semicolon))
             expr = P_Expression(parser, Prec_Invalid, false);
+        P_Eat(parser, TokenType_Semicolon);
         return P_AllocReturnNode(parser, expr, tok);
     } else if (parser->curr.type == TokenType_Identifier) {
         L_Token name = parser->curr;

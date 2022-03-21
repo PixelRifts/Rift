@@ -1,12 +1,17 @@
 printf := func(str : cstring, data : ...) -> int #native;
 puts := func(str : cstring) -> int #native;
 
+add  := func(a : int, b : int) -> int return a + b;
+
 main := func() -> int {
     i := 0;
     j := 10;
     k := 20;
     
-    puts("frogeline");
-    printf("frogeline %d\n", k);
+    l := add(i, j);
+    m := add(l, k);
+    
+    printf("%lld\n", m);
+    
     return 0;
 }
