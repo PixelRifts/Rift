@@ -40,9 +40,6 @@ static void BL_Report_LLVMHandler(const char* reason) { fprintf(stderr, "LLVM Er
 
 #define BL_ReportCodegenError(emitter, error, ...) BL_Report(emitter, "Codegen", error, __VA_ARGS__)
 
-LLVMTypeRef printffunctype;
-LLVMValueRef printffunc;
-
 static b8 DEBUG_MODE = true;
 static const char* compilation_unit_key = "compunit_key";
 
@@ -239,14 +236,6 @@ void BL_Init(BL_Emitter* emitter, string source_filename, string filename) {
     llvmmeta_hash_table_init(&emitter->debug_metadata);
     llvmdbgfn_hash_table_init(&emitter->debug_functions);
     
-    LLVMTypeRef printf_function_args_type[] = { LLVMPointerType(LLVMInt8Type(), 0) };
-    printffunctype = LLVMFunctionType(LLVMInt64Type(), printf_function_args_type, 1, true);
-    printffunc = LLVMAddFunction(emitter->module, "printf", printffunctype);
-    
-    llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = str_lit("printf"), .depth = 0 };
-    llvmsymbol_hash_table_value val = { .symtype = SymbolType_Function, .symflags = ValueFlag_Global, .type = printffunctype, .alloca = printffunc, .not_null = true };
-    llvmsymbol_hash_table_set(&emitter->variables, key, val);
-    
     LLVMInstallFatalErrorHandler(BL_Report_LLVMHandler);
     LLVMEnablePrettyStackTrace();
     
@@ -296,7 +285,6 @@ void BL_Init(BL_Emitter* emitter, string source_filename, string filename) {
         llvmdbgfn_hash_table_value dcl = (llvmdbgfn_hash_table_value) { .type = llvmdecltype, .func = llvmdecl };
         llvmdbgfn_hash_table_set(&emitter->debug_functions, str_lit("declare"), dcl);
     }
-    
 }
 
 static LLVMValueRef BL_BuildBinary(BL_Emitter* emitter, L_Token token, LLVMValueRef left, LLVMValueRef right) {
@@ -419,16 +407,18 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
                 BL_SetMeta(emitter, node, func_meta);
             }
             
+            // add function
+            LLVMTypeRef function_type = BL_PTypeToLLVMType(node->Lambda.function_type);
+            LLVMValueRef func = LLVMAddFunction(emitter->module, "", function_type);
+            
+            if (node->Lambda.is_native) { return func; }
+            
             // prev vars
             LLVMBasicBlockRef prev = emitter->current_block;
             LLVMBasicBlockRef prev_ret = emitter->return_block;
             b8 prev_is_in_function = emitter->is_in_function;
             LLVMValueRef prev_ret_val = emitter->func_return;
             AstNode* prev_func = emitter->curr_func;
-            
-            // add function
-            LLVMTypeRef function_type = BL_PTypeToLLVMType(node->Lambda.function_type);
-            LLVMValueRef func = LLVMAddFunction(emitter->module, "", function_type);
             
             // add blocks
             emitter->current_block = LLVMAppendBasicBlock(func, "entry");

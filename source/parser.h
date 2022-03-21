@@ -27,11 +27,12 @@ AstNode* right;\
 })\
 AST_NODE(Group, str_lit("Group Expression"), AstNode*)\
 AST_NODE(Lambda, str_lit("Lambda Expression"), struct {\
+b8       is_native;\
 P_Scope* scope;\
 P_Type*  function_type;\
 string*  param_names;\
 AstNode* body;\
-L_Token  close_brace;\
+L_Token  last_token;\
 })\
 AST_NODE(Call, str_lit("Call Expression"), struct {\
 AstNode* callee;\

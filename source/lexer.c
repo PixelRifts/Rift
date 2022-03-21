@@ -234,6 +234,8 @@ static L_TokenType L_MatchType(L_Lexer* lexer, u32 start, string needle, L_Token
 
 static L_TokenType L_IdentifierType(L_Lexer* lexer) {
     switch (lexer->start[0]) {
+        case '#': return L_MatchType(lexer, 1, str_lit("native"), TokenType_Native);
+        
         case 'r': return L_MatchType(lexer, 1, str_lit("eturn"), TokenType_Return);
         case 'm': return L_MatchType(lexer, 1, str_lit("atch"), TokenType_Match);
         case 'w': return L_MatchType(lexer, 1, str_lit("hile"), TokenType_While);
@@ -325,9 +327,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                     } else return L_MatchType(lexer, 2, str_lit("ll"), TokenType_Null);
                 }
                 case 'a': {
-                    if (L_MatchType(lexer, 2, str_lit("tive"), TokenType_Native) == TokenType_Native) {
-                        return TokenType_Native;
-                    } else return L_MatchType(lexer, 2, str_lit("mespace"), TokenType_Namespace);
+                    return L_MatchType(lexer, 2, str_lit("mespace"), TokenType_Namespace);
                 }
             }
             return TokenType_Identifier;
@@ -484,7 +484,7 @@ L_Token L_LexToken(L_Lexer* lexer) {
         }
         
         default: {
-            if (is_alpha(c))
+            if (is_alpha(c) || c == '#')
                 return L_Identifier(lexer);
         }
     }

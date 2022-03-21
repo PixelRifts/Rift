@@ -116,13 +116,14 @@ static AstNode* P_AllocGroupNode(P_Parser* parser, AstNode* expr, L_Token token)
     return node;
 }
 
-static AstNode* P_AllocLambdaNode(P_Parser* parser, P_Scope scope, P_Type* function_type, string* param_names, L_Token func, L_Token close_brace, AstNode* body) {
+static AstNode* P_AllocLambdaNode(P_Parser* parser, b8 is_native, P_Scope scope, P_Type* function_type, string* param_names, L_Token func, L_Token last_token, AstNode* body) {
     AstNode* node = P_AllocNode(parser, NodeType_Lambda);
+    node->Lambda.is_native = is_native;
     node->Lambda.function_type = function_type;
     node->Lambda.param_names = param_names;
     node->Lambda.body = body;
     node->Lambda.scope = P_RaiseScope(parser, scope);
-    node->Lambda.close_brace = close_brace;
+    node->Lambda.last_token = last_token;
     node->id = func;
     return node;
 }
@@ -439,7 +440,6 @@ static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
                     break;
                 }
             }
-            L_Token close_brace = parser->prev;
             
             string* param_names = arena_raise(&parser->arena, temp_param_names.elems, sizeof(string) * arity);
             P_Type** param_types = arena_raise(&parser->arena, temp_param_types.elems, sizeof(AstNode*) * arity);
@@ -453,9 +453,15 @@ static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
             type_array_free(&temp_param_types);
             P_Type* func_type = P_AllocFunctionType(parser, return_type, param_types, arity, varargs, func_token);
             
+            if (P_Match(parser, TokenType_Native)) {
+                P_Eat(parser, TokenType_Semicolon);
+                return P_AllocLambdaNode(parser, true, (P_Scope) {0}, func_type, param_names, func_token, (L_Token) {0}, nullptr);
+            }
+            
             AstNode* body = P_Statement(parser);
+            L_Token last_token = parser->prev;
             P_Scope scope = { .type = ScopeType_Func };
-            return P_AllocLambdaNode(parser, scope, func_type, param_names, func_token, close_brace, body);
+            return P_AllocLambdaNode(parser, false, scope, func_type, param_names, func_token, last_token, body);
         }
         
         default: {

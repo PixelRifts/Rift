@@ -1,15 +1,12 @@
-try := 10;
+printf := func(str : cstring, data : ...) -> int #native;
+puts := func(str : cstring) -> int #native;
 
 main := func() -> int {
     i := 0;
-    k := 20;
     j := 10;
+    k := 20;
     
-    if i == 10 {
-        printf("ten\n", i / k * printf("twenty\n"));
-    } else {
-        printf("%lld\n", i);
-    }
-    
+    puts("frogeline");
+    printf("frogeline %d\n", k);
     return 0;
 }

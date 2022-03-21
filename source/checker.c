@@ -202,6 +202,8 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
         } break;
         
         case NodeType_Lambda: {
+            if (node->Lambda.is_native) { return node->Lambda.function_type; }
+            
             C_ScopeContext* scope_context = C_PushScope(checker, node->Lambda.scope, node->Lambda.function_type->function.return_type, true);
             
             for (u32 i = 0; i < node->Lambda.function_type->function.arity; i++) {
@@ -209,7 +211,7 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
                 P_Type* type = node->Lambda.function_type->function.param_types[i];
                 symbol_hash_table_key key = (symbol_hash_table_key) { .name = var_name, .depth = 0 };
                 if (symbol_hash_table_get(&checker->symbol_table, key, nullptr)) {
-                    C_ReportCheckError(checker, node->id, "Parameters have the same name '%.*s'\n", str_expand(var_name));
+                    C_ReportCheckError(checker, node->id, "Two parameters have the same name '%.*s' or parameter shadows another variable\n", str_expand(var_name));
                 }
                 symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Variable, .name = var_name, .depth = checker->scope_depth, .variable_type = type });
             }
@@ -398,18 +400,6 @@ void C_Init(C_Checker* checker, string filename) {
     checker->filename = filename;
     symbol_hash_table_init(&checker->symbol_table);
     arena_init(&checker->arena);
-    
-    // WTF
-    P_Type* printf_function_type = arena_alloc(&checker->arena, sizeof(P_Type));
-    printf_function_type->type = BasicType_Function;
-    printf_function_type->token = (L_Token) {0};
-    printf_function_type->function.return_type = &C_IntegerType;
-    printf_function_type->function.arity = 1;
-    printf_function_type->function.param_types = arena_alloc(&checker->arena, sizeof(P_Type*));
-    printf_function_type->function.param_types[0] = &C_CstringType;
-    printf_function_type->function.varargs = true;
-    symbol_hash_table_key key = (symbol_hash_table_key) { .name = str_lit("printf"), .depth = 0 };
-    symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Function, .name = str_lit("printf"), .depth = 0, .variable_type = printf_function_type });
 }
 
 void C_CheckAst(C_Checker* checker, AstNode* node) {
