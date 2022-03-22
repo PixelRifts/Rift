@@ -203,9 +203,12 @@ static P_Type* P_AllocType(P_Parser* parser, P_BasicType type) {
     return node;
 }
 
+P_Type* cached_invalid_type;
 static P_Type* P_AllocErrorType(P_Parser* parser) {
-    P_Type* node = P_AllocType(parser, BasicType_Invalid);
-    return node;
+    if (!cached_invalid_type) {
+        cached_invalid_type = P_AllocType(parser, BasicType_Invalid);
+    }
+    return cached_invalid_type;
 }
 
 static P_Type* P_AllocIntType(P_Parser* parser, L_Token tok) {
@@ -239,6 +242,13 @@ static P_Type* P_AllocFunctionType(P_Parser* parser, P_Type* return_type, P_Type
     type->function.param_types = param_types;
     type->function.varargs = varargs;
     type->function.arity = arity;
+    return type;
+}
+
+static P_Type* P_AllocPointerType(P_Parser* parser, L_Token tok, P_Type* base) {
+    P_Type* type = P_AllocType(parser, BasicType_Pointer);
+    type->token = tok;
+    type->pointer = base;
     return type;
 }
 
@@ -288,12 +298,24 @@ static b8 P_IsType(P_Parser* parser) {
     return ret;
 }
 
+static P_Type* P_EatTypeMods(P_Parser* parser, P_Type* base) {
+    P_Type* new_base = nullptr;
+    if (P_Match(parser, TokenType_Star)) {
+        L_Token star = parser->prev;
+        new_base = P_AllocPointerType(parser, star, base);
+    } else {
+        return base;
+    }
+    return P_EatTypeMods(parser, new_base);
+}
+
 static P_Type* P_EatType(P_Parser* parser) {
+    P_Type* base = nullptr;
     switch (parser->curr.type) {
-        case TokenType_Int: P_Advance(parser); return P_AllocIntType(parser, parser->prev);
-        case TokenType_Bool: P_Advance(parser); return P_AllocBoolType(parser, parser->prev);
-        case TokenType_Cstring: P_Advance(parser); return P_AllocCstringType(parser, parser->prev);
-        case TokenType_Void: P_Advance(parser); return P_AllocVoidType(parser, parser->prev);
+        case TokenType_Int: P_Advance(parser); base = P_AllocIntType(parser, parser->prev); break;
+        case TokenType_Bool: P_Advance(parser); base = P_AllocBoolType(parser, parser->prev); break;
+        case TokenType_Cstring: P_Advance(parser); base = P_AllocCstringType(parser, parser->prev); break;
+        case TokenType_Void: P_Advance(parser); base = P_AllocVoidType(parser, parser->prev); break;
         
         case TokenType_Func: {
             P_Advance(parser);
@@ -330,12 +352,17 @@ static P_Type* P_EatType(P_Parser* parser) {
             if (!return_type) return_type = P_AllocVoidType(parser, func_token);
             
             type_array_free(&temp_param_types);
-            return P_AllocFunctionType(parser, return_type, param_types, arity, varargs, func_token);
-        }
+            base = P_AllocFunctionType(parser, return_type, param_types, arity, varargs, func_token);
+        } break;
         
         default: P_ReportParseError(parser, "Could not consume type. Got %.*s token\n", str_expand(L_GetTypeName(parser->curr.type)));
     }
-    return P_AllocErrorType(parser);
+    
+    if (!base)
+        return P_AllocErrorType(parser);
+    
+    base = P_EatTypeMods(parser, base);
+    return base;
 }
 
 //~ Expressions

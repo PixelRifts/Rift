@@ -67,6 +67,8 @@ static b8 C_CheckTypeEquals(P_Type* a, P_Type* b) {
             }
             return true;
         }
+        
+        case BasicType_Pointer: return C_CheckTypeEquals(a->pointer, b->pointer);
     }
     
     return false;

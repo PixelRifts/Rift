@@ -25,5 +25,16 @@ main := func() -> int {
     
     printf("%lld\n", l);
     
+    if l == 30 {
+        tau := 0;
+        while tau < 10 {
+            tau++;
+            printf("%lld ", tau);
+        }
+        printf("\n");
+    } else {
+        puts("Not thirty");
+    }
+    
     return 0;
 }

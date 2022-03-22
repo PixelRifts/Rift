@@ -49,6 +49,7 @@ static LLVMTypeRef BL_PTypeToLLVMType(P_Type* type) {
         case BasicType_Integer: return LLVMInt64Type();
         case BasicType_Boolean: return LLVMInt1Type();
         case BasicType_Cstring: return LLVMPointerType(LLVMInt8Type(), 0);
+        
         case BasicType_Function: {
             LLVMTypeRef return_type = BL_PTypeToLLVMType(type->function.return_type);
             LLVMTypeRef* param_types = calloc(type->function.arity, sizeof(LLVMTypeRef));
@@ -57,6 +58,10 @@ static LLVMTypeRef BL_PTypeToLLVMType(P_Type* type) {
             LLVMTypeRef ret = LLVMFunctionType(return_type, param_types, type->function.arity, type->function.varargs);
             free(param_types);
             return ret;
+        } break;
+        
+        case BasicType_Pointer: {
+            return LLVMPointerType(BL_PTypeToLLVMType(type->pointer), 0);
         } break;
     }
     return (LLVMTypeRef) {0};
@@ -125,7 +130,7 @@ static LLVMMetadataRef BL_PTypeToMetadataType(BL_Emitter* emitter, P_Type* type)
                                                                (const char*) name.str, name.size, td.size, td.encoding, LLVMDIFlagZero);
             BL_SetMeta(emitter, name.str, ret);
             return ret;
-        }
+        } break;
         
         case BasicType_Function: {
             LLVMMetadataRef* param_types = calloc(type->function.arity, sizeof(LLVMMetadataRef));
@@ -140,6 +145,14 @@ static LLVMMetadataRef BL_PTypeToMetadataType(BL_Emitter* emitter, P_Type* type)
             BL_SetMeta(emitter, type, ret);
             
             free(param_types);
+            return ret;
+        } break;
+        
+        case BasicType_Pointer: {
+            LLVMMetadataRef pointee = BL_PTypeToMetadataType(emitter, type->pointer);
+            LLVMMetadataRef ret =
+                LLVMDIBuilderCreatePointerType(emitter->debug_builder, pointee, 64, 8, 0, "", 0);
+            BL_SetMeta(emitter, type, ret);
             return ret;
         } break;
     }
@@ -342,18 +355,20 @@ static LLVMValueRef BL_BuildUnary(BL_Emitter* emitter, L_Token op, LLVMValueRef 
     return (LLVMValueRef) {0};
 }
 
-#define NOLOC LLVMSetCurrentDebugLocation2(emitter->builder, nullptr)
+#define NOLOC(name) \
+LLVMMetadataRef name = LLVMGetCurrentDebugLocation2(emitter->builder);\
+LLVMSetCurrentDebugLocation2(emitter->builder, nullptr)
+#define RESLOC(name) LLVMSetCurrentDebugLocation2(emitter->builder, name);
 LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
     if (emitter->emitted_end_in_this_block) return (LLVMValueRef) {0};
     
     switch (node->type) {
         case NodeType_Ident: {
-            NOLOC;
             llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->Ident, .depth = 0 };
             llvmsymbol_hash_table_value val;
             if (llvmsymbol_hash_table_get(&emitter->variables, key, &val)) {
                 if (val.changed) {
-                    LLVMValueRef v = LLVMBuildLoad(emitter->builder, val.alloca, "");
+                    LLVMValueRef v = LLVMBuildLoad2(emitter->builder, val.type, val.alloca, "");
                     val.loaded = v;
                     val.changed = false;
                     llvmsymbol_hash_table_set(&emitter->variables, key, val);
@@ -364,11 +379,10 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             return (LLVMValueRef) {0};
         }
         
-        case NodeType_IntLit: NOLOC; return LLVMConstInt(LLVMInt64Type(), node->IntLit, 0);
-        case NodeType_BoolLit: NOLOC; return LLVMConstInt(LLVMInt1Type(), node->BoolLit, 0);
+        case NodeType_IntLit: return LLVMConstInt(LLVMInt64Type(), node->IntLit, 0);
+        case NodeType_BoolLit: return LLVMConstInt(LLVMInt1Type(), node->BoolLit, 0);
         
         case NodeType_GlobalString: {
-            NOLOC;
             char* hoist = malloc(node->GlobalString.value.size + 1);
             memcpy(hoist, node->GlobalString.value.str, node->GlobalString.value.size);
             hoist[node->GlobalString.value.size] = '\0';
@@ -379,20 +393,17 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
         } break;
         
         case NodeType_Unary: {
-            NOLOC;
             LLVMValueRef operand = BL_Emit(emitter, node->Unary.expr);
             return BL_BuildUnary(emitter, node->id, operand);
         }
         
         case NodeType_Binary: {
-            NOLOC;
             LLVMValueRef left = BL_Emit(emitter, node->Binary.left);
             LLVMValueRef right = BL_Emit(emitter, node->Binary.right);
             return BL_BuildBinary(emitter, node->id, left, right);
         }
         
         case NodeType_Group: {
-            NOLOC;
             return BL_Emit(emitter, node->Group);
         }
         
@@ -466,7 +477,7 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             
             if (node->Lambda.function_type->function.return_type->type == BasicType_Void)
                 LLVMBuildStore(emitter->builder, (LLVMValueRef) {0}, emitter->func_return);
-            LLVMValueRef ret_loaded = LLVMBuildLoad(emitter->builder, emitter->func_return, "");
+            LLVMValueRef ret_loaded = LLVMBuildLoad2(emitter->builder, return_type, emitter->func_return, "");
             LLVMBuildRet(emitter->builder, ret_loaded);
             
             BL_EndBasicBlock(emitter, block_ctx);
@@ -508,7 +519,7 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             
             LLVMValueRef* params = malloc(node->Call.arity * sizeof(LLVMValueRef));
             for (u32 i = 0; i < node->Call.arity; i++) {
-                params[i] = BL_Emit(emitter, node->Call.params[i]);
+                params[i] = BL_Emit_NoLoc(emitter, node->Call.params[i]);
             }
             return LLVMBuildCall2(emitter->builder, val.type, val.alloca, params, node->Call.arity, "");
         }
@@ -760,6 +771,7 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
     return (LLVMValueRef) {0};
 }
 #undef NOLOC
+#undef RESLOC
 
 LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
     LLVMMetadataRef old;

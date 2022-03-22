@@ -104,6 +104,7 @@ TYPE(Boolean, str_lit("Boolean"), str_lit("bool")) \
 TYPE(Void, str_lit("Void"), str_lit("void")) \
 TYPE(Function, str_lit("Function"), str_lit("func")) \
 TYPE(Cstring, str_lit("Cstring"), str_lit("const char*")) \
+TYPE(Pointer, str_lit("Pointer"), str_lit("*")) \
 TYPE(Count, str_lit("__Count"), str_lit("__Count"))
 
 
@@ -115,6 +116,7 @@ enum {
     BasicType_Void,
     BasicType_Function,
     BasicType_Cstring,
+    BasicType_Pointer,
     BasicType_Count
 };
 
@@ -127,6 +129,7 @@ struct P_Type {
     
     union {
         struct { P_Type* return_type; P_Type** param_types; u32 arity; b8 varargs; } function;
+        P_Type* pointer;
     };
 };
 
