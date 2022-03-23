@@ -66,7 +66,7 @@ typedef struct M_Pool {
 } M_Pool;
 
 #define M_POOL_MAX Gigabytes(1)
-#define M_POOL_CHUNK_COMMIT_COUNT 32
+#define M_POOL_CHUNK_COMMIT_COUNT 4
 
 void* pool_alloc(M_Pool* pool);
 void pool_dealloc(M_Pool* pool, void* ptr);

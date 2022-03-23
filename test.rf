@@ -24,6 +24,7 @@ main := func() -> int {
     l := add(i, add(j, k));
     
     t : int***;
+    khi : int** = *t;
     
     printf("%lld\n", l);
     

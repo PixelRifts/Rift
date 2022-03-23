@@ -25,8 +25,29 @@ static char* readFile(const char* path) {
     return buffer;
 }
 
+typedef struct filler { int i; float j; b8 k; } filler;
+
 int main(int argc, char **argv) {
     M_ScratchInit();
+    
+    M_Pool pool = {0};
+    pool_init(&pool, sizeof(int));
+    int* a = pool_alloc(&pool);
+    int* b = pool_alloc(&pool);
+    int* c = pool_alloc(&pool);
+    int* d = pool_alloc(&pool);
+    int* e = pool_alloc(&pool);
+    *a = 1;
+    *b = 2;
+    *c = 3;
+    *d = 4;
+    *e = 5;
+    printf("a = %llu\n", (u64) a); flush;
+    printf("b = %llu\n", (u64) b); flush;
+    printf("c = %llu\n", (u64) c); flush;
+    printf("d = %llu\n", (u64) d); flush;
+    printf("e = %llu\n", (u64) e); flush;
+    pool_free(&pool);
     
     if (argc < 2) {
         printf("Did not recieve filename as first argument\n");

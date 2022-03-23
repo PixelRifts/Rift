@@ -348,6 +348,7 @@ static LLVMValueRef BL_BuildBinary(BL_Emitter* emitter, L_Token token, LLVMValue
 static LLVMValueRef BL_BuildUnary(BL_Emitter* emitter, L_Token op, LLVMValueRef operand) {
     switch (op.type) {
         case TokenType_Plus:  return operand;
+        case TokenType_Star:  return LLVMBuildLoad(emitter->builder, operand, "");
         case TokenType_Minus: return LLVMBuildNeg(emitter->builder, operand, "");
         case TokenType_Tilde: return LLVMBuildNot(emitter->builder, operand, "");
         default: unreachable;
@@ -622,7 +623,6 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             LLVMBasicBlockRef bodyb = LLVMAppendBasicBlock(current_function, "wh");
             LLVMBasicBlockRef afterb = LLVMAppendBasicBlock(current_function, "af");
             
-            
             if (DEBUG_MODE) LLVMSetCurrentDebugLocation2(emitter->builder, nullptr);
             LLVMBuildCondBr(emitter->builder, condition, bodyb, afterb);
             BL_EndBasicBlock(emitter, block_ctx);
@@ -779,7 +779,7 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         if (emitter->scope_depth != 0) {
             old = LLVMGetCurrentDebugLocation2(emitter->builder);
             LLVMMetadataRef loc = BL_Loc(emitter, node->id.line, node->id.column);
-            LLVMSetCurrentDebugLocation2(emitter->builder, loc);
+            LLVMSetCurrentDebugLocation(emitter->builder, LLVMMetadataAsValue(LLVMGetGlobalContext(), loc));
         }
     }
     LLVMValueRef r = BL_Emit_NoLoc(emitter, node);

@@ -180,8 +180,8 @@ Array_Prototype(type_array, P_Type*);
 Array_Prototype(node_array, AstNode*);
 
 typedef struct P_Parser {
-    M_Pool node_pool;
-    M_Pool type_pool;
+    M_Pool  node_pool;
+    M_Pool  type_pool;
     M_Arena arena;
     
     L_Lexer* lexer;

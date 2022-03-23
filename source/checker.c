@@ -86,6 +86,13 @@ static b8 C_CheckBinary(P_Type* lhs, P_Type* rhs, L_TokenType op, P_Type** outpu
 }
 
 static b8 C_CheckUnary(P_Type* operand, L_TokenType op, P_Type** output) {
+    if (op == TokenType_Star) {
+        if (operand->type == BasicType_Pointer) {
+            *output = operand->pointer;
+            return true;
+        } else return false;
+    }
+    
     C_UnaryOpBinding binding = unary_operator_bindings[op];
     for (u32 i = 0; i < binding.count; i++) {
         if (C_CheckTypeEquals(binding.elems[i].a, operand)) {
@@ -389,6 +396,12 @@ static P_Type* C_GetType(C_Checker* checker, AstNode* node) {
             } else {
                 if (type == nullptr) 
                     C_ReportCheckError(checker, node->id, "Variable '%.*s' has neither type nor value. At least one of these should be specified\n", str_expand(var_name));
+                
+                symbol_hash_table_key key = (symbol_hash_table_key) { .name = var_name, .depth = 0 };
+                if (symbol_hash_table_get(&checker->symbol_table, key, nullptr)) {
+                    C_ReportCheckError(checker, node->id, "Symbol '%.*s' already exists\n", str_expand(var_name));
+                }
+                symbol_hash_table_set(&checker->symbol_table, key, (symbol_hash_table_value) { .type = SymbolType_Variable, .name = var_name, .depth = checker->scope_depth, .variable_type = type });
             }
             
             return &C_InvalidType;

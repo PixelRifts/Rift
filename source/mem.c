@@ -223,7 +223,7 @@ void pool_dealloc_range(M_Pool* pool, void* ptr, u64 count) {
     void* start = pool->memory;
     void* end = pool->memory + pool->commit_position + pool->chunk_size * count;
     
-    for (u64 i = 0; i < count; i++) {
+    for (i64 i = count - 1; i >= 0; i--) {
         void* pointer = ptr + i * pool->chunk_size;
         
         if (!(start <= pointer && pointer < end)) {
@@ -246,7 +246,7 @@ void pool_init(M_Pool* pool, u64 chunk_size) {
     
     assert(chunk_size >= sizeof(M_PoolFreeNode) && "Chunk size is too small");
     pool->free_list = nullptr;
-    pool_clear(pool);
+    // pool_clear(pool);
 }
 
 void pool_clear(M_Pool* pool) {
