@@ -1,43 +1,16 @@
-// Simple Declaration: 
-//     name : type = value;
-// type can be inferred from value in which case:
-//     name := value;
-
-// Native declarations
-
 printf := func(str : cstring, data : ...) -> int #native;
 puts   := func(str : cstring) -> int #native;
 
-// Lambda expressions are the way to define functions.
-//    func(param1 : type1, param2 : type2) [-> return_type] body
-//    body can be a block statement or any regular statement
-
-add  := func(a : int, b : int) -> int return a + b;
-
-// Entry point
+khi := func(a : int) {
+    b := &a;
+}
 
 main := func() -> int {
-    i := 0;
-    j := 10;
-    k := 20;
+    l := 10;
+    l = -l;
     
-    l := add(i, add(j, k));
-    
-    t : int***;
-    khi : int** = *t;
-    
-    printf("%lld\n", l);
-    
-    if l == 30 {
-        tau := 0;
-        while tau < 10 {
-            tau = tau + 1;
-            printf("%lld ", tau);
-        }
-        printf("\n");
-    } else {
-        puts("Not thirty");
-    }
+    t := &l;
+    m := &t;
     
     return 0;
 }

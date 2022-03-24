@@ -409,6 +409,7 @@ static b8 P_IsExprTok(P_Parser* parser) {
         case TokenType_Tilde:
         case TokenType_Func:
         case TokenType_Star:
+        case TokenType_Ampersand:
         return true;
     }
     return false;
@@ -436,6 +437,7 @@ static AstNode* P_ExprUnary(P_Parser* parser, b8 is_rhs) {
         case TokenType_Tilde:
         P_Advance(parser); return P_ExprUnaryNum(parser);
         
+        case TokenType_Ampersand:
         case TokenType_Star: {
             P_Advance(parser);
             L_Token last = parser->prev;

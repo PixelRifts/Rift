@@ -8,6 +8,16 @@
 #include "mem.h"
 #include "ds.h"
 
+typedef u32 C_ValueFlags;
+enum {
+    ValueFlag_Assignable = 0x1,
+};
+
+typedef struct C_Value {
+    P_Type*      type;
+    C_ValueFlags flags;
+} C_Value;
+
 typedef u32 C_SymbolType;
 enum {
     SymbolType_Invalid,
@@ -31,7 +41,7 @@ typedef struct C_Symbol {
     u32 depth;
     
     union {
-        P_Type* variable_type;
+        C_Value variable;
     };
 } C_Symbol;
 

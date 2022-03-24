@@ -345,12 +345,21 @@ static LLVMValueRef BL_BuildBinary(BL_Emitter* emitter, L_Token token, LLVMValue
     return (LLVMValueRef) {0};
 }
 
-static LLVMValueRef BL_BuildUnary(BL_Emitter* emitter, L_Token op, LLVMValueRef operand) {
+static LLVMValueRef BL_BuildUnary(BL_Emitter* emitter, L_Token op, LLVMValueRef operand, void* extra_data) {
     switch (op.type) {
         case TokenType_Plus:  return operand;
         case TokenType_Star:  return LLVMBuildLoad(emitter->builder, operand, "");
         case TokenType_Minus: return LLVMBuildNeg(emitter->builder, operand, "");
         case TokenType_Tilde: return LLVMBuildNot(emitter->builder, operand, "");
+        
+        case TokenType_Ampersand: {
+            string name = *((string*) extra_data);
+            llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = name, .depth = 0 };
+            llvmsymbol_hash_table_value val;
+            if (llvmsymbol_hash_table_get(&emitter->variables, key, &val)) {
+                return val.alloca;
+            }
+        };
         default: unreachable;
     }
     return (LLVMValueRef) {0};
@@ -394,8 +403,13 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
         } break;
         
         case NodeType_Unary: {
+            if (node->id.type == TokenType_Ampersand) {
+                // can only get through checker if node->Unary.expr is an ident
+                string extra_data = node->Unary.expr->Ident;
+                return BL_BuildUnary(emitter, node->id, nullptr, &extra_data);
+            }
             LLVMValueRef operand = BL_Emit(emitter, node->Unary.expr);
-            return BL_BuildUnary(emitter, node->id, operand);
+            return BL_BuildUnary(emitter, node->id, operand, nullptr);
         }
         
         case NodeType_Binary: {
@@ -440,7 +454,9 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             
             // add blocks
             emitter->current_block = LLVMAppendBasicBlock(func, "entry");
-            emitter->return_block = LLVMAppendBasicBlock(func, "re");
+            if (node->Lambda.function_type->function.return_type->type != BasicType_Void) {
+                emitter->return_block = LLVMAppendBasicBlock(func, "re");
+            }
             emitter->is_in_function = true;
             emitter->curr_func = node;
             
@@ -449,7 +465,9 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             BL_BlockContext* block_ctx = BL_StartBasicBlock(emitter, emitter->current_block);
             
             LLVMTypeRef return_type = BL_PTypeToLLVMType(node->Lambda.function_type->function.return_type);
-            emitter->func_return = LLVMBuildAlloca(emitter->builder, return_type, "");
+            if (node->Lambda.function_type->function.return_type->type != BasicType_Void) {
+                emitter->func_return = LLVMBuildAlloca(emitter->builder, return_type, "");
+            }
             
             for (u32 i = 0; i < node->Lambda.function_type->function.arity; i++) {
                 string var_name = node->Lambda.param_names[i];
@@ -465,23 +483,29 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             
             BL_Emit(emitter, node->Lambda.body);
             if (!emitter->emitted_end_in_this_block) {
-                LLVMBuildBr(emitter->builder, emitter->return_block);
+                if (node->Lambda.function_type->function.return_type->type != BasicType_Void) {
+                    LLVMBuildBr(emitter->builder, emitter->return_block);
+                } else {
+                    LLVMBuildRet(emitter->builder, nullptr);
+                }
                 emitter->emitted_end_in_this_block = false;
             }
             
             BL_EndBasicBlock(emitter, block_ctx);
             // ==-- Entry End --== //
             
-            // ==-- Return --== //
-            LLVMMoveBasicBlockAfter(emitter->return_block, emitter->current_block);
-            block_ctx = BL_StartBasicBlock(emitter, emitter->return_block);
-            
-            if (node->Lambda.function_type->function.return_type->type == BasicType_Void)
-                LLVMBuildStore(emitter->builder, (LLVMValueRef) {0}, emitter->func_return);
-            LLVMValueRef ret_loaded = LLVMBuildLoad2(emitter->builder, return_type, emitter->func_return, "");
-            LLVMBuildRet(emitter->builder, ret_loaded);
-            
-            BL_EndBasicBlock(emitter, block_ctx);
+            if (node->Lambda.function_type->function.return_type->type != BasicType_Void) {
+                // ==-- Return --== //
+                LLVMMoveBasicBlockAfter(emitter->return_block, emitter->current_block);
+                block_ctx = BL_StartBasicBlock(emitter, emitter->return_block);
+                
+                if (node->Lambda.function_type->function.return_type->type == BasicType_Void)
+                    LLVMBuildStore(emitter->builder, (LLVMValueRef) {0}, emitter->func_return);
+                LLVMValueRef ret_loaded = LLVMBuildLoad2(emitter->builder, return_type, emitter->func_return, "");
+                LLVMBuildRet(emitter->builder, ret_loaded);
+                
+                BL_EndBasicBlock(emitter, block_ctx);
+            }
             // ==-- Return End --== //
             BL_PopScope(emitter, scope_ctx);
             
@@ -709,7 +733,6 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
                 } else {
                     // TODO(voxel): @default_init
                 }
-                
             } else {
                 if (node->VarDecl.value) {
                     if (node->VarDecl.value->type == NodeType_Lambda) {
