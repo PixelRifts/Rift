@@ -207,7 +207,9 @@ static C_Value C_Check(C_Checker* checker, AstNode* node) {
             if (!C_CheckUnary(checker, xpr, node->id.type, &output)) {
                 C_ReportCheckError(checker, node->id, "Cannot apply unary operator '%.*s' to type '%.*s'\n", str_expand(L_GetTypeName(node->id.type)), str_expand(C_GetBasicTypeName(xpr.type)));
             }
-            return (C_Value) { output, 0 };
+            u32 flags = 0;
+            if (node->id.type == TokenType_Star) flags |= ValueFlag_Assignable;
+            return (C_Value) { output, flags };
         } break;
         
         case NodeType_Binary: {
@@ -359,17 +361,30 @@ static C_Value C_Check(C_Checker* checker, AstNode* node) {
             C_CheckInFunction(checker, node);
             C_Value symboltype = {0};
             
-            symbol_hash_table_key key = (symbol_hash_table_key) { .name = node->id.lexeme, .depth = 0 };
-            symbol_hash_table_value val;
-            if (C_GetSymbol(checker, key, &val)) {
-                if (val.type != SymbolType_Variable)
-                    C_ReportCheckError(checker, node->id, "'%.*s' is not assignable\n", str_expand(node->id.lexeme));
-                symboltype = val.variable;
-            }
-            
-            C_Value valuetype = C_Check(checker, node->Assign.value);
-            if (!C_CheckTypeEquals(symboltype.type, valuetype.type)) {
-                C_ReportCheckError(checker, node->id, "Assignment type mismatch. got types '%.*s' and '%.*s'\n", str_expand(C_GetBasicTypeName(symboltype.type)), str_expand(C_GetBasicTypeName(valuetype.type)));
+            if (node->Assign.assignee->type == NodeType_Ident) {
+                
+                symbol_hash_table_key key = (symbol_hash_table_key) { .name = node->Assign.assignee->Ident, .depth = 0 };
+                symbol_hash_table_value val;
+                if (C_GetSymbol(checker, key, &val)) {
+                    if ((val.variable.flags & ValueFlag_Assignable) == 0)
+                        C_ReportCheckError(checker, node->id, "'%.*s' is not assignable\n", str_expand(node->Ident));
+                    symboltype = val.variable;
+                }
+                
+                C_Value valuetype = C_Check(checker, node->Assign.value);
+                if (!C_CheckTypeEquals(symboltype.type, valuetype.type)) {
+                    C_ReportCheckError(checker, node->id, "Assignment type mismatch. got types '%.*s' and '%.*s'\n", str_expand(C_GetBasicTypeName(symboltype.type)), str_expand(C_GetBasicTypeName(valuetype.type)));
+                }
+                
+            } else if (node->Assign.assignee->type == NodeType_Unary && node->Assign.assignee->id.type == TokenType_Star) {
+                // Deref
+                C_Value assigneetype = C_Check(checker, node->Assign.assignee);
+                C_Value valuetype = C_Check(checker, node->Assign.value);
+                if (!C_CheckTypeEquals(assigneetype.type, valuetype.type)) {
+                    C_ReportCheckError(checker, node->id, "Assignment type mismatch. got types '%.*s' and '%.*s'\n", str_expand(C_GetBasicTypeName(assigneetype.type->pointer)), str_expand(C_GetBasicTypeName(valuetype.type)));
+                }
+            } else {
+                C_ReportCheckError(checker, node->Assign.assignee->id, "Cannot Assign to expression\n");
             }
             
             return (C_Value) { &C_InvalidType, 0 };

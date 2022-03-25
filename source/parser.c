@@ -181,10 +181,11 @@ static AstNode* P_AllocWhileNode(P_Parser* parser, L_Token token, P_Scope scope,
     return node;
 }
 
-static AstNode* P_AllocAssignNode(P_Parser* parser, L_Token name, AstNode* value) {
+static AstNode* P_AllocAssignNode(P_Parser* parser, AstNode* assignee, AstNode* value) {
     AstNode* node = P_AllocNode(parser, NodeType_Assign);
+    node->Assign.assignee = assignee;
     node->Assign.value = value;
-    node->id = name;
+    node->id = assignee->id;
     return node;
 }
 
@@ -613,12 +614,6 @@ static AstNode* P_Statement(P_Parser* parser) {
             } else P_Eat(parser, TokenType_Semicolon);
             
             return P_AllocVarDeclNode(parser, type, name, value);
-        } else if (parser->next.type == TokenType_Equal) {
-            P_Advance(parser); // Identifier
-            P_Advance(parser); // =
-            AstNode* value = P_Expression(parser, Prec_Invalid, false);
-            P_Eat(parser, TokenType_Semicolon);
-            return P_AllocAssignNode(parser, name, value);
         } else {
             AstNode* expr = P_Expression(parser, Prec_Invalid, false);
             return P_AllocExprStatementNode(parser, expr);
@@ -658,6 +653,13 @@ static AstNode* P_Statement(P_Parser* parser) {
         return P_AllocBlockNode(parser, scope, statements, count, tok);
     } else if (P_IsExprTok(parser)) {
         AstNode* expr = P_Expression(parser, Prec_Invalid, false);
+        
+        if (P_Match(parser, TokenType_Equal)) {
+            AstNode* value = P_Expression(parser, Prec_Invalid, false);
+            P_Eat(parser, TokenType_Semicolon);
+            return P_AllocAssignNode(parser, expr, value);
+        }
+        
         return P_AllocExprStatementNode(parser, expr);
     }
     return P_AllocErrorNode(parser);

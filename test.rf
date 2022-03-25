@@ -10,7 +10,8 @@ main := func() -> int {
     l = -l;
     
     t := &l;
-    m := &t;
+    *t = 20;
+    printf("%d\n", l);
     
     return 0;
 }

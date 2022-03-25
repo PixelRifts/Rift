@@ -61,6 +61,7 @@ AstNode* condition;\
 AstNode* body;\
 })\
 AST_NODE(Assign, str_lit("Variable Assignment"), struct {\
+AstNode* assignee;\
 AstNode* value;\
 })\
 AST_NODE(VarDecl, str_lit("Variable Declaration"), struct {\

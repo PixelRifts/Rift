@@ -47,8 +47,6 @@ typedef struct BL_Value {
     
     LLVMTypeRef type;
     LLVMValueRef alloca;
-    LLVMValueRef loaded;
-    b8 changed;
     b8 not_null;
     b8 tombstone;
 } BL_Value;

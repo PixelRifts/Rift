@@ -377,17 +377,10 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->Ident, .depth = 0 };
             llvmsymbol_hash_table_value val;
             if (llvmsymbol_hash_table_get(&emitter->variables, key, &val)) {
-                if (val.changed) {
-                    LLVMValueRef v = LLVMBuildLoad2(emitter->builder, val.type, val.alloca, "");
-                    val.loaded = v;
-                    val.changed = false;
-                    llvmsymbol_hash_table_set(&emitter->variables, key, val);
-                    return v;
-                }
-                return val.loaded;
+                return LLVMBuildLoad2(emitter->builder, val.type, val.alloca, "");
             }
             return (LLVMValueRef) {0};
-        }
+        } break;
         
         case NodeType_IntLit: return LLVMConstInt(LLVMInt64Type(), node->IntLit, 0);
         case NodeType_BoolLit: return LLVMConstInt(LLVMInt1Type(), node->BoolLit, 0);
@@ -410,17 +403,17 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             }
             LLVMValueRef operand = BL_Emit(emitter, node->Unary.expr);
             return BL_BuildUnary(emitter, node->id, operand, nullptr);
-        }
+        } break;
         
         case NodeType_Binary: {
             LLVMValueRef left = BL_Emit(emitter, node->Binary.left);
             LLVMValueRef right = BL_Emit(emitter, node->Binary.right);
             return BL_BuildBinary(emitter, node->id, left, right);
-        }
+        } break;
         
         case NodeType_Group: {
             return BL_Emit(emitter, node->Group);
-        }
+        } break;
         
         case NodeType_Lambda: {
             LLVMMetadataRef func_meta;
@@ -477,7 +470,7 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
                 LLVMBuildStore(emitter->builder, LLVMGetParam(func, i), alloca);
                 
                 llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = var_name, .depth = 0 };
-                llvmsymbol_hash_table_value val = { .symtype = SymbolType_Variable, .type = type, .alloca = alloca, .changed = true, .not_null = true };
+                llvmsymbol_hash_table_value val = { .symtype = SymbolType_Variable, .type = type, .alloca = alloca, .not_null = true };
                 llvmsymbol_hash_table_set(&emitter->variables, key, val);
             }
             
@@ -533,7 +526,7 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             }
             
             return func;
-        }
+        } break;
         
         case NodeType_Call: {
             // Change key.name when implementing function pointers
@@ -547,7 +540,7 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
                 params[i] = BL_Emit_NoLoc(emitter, node->Call.params[i]);
             }
             return LLVMBuildCall2(emitter->builder, val.type, val.alloca, params, node->Call.arity, "");
-        }
+        } break;
         
         case NodeType_Return: {
             LLVMValueRef stored = {0};
@@ -571,11 +564,11 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             if (DEBUG_MODE) LLVMSetMetadata(br, 0, LLVMMetadataAsValue(LLVMGetGlobalContext(), loc));
             emitter->emitted_end_in_this_block = true;
             return stored;
-        }
+        } break;
         
         case NodeType_ExprStatement: {
             return BL_Emit(emitter, node->ExprStatement);
-        }
+        } break;
         
         case NodeType_Block: {
             C_ScopeContext* scope_ctx = nullptr;
@@ -586,7 +579,7 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             if (scope_ctx) BL_PopScope(emitter, scope_ctx);
             
             return (LLVMValueRef) {0};
-        }
+        } break;
         
         case NodeType_If: {
             LLVMValueRef condition = BL_Emit(emitter, node->If.condition);
@@ -632,7 +625,7 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             emitter->current_block = mergeb;
             
             return (LLVMValueRef) {0};
-        }
+        } break;
         
         case NodeType_While: {
             LLVMValueRef current_function = LLVMGetBasicBlockParent(emitter->current_block);
@@ -666,30 +659,36 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             emitter->current_block = afterb;
             
             return (LLVMValueRef) {0};
-        }
+        } break;
         
         case NodeType_Assign: {
-            char* hoist = malloc(node->id.lexeme.size + 1);
-            memcpy(hoist, node->id.lexeme.str, node->id.lexeme.size);
-            hoist[node->id.lexeme.size] = '\0';
-            llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->id.lexeme, .depth = 0 };
-            llvmsymbol_hash_table_value val;
-            if (llvmsymbol_hash_table_get(&emitter->variables, key, &val)) {
-                LLVMValueRef value = BL_Emit(emitter, node->Assign.value);
-                LLVMBuildStore(emitter->builder, value, val.alloca);
-                val.changed = true;
-                llvmsymbol_hash_table_set(&emitter->variables, key, val);
-                
-                free(hoist);
-                return val.loaded;
+            if (node->Assign.assignee->type == NodeType_Ident) {
+                char* hoist = malloc(node->id.lexeme.size + 1);
+                memcpy(hoist, node->id.lexeme.str, node->id.lexeme.size);
+                hoist[node->id.lexeme.size] = '\0';
+                llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->id.lexeme, .depth = 0 };
+                llvmsymbol_hash_table_value val;
+                if (llvmsymbol_hash_table_get(&emitter->variables, key, &val)) {
+                    LLVMValueRef value = BL_Emit(emitter, node->Assign.value);
+                    LLVMBuildStore(emitter->builder, value, val.alloca);
+                    llvmsymbol_hash_table_set(&emitter->variables, key, val);
+                    
+                    free(hoist);
+                    return (LLVMValueRef) {0};
+                } else {
+                    free(hoist);
+                    return (LLVMValueRef) {0};
+                }
             } else {
-                free(hoist);
+                // Deref assign
+                LLVMValueRef assignee = BL_Emit(emitter, node->Assign.assignee->Unary.expr);
+                LLVMValueRef value = BL_Emit(emitter, node->Assign.value);
+                LLVMBuildStore(emitter->builder, value, assignee);
                 return (LLVMValueRef) {0};
             }
-        }
+        } break;
         
         case NodeType_VarDecl: {
-            
             char* hoist = malloc(node->id.lexeme.size + 1);
             memcpy(hoist, node->id.lexeme.str, node->id.lexeme.size);
             hoist[node->id.lexeme.size] = '\0';
@@ -784,12 +783,12 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
             }
             
             llvmsymbol_hash_table_key key = (llvmsymbol_hash_table_key) { .name = node->id.lexeme, .depth = 0 };
-            llvmsymbol_hash_table_value val = (llvmsymbol_hash_table_value) { .symtype = symtype, .symflags = symflags, .alloca = addr, .changed = true, .type = var_type, .not_null = true, .tombstone = false };
+            llvmsymbol_hash_table_value val = (llvmsymbol_hash_table_value) { .symtype = symtype, .symflags = symflags, .alloca = addr, .type = var_type, .not_null = true, .tombstone = false };
             llvmsymbol_hash_table_set(&emitter->variables, key, val);
             
             free(hoist);
             return addr;
-        }
+        } break;
     }
     return (LLVMValueRef) {0};
 }
