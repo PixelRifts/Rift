@@ -48,7 +48,7 @@ void P_ApplySnapshot(P_Parser* parser, P_ParserSnap snap) {
 
 //~ Node Allocation
 static AstNode* P_AllocNode(P_Parser* parser, P_NodeType type) {
-    AstNode* node = pool_alloc(&parser->node_pool);
+    AstNode* node = arena_alloc(&parser->node_arena, sizeof(AstNode));
     node->type = type;
     return node;
 }
@@ -199,7 +199,7 @@ static AstNode* P_AllocVarDeclNode(P_Parser* parser, P_Type* type, L_Token name,
 
 //- Type Allocation
 static P_Type* P_AllocType(P_Parser* parser, P_BasicType type) {
-    P_Type* node = pool_alloc(&parser->type_pool);
+    P_Type* node = arena_alloc(&parser->type_arena, sizeof(P_Type));
     node->type = type;
     return node;
 }
@@ -614,6 +614,12 @@ static AstNode* P_Statement(P_Parser* parser) {
             } else P_Eat(parser, TokenType_Semicolon);
             
             return P_AllocVarDeclNode(parser, type, name, value);
+        } else if (parser->next.type == TokenType_Equal) {
+            AstNode* expr = P_Expression(parser, Prec_Invalid, false);
+            P_Advance(parser); // =
+            AstNode* value = P_Expression(parser, Prec_Invalid, false);
+            P_Eat(parser, TokenType_Semicolon);
+            return P_AllocAssignNode(parser, expr, value);
         } else {
             AstNode* expr = P_Expression(parser, Prec_Invalid, false);
             return P_AllocExprStatementNode(parser, expr);
@@ -668,8 +674,8 @@ static AstNode* P_Statement(P_Parser* parser) {
 void P_Init(P_Parser* parser, string filename, L_Lexer* lexer) {
     parser->lexer = lexer;
     parser->filename = filename;
-    pool_init(&parser->node_pool, sizeof(AstNode));
-    pool_init(&parser->type_pool, sizeof(P_Type));
+    arena_init(&parser->node_arena);
+    arena_init(&parser->type_arena);
     arena_init(&parser->arena);
     
     P_Advance(parser); // Next
@@ -683,6 +689,6 @@ AstNode* P_Parse(P_Parser* parser) {
 
 void P_Free(P_Parser* parser) {
     arena_free(&parser->arena);
-    pool_free(&parser->node_pool);
-    pool_free(&parser->type_pool);
+    arena_free(&parser->node_arena);
+    arena_free(&parser->type_arena);
 }

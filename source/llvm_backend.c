@@ -670,7 +670,7 @@ LLVMValueRef BL_Emit_NoLoc(BL_Emitter* emitter, AstNode* node) {
                 llvmsymbol_hash_table_value val;
                 if (llvmsymbol_hash_table_get(&emitter->variables, key, &val)) {
                     LLVMValueRef value = BL_Emit(emitter, node->Assign.value);
-                    LLVMBuildStore(emitter->builder, value, val.alloca);
+                    LLVMBuildStore(emitter->builder, value, val.alloca); 
                     llvmsymbol_hash_table_set(&emitter->variables, key, val);
                     
                     free(hoist);

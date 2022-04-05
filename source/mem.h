@@ -51,6 +51,7 @@ M_Scratch scratch_get();
 void scratch_return(M_Scratch* scratch);
 
 //~ Pool Allocator
+// IMPORTANT_NOTE(voxel): This is unstable on linux for some reason
 
 typedef struct M_PoolFreeNode {
     struct M_PoolFreeNode* next;
