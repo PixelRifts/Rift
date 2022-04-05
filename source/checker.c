@@ -52,7 +52,7 @@ static b8 C_CheckTypeEquals(P_Type* a, P_Type* b) {
     if (!a || !b) return false; 
     if (a->type != b->type) return false;
     switch (a->type) {
-        // No extra Data associated with these types
+        // No extra Data associated with thes types
         case BasicType_Integer:
         case BasicType_Void:
         case BasicType_Boolean:
@@ -384,7 +384,7 @@ static C_Value C_Check(C_Checker* checker, AstNode* node) {
                     C_ReportCheckError(checker, node->id, "Assignment type mismatch. got types '%.*s' and '%.*s'\n", str_expand(C_GetBasicTypeName(assigneetype.type->pointer)), str_expand(C_GetBasicTypeName(valuetype.type)));
                 }
             } else {
-                C_ReportCheckError(checker, node->Assign.assignee->id, "Cannot Assign to expression\n");
+                C_ReportCheckError(checker, node->Assign.assignee->id, "Cannot Assign to expression\n", 0);
             }
             
             return (C_Value) { &C_InvalidType, 0 };

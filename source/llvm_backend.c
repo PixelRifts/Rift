@@ -233,6 +233,10 @@ void BL_Init(BL_Emitter* emitter, string source_filename, string filename) {
     emitter->builder = LLVMCreateBuilder();
     
     INITIALIZE_TARGET(X86);
+    INITIALIZE_TARGET(ARM);
+    INITIALIZE_TARGET(AArch64);
+    INITIALIZE_TARGET(RISCV);
+    INITIALIZE_TARGET(WebAssembly); 
     
     LLVMTargetRef target;
     char* error = nullptr;
@@ -801,11 +805,11 @@ LLVMValueRef BL_Emit(BL_Emitter* emitter, AstNode* node) {
         if (emitter->scope_depth != 0) {
             old = LLVMGetCurrentDebugLocation2(emitter->builder);
             LLVMMetadataRef loc = BL_Loc(emitter, node->id.line, node->id.column);
-            LLVMSetCurrentDebugLocation(emitter->builder, LLVMMetadataAsValue(LLVMGetGlobalContext(), loc));
+            LLVMSetCurrentDebugLocation2(emitter->builder, loc);
         }
     }
     LLVMValueRef r = BL_Emit_NoLoc(emitter, node);
-    if (DEBUG_MODE)
+    if (DEBUG_MODE && old != nullptr)
         LLVMSetCurrentDebugLocation2(emitter->builder, old);
     return r;
 }
