@@ -49,34 +49,10 @@ command_list =
 		.cursor_at_end = true,
 		.cmd =
 		{
-			{ "bin\rift.exe ./test.rf", .os = "win" },
-		},
-	},
-	{
-		.name = "example",
-		.out = "*compilation*",
-		.footer_panel = true,
-		.save_dirty_files = true,
-		.cursor_at_end = true,
-		.cmd =
-		{
-			{ "a.exe", .os = "win" },
-		},
-	},
-	{
-		.name = "generated",
-		.out = "*compilation*",
-		.footer_panel = true,
-		.save_dirty_files = true,
-		.cursor_at_end = true,
-		.cmd =
-		{
-			{ "clang -g blah.ll", .os = "win" },
+			{ "Debug\rift.exe ./test.rf", .os = "win" },
 		},
 	},
 };
 
 fkey_command[1] = "build";
 fkey_command[2] = "run";
-fkey_command[4] = "example";
-fkey_command[5] = "generated";

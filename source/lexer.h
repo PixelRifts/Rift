@@ -4,7 +4,7 @@
 #define LEXER_H
 
 #include "defines.h"
-#include "str.h"
+#include "base/str.h"
 
 typedef u32 L_TokenType;
 
