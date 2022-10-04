@@ -4,6 +4,7 @@
 #include "base/mem.h"
 #include "base/utils.h"
 #include "lexer.h"
+#include "parser.h"
 
 #include "llvm-c/Core.h"
 
@@ -33,8 +34,14 @@ int main(int argc, char **argv) {
         string source_filename = { .str = (u8*) argv[1], .size = strlen(argv[1]) };
         
         L_Lexer lexer = {0};
-        L_Init(&lexer, source_str);
-        
+        P_Parser parser = {0};
+		L_Init(&lexer, source_str);
+        P_Init(&parser, &lexer);
+		
+		P_Parse(&parser);
+		
+		P_Free(&parser);
+		
         free(source);
     }
     

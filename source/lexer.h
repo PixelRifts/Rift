@@ -11,7 +11,7 @@ typedef u32 L_TokenType;
 enum {
     TokenType_Error, TokenType_EOF,
     
-    TokenType_Identifier, TokenType_CstringLit,
+    TokenType_Ident, TokenType_CstringLit,
     TokenType_IntLit, TokenType_FloatLit, TokenType_DoubleLit, TokenType_CharLit,
     TokenType_LongLit,
     

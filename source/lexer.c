@@ -6,7 +6,7 @@ string L_GetTypeName(L_TokenType type) {
     switch (type) {
         case TokenType_Error: return str_lit("Error");
         case TokenType_EOF: return str_lit("EOF");
-        case TokenType_Identifier: return str_lit("Identifier");
+        case TokenType_Ident: return str_lit("Identifier");
         case TokenType_CstringLit: return str_lit("Null-terminated String Literal");
         case TokenType_CharLit: return str_lit("Character Literal");
         case TokenType_IntLit: return str_lit("Integer Literal");
@@ -229,7 +229,7 @@ static L_TokenType L_MatchType(L_Lexer* lexer, u32 start, string needle, L_Token
     if (lexer->current - lexer->start == start + needle.size && memcmp(lexer->start + start, needle.str, needle.size) == 0) {
         return yes;
     }
-    return TokenType_Identifier;
+    return TokenType_Ident;
 }
 
 static L_TokenType L_IdentifierType(L_Lexer* lexer) {
@@ -247,7 +247,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                 case 'r': return L_MatchType(lexer, 2, str_lit("ue"), TokenType_True);
                 case 'y': return L_MatchType(lexer, 2, str_lit("pedef"), TokenType_Typedef);
             }
-            return TokenType_Identifier;
+            return TokenType_Ident;
         }
         
         case 'u': {
@@ -263,7 +263,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                 case 'l': return L_MatchType(lexer, 2, str_lit("ong"), TokenType_Ulong);
                 case 'n': return L_MatchType(lexer, 2, str_lit("ion"), TokenType_Union);
             }
-            return TokenType_Identifier;
+            return TokenType_Ident;
         }
         
         case 'o': {
@@ -271,7 +271,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                 case 'f': return L_MatchType(lexer, 2, str_lit("fsetof"), TokenType_Offsetof);
                 case 'p': return L_MatchType(lexer, 2, str_lit("erator"), TokenType_Operator);
             }
-            return TokenType_Identifier;
+            return TokenType_Ident;
         }
         
         case 'b': {
@@ -279,7 +279,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                 case 'o': return L_MatchType(lexer, 2, str_lit("ol"), TokenType_Bool);
                 case 'r': return L_MatchType(lexer, 2, str_lit("eak"), TokenType_Break);
             }
-            return TokenType_Identifier;
+            return TokenType_Ident;
         }
         
         case 'c': {
@@ -298,7 +298,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                     } else return L_MatchType(lexer, 2, str_lit("nsert"), TokenType_Cinsert);
                 }
             }
-            return TokenType_Identifier;
+            return TokenType_Ident;
         }
         
         case 's': {
@@ -308,7 +308,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                 case 'i': return L_MatchType(lexer, 2, str_lit("zeof"), TokenType_Sizeof);
                 case 'h': return L_MatchType(lexer, 2, str_lit("ort"),  TokenType_Short);
             }
-            return TokenType_Identifier;
+            return TokenType_Ident;
         }
         
         case 'e': {
@@ -316,7 +316,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                 case 'n': return L_MatchType(lexer, 2, str_lit("um"), TokenType_Enum);
                 case 'l': return L_MatchType(lexer, 2, str_lit("se"), TokenType_Else);
             }
-            return TokenType_Identifier;
+            return TokenType_Ident;
         }
         
         case 'n': {
@@ -330,7 +330,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                     return L_MatchType(lexer, 2, str_lit("mespace"), TokenType_Namespace);
                 }
             }
-            return TokenType_Identifier;
+            return TokenType_Ident;
         }
         
         case 'i': {
@@ -339,7 +339,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                 case 'n': return L_MatchType(lexer, 2, str_lit("t"), TokenType_Int);
                 default: return L_MatchType(lexer, 1, str_lit("f"), TokenType_If);
             }
-            return TokenType_Identifier;
+            return TokenType_Ident;
         }
         
         case 'd': {
@@ -351,7 +351,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                 }
                 case 'e': return L_MatchType(lexer, 2, str_lit("fault"), TokenType_Default);
             }
-            return TokenType_Identifier;
+            return TokenType_Ident;
         }
         
         case 'f': {
@@ -366,10 +366,10 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
                 case 'a': return L_MatchType(lexer, 2, str_lit("lse"), TokenType_False);
                 case 'u': return L_MatchType(lexer, 2, str_lit("nc"), TokenType_Func);
             }
-            return TokenType_Identifier;
+            return TokenType_Ident;
         }
     }
-    return TokenType_Identifier;
+    return TokenType_Ident;
 }
 
 static L_Token L_Identifier(L_Lexer* lexer) {

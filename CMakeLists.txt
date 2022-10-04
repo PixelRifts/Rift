@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.11)
 project(Rift)
 set(CMAKE_C_STANDARD 11) # Enable c11 standard
 
+
 file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS source/*.c source/*.h)
 
 add_executable(Rift ${SOURCE_FILES})
@@ -12,6 +13,7 @@ if(MSVC)
     target_link_directories(Rift PRIVATE third-party/lib/)
     target_link_libraries(Rift LLVM-C)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+    add_definitions(/Zc:preprocessor)
 endif()
 if(UNIX)
     find_package(LLVM REQUIRED CONFIG)
