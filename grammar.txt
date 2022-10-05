@@ -1,0 +1,11 @@
+
+Expr -> (Expr)
+      | Term [+ -] Factor
+      | Term
+
+Term -> Factor [* / %] Number
+      | Factor
+
+Factor -> (Number)
+        | [+ -] Number
+        | Number
