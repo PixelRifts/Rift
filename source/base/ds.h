@@ -11,6 +11,7 @@
 #define darray(type) type##_array
 
 #define darray_add(type, array, data) type##_array##_add(array, data)
+#define darray_add_all(type, array, data, count) type##_array##_add_all(array, data, count)
 #define darray_add_at(type, array, data, idx) type##_array##_add_at(array, data, idx)
 #define darray_reserve(type, array, count) type##_array##_reserve(array, count)
 #define darray_remove(type, array, idx) type##_array##_remove(array, idx)
@@ -23,6 +24,7 @@ u32 len;\
 Data* elems;\
 } Data##_array;\
 void Data##_array##_add(Data##_array* array, Data data);\
+void Data##_array##_add_all(Data##_array* array, Data* data, u32 count);\
 void Data##_array##_add_at(Data##_array* array, Data data, u32 idx);\
 void Data##_array##_reserve(Data##_array* array, u32 count);\
 Data Data##_array##_remove(Data##_array* array, int idx);\
@@ -39,6 +41,18 @@ array->cap = new_cap;\
 free(prev);\
 }\
 array->elems[array->len++] = data;\
+}\
+void Data##_array##_add_all(Data##_array* array, Data* data, u32 count) {\
+if (array->len + count > array->cap) {\
+void* prev = array->elems;\
+u32 new_cap = DoubleCapacity(array->cap);\
+array->elems = calloc(new_cap, sizeof(Data));\
+memmove(array->elems, prev, array->len * sizeof(Data));\
+array->cap = new_cap;\
+free(prev);\
+}\
+memmove(&array->elems[array->len], data, count * sizeof(Data));\
+array->len += count;\
 }\
 void Data##_array##_add_at(Data##_array* array, Data data, u32 idx) {\
 if (array->len + 1 > array->cap) {\

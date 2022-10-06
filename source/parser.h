@@ -31,7 +31,7 @@ typedef struct P_Parser {
 
 
 IR_Ast* P_ParseExpression(P_Parser* p, P_Precedence prec);
-void P_Parse(P_Parser* p);
+IR_Ast* P_Parse(P_Parser* p);
 
 void P_Init(P_Parser* p, L_Lexer* lexer);
 void P_Free(P_Parser* p);

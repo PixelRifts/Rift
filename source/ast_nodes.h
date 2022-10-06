@@ -30,6 +30,10 @@ typedef struct IR_AstExprBinary {
 } IR_AstExprBinary;
 
 
+typedef struct IR_AstStmtPrint {
+	IR_Ast* value;
+} IR_AstStmtPrint;
+
 //~ Ast struct definition
 
 typedef u32 IR_AstType;
@@ -38,6 +42,8 @@ enum {
 	AstType_FloatLiteral,
 	AstType_ExprUnary,
 	AstType_ExprBinary,
+	
+	AstType_StmtPrint,
 	
 	AstType_COUNT,
 };
@@ -50,6 +56,8 @@ struct IR_Ast {
 		IR_AstFloatLiteral float_lit;
 		IR_AstExprUnary unary;
 		IR_AstExprBinary binary;
+		
+		IR_AstStmtPrint print;
 	};
 };
 

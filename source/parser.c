@@ -91,6 +91,13 @@ static IR_Ast* P_MakeExprBinaryNode(P_Parser* p, IR_Ast* a, L_Token operator, IR
 }
 
 
+static IR_Ast* P_MakeStmtPrintNode(P_Parser* p, IR_Ast* value) {
+	IR_Ast* ret = pool_alloc(p->ast_node_pool);
+	ret->type = AstType_StmtPrint;
+	ret->print.value = value;
+	return ret;
+}
+
 //~ Parsing
 
 IR_Ast* P_ParseExpression(P_Parser* p, P_Precedence prec);
@@ -173,7 +180,10 @@ void DumpAST(IR_Ast* ast, u32 indent) {
 	for (u32 i = 0; i < indent; i++) printf("\t");
 	
 	switch (ast->type) {
-		case AstType_IntLiteral: printf("Int lit: %d\n", ast->int_lit.value); break;
+		case AstType_IntLiteral: {
+			printf("Int lit: %d\n", ast->int_lit.value);
+		} break;
+		
 		case AstType_ExprUnary: {
 			printf("Unary expr: %.*s\n", str_expand(L_GetTypeName(ast->unary.operator.type)));
 			DumpAST(ast->unary.operand, indent + 1);
@@ -189,9 +199,10 @@ void DumpAST(IR_Ast* ast, u32 indent) {
 	}
 }
 
-void P_Parse(P_Parser* p) {
+IR_Ast* P_Parse(P_Parser* p) {
 	IR_Ast* a = P_ParseExpression(p, Prec_Invalid);
 	DumpAST(a, 0);
+	return P_MakeStmtPrintNode(p, a);
 }
 
 //~ Lifecycle

@@ -5,6 +5,7 @@
 #include "base/utils.h"
 #include "lexer.h"
 #include "parser.h"
+#include "vm.h"
 
 #include "llvm-c/Core.h"
 
@@ -40,9 +41,18 @@ int main(int argc, char **argv) {
 		
 		P_Parse(&parser);
 		
+		VM_Chunk chunk = VM_ChunkAlloc();
+		u32 v = 1080;
+		VM_ChunkPush(&chunk, &v, sizeof(u32));
+		Iterate(chunk, i) {
+			printf("%d", chunk.elems[i]);
+		}
+		printf("\n");
+		VM_ChunkFree(&chunk);
+		
 		P_Free(&parser);
 		
-        free(source);
+		free(source);
     }
     
     M_ScratchFree();
