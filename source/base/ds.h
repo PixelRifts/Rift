@@ -17,7 +17,7 @@
 #define darray_remove(type, array, idx) type##_array##_remove(array, idx)
 #define darray_free(type, array) type##_array##_free(array)
 
-#define DArray_Prototype(Data)\
+#define DArray_Prototype(Data) \
 typedef struct Data##_array {\
 u32 cap;\
 u32 len;\
@@ -30,7 +30,7 @@ void Data##_array##_reserve(Data##_array* array, u32 count);\
 Data Data##_array##_remove(Data##_array* array, int idx);\
 void Data##_array##_free(Data##_array* array);
 
-#define DArray_Impl(Data)\
+#define DArray_Impl(Data) \
 void Data##_array##_add(Data##_array* array, Data data) {\
 if (array->len + 1 > array->cap) {\
 void* prev = array->elems;\
@@ -96,12 +96,12 @@ free(array->elems);\
 
 #define dstack(type) type##_stack
 
-#define dstack_push(type, stack, data) Data##_stack##_push(stack, data)
-#define dstack_pop(type, stack, data) Data##_stack##_pop(stack)
-#define dstack_peek(type, stack, data) Data##_stack##_peek(stack)
-#define dstack_free(type, stack, data) Data##_stack##_free(stack)
+#define dstack_push(type, stack, data) type##_stack##_push(stack, data)
+#define dstack_pop(type, stack) type##_stack##_pop(stack)
+#define dstack_peek(type, stack) type##_stack##_peek(stack)
+#define dstack_free(type, stack) type##_stack##_free(stack)
 
-#define Stack_Prototype(Data)\
+#define Stack_Prototype(Data) \
 typedef struct Data##_stack {\
 u32 cap;\
 u32 len;\

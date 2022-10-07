@@ -39,15 +39,10 @@ int main(int argc, char **argv) {
 		L_Init(&lexer, source_str);
         P_Init(&parser, &lexer);
 		
-		P_Parse(&parser);
+		IR_Ast* ast = P_Parse(&parser);
 		
-		VM_Chunk chunk = VM_ChunkAlloc();
-		u32 v = 1080;
-		VM_ChunkPush(&chunk, &v, sizeof(u32));
-		Iterate(chunk, i) {
-			printf("%d", chunk.elems[i]);
-		}
-		printf("\n");
+		VM_Chunk chunk = VM_LowerConstexpr(ast);
+		VM_RunExprChunk(&chunk);
 		VM_ChunkFree(&chunk);
 		
 		P_Free(&parser);
