@@ -5,6 +5,7 @@
 #include "base/utils.h"
 #include "lexer.h"
 #include "parser.h"
+#include "checker.h"
 #include "vm.h"
 
 #include "llvm-c/Core.h"
@@ -41,9 +42,14 @@ int main(int argc, char **argv) {
 		
 		IR_Ast* ast = P_Parse(&parser);
 		
-		VM_Chunk chunk = VM_LowerConstexpr(ast);
-		VM_RunExprChunk(&chunk);
-		VM_ChunkFree(&chunk);
+		C_Checker checker = {0};
+		C_Init(&checker, ast);
+		if (C_Check(&checker)) {
+			VM_Chunk chunk = VM_LowerConstexpr(ast);
+			VM_RunExprChunk(&chunk);
+			VM_ChunkFree(&chunk);
+		}
+		C_Free(&checker);
 		
 		P_Free(&parser);
 		
