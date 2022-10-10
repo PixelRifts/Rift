@@ -29,4 +29,6 @@ struct Type {
 	};
 };
 
+typedef u64 TypeID;
+
 #endif //TYPES_H

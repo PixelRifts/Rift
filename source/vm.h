@@ -13,7 +13,6 @@ DArray_Prototype(u8);
 #if 0
 typedef struct VM_Chunk VM_Chunk;
 #endif
-
 typedef darray(u8) VM_Chunk;
 
 VM_Chunk VM_ChunkAlloc(void);
