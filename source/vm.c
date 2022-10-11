@@ -6,38 +6,38 @@ Stack_Impl(VM_RuntimeValue);
 
 
 // For completeness' sake
-VM_Chunk VM_ChunkAlloc(void) {
-	VM_Chunk chunk = {0};
+IR_Chunk IR_ChunkAlloc(void) {
+	IR_Chunk chunk = {0};
 	return chunk;
 }
 
-void VM_ChunkPushOp(VM_Chunk* chunk, u8 byte) {
+void IR_ChunkPushOp(IR_Chunk* chunk, u8 byte) {
 	darray_add(u8, chunk, byte);
 }
 
-void VM_ChunkPushU32(VM_Chunk* chunk, u32 val) {
+void IR_ChunkPushU32(IR_Chunk* chunk, u32 val) {
 	darray_add_all(u8, chunk, (u8*)&val, sizeof(u32));
 }
 
-void VM_ChunkPush(VM_Chunk* chunk, u8* bytes, u32 count) {
+void IR_ChunkPush(IR_Chunk* chunk, u8* bytes, u32 count) {
 	darray_add_all(u8, chunk, bytes, count);
 }
 
-void VM_ChunkFree(VM_Chunk* chunk) {
+void IR_ChunkFree(IR_Chunk* chunk) {
 	darray_free(u8, chunk);
 }
 
 //~ VM Helpers
 
-void VM_Lower(VM_Chunk* chunk, IR_Ast* ast) {
+void VM_Lower(IR_Chunk* chunk, IR_Ast* ast) {
 	switch (ast->type) {
 		case AstType_IntLiteral: {
-			VM_ChunkPushOp(chunk, Opcode_Push);
+			IR_ChunkPushOp(chunk, Opcode_Push);
 			VM_RuntimeValue value = {
 				.type = RuntimeValueType_Integer,
 				.as_int = ast->int_lit.value,
 			};
-			VM_ChunkPush(chunk, &value, sizeof(VM_RuntimeValue));
+			IR_ChunkPush(chunk, &value, sizeof(VM_RuntimeValue));
 		} break;
 		
 		case AstType_FloatLiteral: {
@@ -46,28 +46,28 @@ void VM_Lower(VM_Chunk* chunk, IR_Ast* ast) {
 		
 		case AstType_ExprUnary: {
 			VM_Lower(chunk, ast->unary.operand);
-			VM_ChunkPushOp(chunk, Opcode_UnaryOp);
-			VM_ChunkPushU32(chunk, ast->unary.operator.type);
+			IR_ChunkPushOp(chunk, Opcode_UnaryOp);
+			IR_ChunkPushU32(chunk, ast->unary.operator.type);
 		} break;
 		
 		case AstType_ExprBinary: {
 			VM_Lower(chunk, ast->binary.a);
 			VM_Lower(chunk, ast->binary.b);
-			VM_ChunkPushOp(chunk, Opcode_BinaryOp);
-			VM_ChunkPushU32(chunk, ast->binary.operator.type);
+			IR_ChunkPushOp(chunk, Opcode_BinaryOp);
+			IR_ChunkPushU32(chunk, ast->binary.operator.type);
 		} break;
 		
 		case AstType_StmtPrint: {
 			VM_Lower(chunk, ast->print.value);
-			VM_ChunkPushOp(chunk, Opcode_Print);
+			IR_ChunkPushOp(chunk, Opcode_Print);
 		} break;
 		
 		default: {} break;
 	}
 }
 
-VM_Chunk VM_LowerConstexpr(IR_Ast* ast) {
-	VM_Chunk chunk = VM_ChunkAlloc();
+IR_Chunk VM_LowerConstexpr(IR_Ast* ast) {
+	IR_Chunk chunk = IR_ChunkAlloc();
 	VM_Lower(&chunk, ast);
 	return chunk;
 }
@@ -116,7 +116,7 @@ static void VM_Print(VM_RuntimeValue value) {
 
 #define PushValue() dstack_push(VM_RuntimeValue, &datastack, *(VM_RuntimeValue*)&chunk->elems[i])
 #define ReadOp() (*(L_TokenType*)&chunk->elems[i])
-VM_RuntimeValue VM_RunExprChunk(VM_Chunk* chunk) {
+VM_RuntimeValue VM_RunExprChunk(IR_Chunk* chunk) {
 	dstack(VM_RuntimeValue) datastack = {0};
 	
 	u32 i = 0;

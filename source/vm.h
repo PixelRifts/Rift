@@ -11,15 +11,15 @@
 DArray_Prototype(u8);
 
 #if 0
-typedef struct VM_Chunk VM_Chunk;
+typedef struct IR_Chunk IR_Chunk;
 #endif
-typedef darray(u8) VM_Chunk;
+typedef darray(u8) IR_Chunk;
 
-VM_Chunk VM_ChunkAlloc(void);
-void VM_ChunkPushOp(VM_Chunk* chunk, u8 byte);
-void VM_ChunkPushU32(VM_Chunk* chunk, u32 value);
-void VM_ChunkPush(VM_Chunk* chunk, u8* bytes, u32 count);
-void VM_ChunkFree(VM_Chunk* chunk);
+IR_Chunk IR_ChunkAlloc(void);
+void IR_ChunkPushOp(IR_Chunk* chunk, u8 byte);
+void IR_ChunkPushU32(IR_Chunk* chunk, u32 value);
+void IR_ChunkPush(IR_Chunk* chunk, u8* bytes, u32 count);
+void IR_ChunkFree(IR_Chunk* chunk);
 
 //~ Opcodes and runtime values
 
@@ -55,9 +55,9 @@ typedef struct VM_RuntimeValue {
 
 Stack_Prototype(VM_RuntimeValue);
 
-void VM_Lower(VM_Chunk* chunk, IR_Ast* ast);
-VM_Chunk VM_LowerConstexpr(IR_Ast* ast);
+void VM_Lower(IR_Chunk* chunk, IR_Ast* ast);
+IR_Chunk VM_LowerConstexpr(IR_Ast* ast);
 
-VM_RuntimeValue VM_RunExprChunk(VM_Chunk* chunk);
+VM_RuntimeValue VM_RunExprChunk(IR_Chunk* chunk);
 
 #endif //VM_H

@@ -7,8 +7,7 @@
 #include "parser.h"
 #include "checker.h"
 #include "vm.h"
-
-#include "llvm-c/Core.h"
+#include "llvm_emitter.h"
 
 static char* readFile(const char* path) {
     FILE* file = fopen(path, "rb");
@@ -45,9 +44,14 @@ int main(int argc, char **argv) {
 		C_Checker checker = {0};
 		C_Init(&checker, ast);
 		if (C_Check(&checker)) {
-			VM_Chunk chunk = VM_LowerConstexpr(ast);
+			IR_Chunk chunk = VM_LowerConstexpr(ast);
 			VM_RunExprChunk(&chunk);
-			VM_ChunkFree(&chunk);
+			IR_ChunkFree(&chunk);
+			
+			LLVM_Emitter emitter = {0};
+			LLVM_Init(&emitter);
+			LLVM_Emit(&emitter, ast);
+			LLVM_Free(&emitter);
 		}
 		C_Free(&checker);
 		

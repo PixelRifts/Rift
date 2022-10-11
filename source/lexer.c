@@ -96,6 +96,7 @@ string L_GetTypeName(L_TokenType type) {
         case TokenType_Cinsert: return str_lit("Cinsert");
         case TokenType_Operator: return str_lit("Operator");
         case TokenType_Typedef: return str_lit("Typedef");
+        case TokenType_Print: return str_lit("Print");
     }
     return str_lit("unreachable");
 }
@@ -241,7 +242,8 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
         case 'w': return L_MatchType(lexer, 1, str_lit("hile"), TokenType_While);
         case 'l': return L_MatchType(lexer, 1, str_lit("ong"), TokenType_Long);
         case 'v': return L_MatchType(lexer, 1, str_lit("oid"), TokenType_Void);
-        
+        case 'p': return L_MatchType(lexer, 1, str_lit("rint"), TokenType_Print);
+		
         case 't': {
             switch (lexer->start[1]) {
                 case 'r': return L_MatchType(lexer, 2, str_lit("ue"), TokenType_True);
@@ -368,7 +370,7 @@ static L_TokenType L_IdentifierType(L_Lexer* lexer) {
             }
             return TokenType_Ident;
         }
-    }
+	}
     return TokenType_Ident;
 }
 

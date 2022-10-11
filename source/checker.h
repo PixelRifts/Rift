@@ -7,6 +7,8 @@
 #include "types.h"
 #include "base/ds.h"
 
+//~ Type Cache
+
 DArray_Prototype(Type);
 
 #if 0
@@ -14,8 +16,12 @@ typedef struct TypeCache TypeCache;
 #endif
 typedef darray(Type) TypeCache;
 
-
-//~ Type Cache
+// TODO(voxel): Switch to hashset
+//typedef struct TypeCache {
+//u32 len;
+//u32 cap;
+//Type* elems;
+//} TypeCache;
 
 void TypeCache_Init(TypeCache* cache);
 TypeID TypeCache_Register(TypeCache* cache, Type type);

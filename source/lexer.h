@@ -52,6 +52,8 @@ enum {
     
     TokenType_Tag, TokenType_Sizeof, TokenType_Offsetof, TokenType_Cinclude,
     TokenType_Cinsert, TokenType_Operator, TokenType_Typedef,
+	
+	TokenType_Print,
     
     TokenType_TokenTypeCount
 };

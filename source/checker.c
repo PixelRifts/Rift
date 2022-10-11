@@ -1,6 +1,7 @@
 #include "checker.h"
 
 //~ Type Cache
+
 DArray_Impl(Type);
 
 void TypeCache_Init(TypeCache* cache) {
@@ -19,7 +20,7 @@ TypeID TypeCache_Register(TypeCache* cache, Type type) {
 
 // NOTE(voxel): @unsafe IF YOU DON'T KNOW WHAT YOU'RE DOING
 // NOTE(voxel): ALWAYS USE TypeCache_Register
-void TypeCache_RegisterWithID(TypeCache* cache, Type type, TypeID id) {
+static void TypeCache_RegisterWithID(TypeCache* cache, Type type, TypeID id) {
 	cache->elems[id] = type;
 }
 

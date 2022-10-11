@@ -38,7 +38,7 @@ static void Advance(P_Parser* p) {
 }
 
 static void EatOrError(P_Parser* p, L_TokenType type) {
-	if (p->next.type != type)
+	if (p->curr.type != type)
 		ErrorHere(p, "Expected token %.*s but got %.*s", str_expand(L_GetTypeName(type)), str_expand(L_GetTypeName(p->next.type)));
 	
 	// Panic mode reset delimiters
@@ -50,7 +50,7 @@ static void EatOrError(P_Parser* p, L_TokenType type) {
 }
 
 static b8 Match(P_Parser* p, L_TokenType type) {
-	if (p->next.type == type) {
+	if (p->curr.type == type) {
 		Advance(p);
 		return true;
 	}
@@ -100,16 +100,17 @@ static IR_Ast* P_MakeStmtPrintNode(P_Parser* p, IR_Ast* value) {
 
 //~ Parsing
 
-IR_Ast* P_ParseExpression(P_Parser* p, P_Precedence prec);
-IR_Ast* P_ParsePrefixExpression(P_Parser* p);
+IR_Ast* P_ParseExpr(P_Parser* p, P_Precedence prec);
+IR_Ast* P_ParseStmt(P_Parser* p);
+IR_Ast* P_ParsePrefixExpr(P_Parser* p);
 
 IR_Ast* P_ParsePrefixUnaryExpr(P_Parser* p) {
 	Advance(p);
 	L_Token operator = p->curr;
-	return P_MakeExprUnaryNode(p, operator, P_ParsePrefixExpression(p));
+	return P_MakeExprUnaryNode(p, operator, P_ParsePrefixExpr(p));
 }
 
-IR_Ast* P_ParsePrefixExpression(P_Parser* p) {
+IR_Ast* P_ParsePrefixExpr(P_Parser* p) {
 	switch (p->curr.type) {
 		case TokenType_IntLit: {
 			Advance(p);
@@ -124,7 +125,7 @@ IR_Ast* P_ParsePrefixExpression(P_Parser* p) {
 		
 		case TokenType_OpenParenthesis: {
             Advance(p);
-            IR_Ast* in = P_ParseExpression(p, Prec_Invalid);
+            IR_Ast* in = P_ParseExpr(p, Prec_Invalid);
             EatOrError(p, TokenType_CloseParenthesis);
             return in;
         }
@@ -137,14 +138,14 @@ IR_Ast* P_ParsePrefixExpression(P_Parser* p) {
 }
 
 
-IR_Ast* P_ParseInfixExpression(P_Parser* p, L_Token op, P_Precedence prec, IR_Ast* left) {
+IR_Ast* P_ParseInfixExpr(P_Parser* p, L_Token op, P_Precedence prec, IR_Ast* left) {
 	switch (op.type) {
 		case TokenType_Plus:
         case TokenType_Minus:
         case TokenType_Star:
         case TokenType_Slash:
         case TokenType_Percent: {
-			IR_Ast* right = P_ParseExpression(p, prec);
+			IR_Ast* right = P_ParseExpr(p, prec);
 			return P_MakeExprBinaryNode(p, left, op, right);
 		} break;
 		
@@ -155,8 +156,8 @@ IR_Ast* P_ParseInfixExpression(P_Parser* p, L_Token op, P_Precedence prec, IR_As
 	return 0;
 }
 
-IR_Ast* P_ParseExpression(P_Parser* p, P_Precedence prec) {
-	IR_Ast* lhs = P_ParsePrefixExpression(p);
+IR_Ast* P_ParseExpr(P_Parser* p, P_Precedence prec) {
+	IR_Ast* lhs = P_ParsePrefixExpr(p);
 	
 	if (infix_expr_precs[p->curr.type] != Prec_Invalid) {
 		Advance(p);
@@ -165,7 +166,7 @@ IR_Ast* P_ParseExpression(P_Parser* p, P_Precedence prec) {
 			if (infix_expr_precs[op.type] == Prec_Invalid) break;
 			
 			if (infix_expr_precs[op.type] >= prec) {
-				lhs = P_ParseInfixExpression(p, op, infix_expr_precs[op.type] + 1, lhs);
+				lhs = P_ParseInfixExpr(p, op, infix_expr_precs[op.type] + 1, lhs);
 				op = p->curr;
 				
 				if (infix_expr_precs[op.type] != Prec_Invalid) Advance(p);
@@ -176,33 +177,17 @@ IR_Ast* P_ParseExpression(P_Parser* p, P_Precedence prec) {
 	return lhs;
 }
 
-void DumpAST(IR_Ast* ast, u32 indent) {
-	for (u32 i = 0; i < indent; i++) printf("\t");
-	
-	switch (ast->type) {
-		case AstType_IntLiteral: {
-			printf("Int lit: %d\n", ast->int_lit.value);
-		} break;
-		
-		case AstType_ExprUnary: {
-			printf("Unary expr: %.*s\n", str_expand(L_GetTypeName(ast->unary.operator.type)));
-			DumpAST(ast->unary.operand, indent + 1);
-		} break;
-		
-		case AstType_ExprBinary: {
-			printf("Binary expr: %.*s\n", str_expand(L_GetTypeName(ast->binary.operator.type)));
-			DumpAST(ast->binary.a, indent + 1);
-			DumpAST(ast->binary.b, indent + 1);
-		} break;
-		
-		default: break;
+IR_Ast* P_ParseStmt(P_Parser* p) {
+	if (Match(p, TokenType_Print)) {
+		return P_MakeStmtPrintNode(p, P_ParseExpr(p, Prec_Invalid));
 	}
+	
+	ErrorHere(p, "Invalid Token for statement start");
+	return 0;
 }
 
 IR_Ast* P_Parse(P_Parser* p) {
-	IR_Ast* a = P_ParseExpression(p, Prec_Invalid);
-	DumpAST(a, 0);
-	return P_MakeStmtPrintNode(p, a);
+	return P_ParseStmt(p);
 }
 
 //~ Lifecycle
