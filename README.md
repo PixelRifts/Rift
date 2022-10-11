@@ -13,6 +13,8 @@ Meant to be C-Like with some helpful features.
 - Transpiles to C code
 
 ## Getting Started
+(NOTE FOR LINUX USERS): Install `llvm llvm-dev zlib1g-dev` before compiling
+
 1) Clone the Repo to your machine
 2) Make a bin directory in the repo root
 3) Build project using build.bat
