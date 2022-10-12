@@ -20,11 +20,11 @@ main := func() -> int {
     i := 0;
     j := 10;
     k := 20;
-    
+
     l := add(i, add(j, k));
-    
+
     printf("%lld\n", l);
-    
+
     if l == 30 {
         tau := 0;
         while tau < 10 {
@@ -35,6 +35,6 @@ main := func() -> int {
     } else {
         puts("Not thirty");
     }
-    
+
     return 0;
 }

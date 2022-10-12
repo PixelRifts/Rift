@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.11)
 project(Rift)
 set(CMAKE_C_STANDARD 11) # Enable c11 standard
 
-
 file(GLOB_RECURSE SOURCE_FILES CONFIGURE_DEPENDS source/*.c source/*.h)
 
 add_executable(Rift ${SOURCE_FILES})
@@ -17,10 +16,20 @@ if(MSVC)
 endif()
 if(UNIX)
     find_package(LLVM REQUIRED CONFIG)
-    message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
-    message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
-
+    message(STATUS, "${LLVM_INCLUDE_DIRS}")
     include_directories(${LLVM_INCLUDE_DIRS})
+    target_include_directories(Rift PRIVATE third-party/lib)
     add_definitions(${LLVM_DEFINITIONS})
+    llvm_map_components_to_libnames(llvm_libs
+            Analysis
+            Core
+            ExecutionEngine
+            InstCombine
+            Object
+            OrcJIT
+            RuntimeDyld
+            ScalarOpts
+            Support
+            native)
     target_link_libraries(Rift ${llvm_libs} m)
 endif()

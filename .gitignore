@@ -11,6 +11,7 @@ generated.*
 *.vcxproj.filters
 *.proj
 *.proj.filters
+./Rift
 
 CMakeLists.txt.user
 CMakeCache.txt
@@ -25,3 +26,4 @@ CTestTestfile.cmake
 _deps
 build/
 Rift.dir
+Debug
